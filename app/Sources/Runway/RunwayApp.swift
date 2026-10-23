@@ -30,6 +30,12 @@ struct RunwayApp: App {
         .defaultSize(width: 320, height: 640)
         .defaultPosition(.topTrailing)
 
+        Window("Set up Runway", id: "runway-setup") {
+            FirstRunView(model: model)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+
         // The menu's content in a plain window, so it can be screenshotted and tried without clicking the menu bar.
         Window("Runway menu", id: "runway-menu") {
             MenuBarContent(model: model).fixedSize()
