@@ -52,6 +52,7 @@ final class StatusDecodingTests: XCTestCase {
         XCTAssertEqual(t14.agent, .claude)
         XCTAssertEqual(t14.question?.goLabel, "Merge")
         XCTAssertEqual(t14.question?.noLabel, "Not yet")
+        XCTAssertEqual(t14.question?.short, "Merge sign-in change?")
         let t19 = try XCTUnwrap(byID["T-19"])
         XCTAssertTrue(t19.pinned)
         XCTAssertEqual(t19.placeLine, "Mac mini (pinned)")

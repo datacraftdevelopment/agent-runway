@@ -22,14 +22,14 @@
       "id": "T-14", "repo": "recipe-app", "title": "Let people sign in with a magic link", "column": "needs_you",
       "agent": "claude", "risk": "not_low", "runs_on": "This Mac", "pinned": false,
       "pr": "#41", "review": "Codex: pass, risk raised (touches auth)",
-      "question": { "text": "The build and review passed, but this touches sign-in, so it never merges on its own. Merge PR #41?", "go_label": "Merge", "no_label": "Not yet" },
+      "question": { "text": "The build and review passed, but this touches sign-in, so it never merges on its own. Merge PR #41?", "short": "Merge sign-in change?", "go_label": "Merge", "no_label": "Not yet" },
       "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T18:42:00", "waits_on": [],
       "summary": "Sign-in path is sensitive, so this waits for you whatever the review says."
     },
     {
       "id": "T-17", "repo": "recipe-app", "title": "Pick a date format for the shopping list", "column": "needs_you",
       "agent": "codex", "risk": "low", "runs_on": "Mac mini", "pinned": false,
-      "question": { "text": "The ticket doesn’t say which date format to use. Recommended: “Mon 26 Oct”, matching the recipe pages.", "go_label": "Use recommended", "no_label": "Answer differently" },
+      "question": { "text": "The ticket doesn’t say which date format to use. Recommended: “Mon 26 Oct”, matching the recipe pages.", "short": "Which date format?", "go_label": "Use recommended", "no_label": "Answer differently" },
       "filed_from": "Codex on Mac mini", "filed_at": "2026-10-23T18:55:00", "waits_on": [],
       "summary": "The worker stopped with one question before building."
     },

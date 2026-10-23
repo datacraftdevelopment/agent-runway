@@ -127,11 +127,14 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     /// A needs-you question with the two answers the person can give.
     public struct Question: Codable, Equatable, Sendable {
         public var text: String
+        /// The menu-sized form, for the menu bar and the side panel: "Merge sign-in change?".
+        public var short: String?
         public var goLabel: String
         public var noLabel: String
 
-        public init(text: String, goLabel: String = "Go", noLabel: String = "No") {
+        public init(text: String, short: String? = nil, goLabel: String = "Go", noLabel: String = "No") {
             self.text = text
+            self.short = short
             self.goLabel = goLabel
             self.noLabel = noLabel
         }
