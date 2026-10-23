@@ -13,6 +13,8 @@ One board that dispatches coding tickets to agents running on many machines (Mac
 - **Cloud sessions** are started by the controller and report back to its board.
 - **The app is the controller's face.** It shows the board (one machine or the whole fleet), starts, stops and pauses dispatch, and answers decisions for any machine. Nothing hides in the background.
 
+**Herdr as the SSH and session layer (checked 2026-10-23, Herdr 0.9.5, Apache-2.0, last commit 2026-10-21).** Each worker runs its own Herdr server; the controller saves each worker once (`herdr machine add <host>`, over normal SSH) and then drives it from scripts with no TUI open: `herdr --machine <label> pane …` / `agent start` / `agent list`, JSON output. Herdr recognises Claude Code and Codex in panes and reports idle, working, blocked, done or unknown, so the app reads agent state from Herdr instead of inventing it. Sessions survive a dropped SSH connection or a closed client; after a machine restart the layout comes back and supported agents can resume, but the original processes don't. Joe can open the Herdr TUI to see every machine's agents in one window and drop into any session. Herdr does not copy config or secrets to workers; sign-ins stay per machine.
+
 Earlier idea, kept for reference: a hosted hub with a daemon on every machine connecting out (AgentConnect's model). Dropped because Joe doesn't need it hosted.
 
 Risks to test first:
@@ -78,5 +80,5 @@ Joe first, then a few collaborators. Not a service, and not multi-tenant. Each p
 
 - ~~UI stack~~ Decided 2026-10-22: one web UI, served locally by the daemon and hosted, in a Tauri desktop shell.
 - Ticket store: the hub's own store. Joe would rather not use GitHub Issues.
-- Herdr as the session layer on the workers (first to try), or plain tmux over SSH. AgentConnect is no longer needed with one controller.
+- ~~Herdr or tmux~~ Herdr is the SSH and session layer (2026-10-23). AgentConnect is no longer needed.
 - Plan terms for subscription logins on always-on daemons.
