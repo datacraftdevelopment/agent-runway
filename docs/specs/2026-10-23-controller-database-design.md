@@ -37,7 +37,7 @@ Kept close to the runway-db draft so that design isn't wasted:
 - `machines` (id, label, herdr_label, kind: local/ssh/cloud, enabled)
 - `attempts` (id, ticket_id, dispatch_id, machine_id, herdr_session, branch, started_at, ended_at, outcome)
 - `events` (id, at, kind, ticket_id, attempt_id, payload JSON), append-only
-- `sessions` (machine_id, session_id, folder, started_at, last_seen_at, source)
+- `sessions` (machine_id, agent, session_id, folder, started_at, last_seen_at, source)
 - `decisions` (id, ticket_id, question, options, answer, answered_by, answered_at)
 
 Risk is written at filing and can only go up (reviewer raises are events). Status is derived from events, not edited by hand.
@@ -48,13 +48,13 @@ The controller passes the ticket body, its spec path and the dispatch id when it
 
 ## Steered sessions (found, not reported)
 
-Joe's own sessions (Claude Code in the terminal or the desktop app, on any machine) show on the board without anything installed. Desktop doesn't run plugin hooks, so a session hook can't be the source.
+Joe's own sessions (Claude Code or Codex, in the terminal or the desktop app, on any machine) show on the board without anything installed. Desktop doesn't run plugin hooks, so a session hook can't be the source.
 
-- Claude Code writes a log file per session under `~/.claude/projects/<folder>/<session-id>.jsonl`. On each refresh the controller lists recent files on every machine over SSH (`find ~/.claude/projects -name '*.jsonl' -mmin -N`, plus file times), and reads only the first lines for the folder and start time.
+- Claude Code writes a log file per session under `~/.claude/projects/<folder>/<session-id>.jsonl`. On each refresh the controller lists recent files on every machine over SSH (`find ~/.claude/projects -name '*.jsonl' -mmin -N`, plus file times), and reads only the first lines for the folder and start time. Codex does the same under `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (first line holds the folder), scanned the same way.
 - A session counts as active if its file changed in the last few minutes, idle otherwise. Sessions the controller started itself (it knows their ids from `attempts`) are left out, so tickets aren't shown twice.
-- Stored in a `sessions` table (machine_id, session_id, folder, started_at, last_seen_at, source: scan). The board shows them as steered; the controller never drives them.
+- Stored in a `sessions` table (machine_id, session_id, folder, started_at, last_seen_at, source: scan, agent: claude/codex). The board shows them as steered; the controller never drives them.
 - Where a hook does run (terminal Claude Code with the plugin), it may add detail (a title, the branch) through the outbox. Nothing depends on it.
-- To check on the first try: that the desktop app's Code tab writes the same log files. If it doesn't, desktop sessions won't show until we find where it keeps them.
+- To check on the first try: that the Claude desktop app's Code tab and the Codex desktop app write these same log files. If it doesn't, desktop sessions won't show until we find where it keeps them.
 
 ## Consequences
 
@@ -69,4 +69,4 @@ Joe's own sessions (Claude Code in the terminal or the desktop app, on any machi
 - [ ] A2: Two dispatches of the same ticket started at once: exactly one gets a claim, the other is refused.
 - [ ] A3: One low-risk ticket runs on a worker through Herdr, its receipt is pulled into the database, and the board shows it done.
 - [ ] A4: Pulling the same receipts twice leaves one event per receipt.
-- [ ] A5: A session started by hand in Claude Code desktop on a worker appears on the board as steered within one refresh, with its folder.
+- [ ] A5: A session started by hand in Claude Code desktop and one in Codex desktop on a worker each appear on the board as steered within one refresh, with its folder.
