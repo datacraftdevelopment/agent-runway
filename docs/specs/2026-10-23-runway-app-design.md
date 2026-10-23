@@ -17,12 +17,16 @@ what's up next, what's running, what needs you and what's done, in the look of R
 - **The front door is a skill, not the app.** `file-tickets` runs inside the person's normal Claude Code or Codex
   session. It proposes a short batch (title, what done looks like, risk, what it touches, what it waits on), and files
   only on the person's go, typed in that session. That go is the approval; Runway never files on its own.
-- **Tickets travel by git.** Filing commits ticket files to one dedicated branch in the repo, `runway/tickets`, which is
-  never merged and needs no branch protection. It works the same from any Mac or a cloud session, with nothing to
-  connect to. Each ticket names its base branch; the skill pushes that branch first.
-- **A ticket is a Markdown file** (`runway/tickets/<id>.md` on that branch): frontmatter for `id`, `base`, `risk`
-  (`low` only with a one-line reason; default `not-low`), `touches`, `blocked_by`, `agent` (`any`, `claude`, `codex`),
-  then the task and its Acceptance lines. A ticket points at a spec when there is one and never restates it.
+- **One local database, nothing hosted** (Joe, 2026-10-23). A single SQLite file on the Mac that runs Runway
+  (`~/.runway/runway.db`) holds tickets, blockers, runs, reviews, go/no answers and history. It is the only source of
+  truth; the app, the loop, the `runway` skill and the CLI all read and write it. Specs and PRs stay in git; a
+  ticket points at them and never restates them.
+- **Filing goes straight into the database.** On the person's go, the skill runs `runway file`: directly on the
+  Runway Mac, over SSH from another Mac. A cloud session can't reach the Mac, so it pushes ticket files to a dedicated
+  `runway/tickets` branch (never merged, needs no protection) and Runway imports them on its next tick.
+- **A ticket's fields:** `id`, `repo`, `base` branch, `risk` (`low` only with a one-line reason; default `not-low`),
+  `touches`, `blocked_by`, `agent` (`any`, `claude`, `codex`), the task, and its Acceptance lines. The cloud file
+  form is the same fields as Markdown frontmatter plus body.
 - **One Mac is enough.** By default Runway runs tickets on the same Mac the app is on. Other Macs are an option added
   later in the app, reached over plain SSH (Tailscale SSH recommended). Nothing is installed on another Mac except
   Claude Code, Codex, git and tmux, which it needs anyway.
@@ -52,8 +56,8 @@ what's up next, what's running, what needs you and what's done, in the look of R
 
 | Piece | What it is | Reused from |
 | --- | --- | --- |
-| `runway` CLI | Python, stdlib only. `file`, `loop`, `status --json`, `pause`/`resume`, `go`/`no`, `doctor`. State in `~/.runway/` (journal JSON per repo, `machines.json`, `limits.json`). | `journal.py`, `loop.py`, `gate.py`, `tickets.py` from PR #3, with Orca calls swapped for ssh/tmux |
-| `file-tickets` skill | For Claude Code and Codex. Proposes the batch, files on go, pushes `runway/tickets`. | PR #2/#3 skill text, trimmed |
+| `runway` CLI | Python, stdlib only. `file`, `loop`, `status --json`, `pause`/`resume`, `go`/`no`, `doctor`. State in `~/.runway/runway.db` (SQLite, stdlib `sqlite3`); `import` pulls cloud-filed tickets from `runway/tickets`. | `loop.py`, `gate.py`, `tickets.py` from PR #3 with Orca swapped for ssh/tmux; `store.py` (SQLite) from PR #2 |
+| `file-tickets` skill | For Claude Code and Codex. Proposes the batch, files on go with `runway file` (or the `runway/tickets` branch from a cloud session). | PR #2/#3 skill text, trimmed |
 | `work-ticket` skill | What a headless worker follows: build in the worktree, open a draft PR, write the outcome file. | PR #2 |
 | `review-ticket` skill | The other agent's review and verdict. | PR #2 |
 | `runway` skill | From any session: what's running, what needs me, pause, resume, go/no. | v1's `runway` skill idea |
