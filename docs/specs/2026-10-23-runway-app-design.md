@@ -32,6 +32,11 @@ what's up next, what's running, what needs you and what's done, in the look of R
   web and Codex cloud, started from the Runway Mac with the person's own accounts). Each runner has slots; each ticket
   goes to a free one that has the agent it needs. Nothing is installed on another Mac except Claude Code, Codex, git,
   tmux and the Runway skills.
+- **Each repo has a main computer, and work can be pinned** (Joe, 2026-10-23). The main computer is where the repo's
+  local folder lives; the sidebar shows it. A repo's "Runs on" is any runner (default) or its main computer only, and
+  a ticket can override it with one named runner (for example, because a folder it needs only exists there). A pinned
+  ticket waits for a free slot on that runner even when others are free.
+- **Claude Code, Codex and Any have their own colours** everywhere a ticket or agent appears (Joe, 2026-10-23).
 - **Setup is shared between the app and an agent** (Joe, 2026-10-23). The app lays the groundwork (installs the
   `runway` command, creates the database, adds the Runway skills to Claude Code and Codex), then hands over to a
   `setup` skill the person runs in their agent: it checks sign-ins, adds the computer as a runner, asks which repos to
