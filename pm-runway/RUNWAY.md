@@ -61,7 +61,7 @@ Push notifications. A badge on the app icon.
 | `blocked_by` | Tickets that must have **landed** on the chunk branch first, or `[]`. |
 | `touches` | Areas, not file paths. Two tickets touching one area never run at once. |
 | `risk` | `low` (with a one-line `risk_reason`) or `not-low`. Never lower than the spec. Review can raise it, never lower it. |
-| `model` | `any`, `claude` or `codex`. The reviewer is always the other one. |
+| `model` | `any`, `claude`, `codex` or `pi`. `any` goes to the usual builder, or to the next agent while that one rests. The reviewer is always a different agent from the builder. |
 | `status` | `draft`, then `ready-for-agent` on your go. Run state is never written back here. |
 
 ## The readiness rules
@@ -91,6 +91,15 @@ The checker enforces the shape of 1 to 8 (fields, sections, Verify lines, blocke
 
 One fix pass per ticket: a failed build, a failed review or a merge conflict sends it back once, with the reason in the worker's prompt; the second failure waits for you. `runway pause` stops new work starting; running workers finish. The status screen redraws each tick, and `~/.pm-runway/board.html` (`runway board` prints its URL) shows Queued, Implementing, In review, Merged and Waiting on you for Orca's browser tab.
 
+## When a subscription runs out
+
+The loop moves work off an agent the moment that agent's usage limit refuses it, and back once the limit resets. It doesn't read remaining usage; the limit error is the signal.
+
+- **How it sees it:** a worker that reports failure with a usage-limit message, or a running worker whose latest output (`orca orchestration worker-read`) shows one. The loop stops a parked worker with `worker-stop`. The phrases are Claude Code's, Codex's and Orca's own (`usage limit reached`, `limit reached`, `usageLimitExceeded`, …), not a bare "rate limit" or 429, so a ticket about rate limiting doesn't trip it.
+- **What it does:** the agent rests until the reset time the message gives, or for 30 minutes when it gives none, and is then tried again. The resting list is `~/.pm-runway/limits.json`, one per controller, because a limit is the account's. The attempt is undone, not counted as a failed build, so it doesn't use up the fix pass.
+- **Where work goes:** `model: any` tickets go to the next agent in `machines.json`'s `agents` list. A ticket that names a model waits for it. A review waits for a different agent from the builder, so while Claude rests, Codex builds and its reviews queue until Claude is back (or a third agent, such as Pi, is listed). The whole-chunk review takes whichever agent is awake.
+- **What you see:** "Resting: claude … until 15:00Z" on the status screen and the board.
+
 ## The gate
 
 `runway gate --chunk <chunk> --pr <n> [--merge]`, run by the loop at the end. It merges the chunk PR only when all of these hold, and otherwise leaves it for you with the reasons:
@@ -111,6 +120,7 @@ The gate reads risk from the journal, `runway.json` from the default branch, and
 | Specs and tickets | the repo: `docs/specs/`, `docs/maps/<effort>/tickets/` |
 | Per-repo rules | the repo: `runway.json` on the default branch (template: `templates/runway/runway.json`) |
 | Machines, slots, agents | the controller: `~/.pm-runway/machines.json` (template: `templates/runway/machines.json`) |
+| Agents resting after a usage limit | the controller: `~/.pm-runway/limits.json` |
 | A chunk's journal | the controller: `~/.pm-runway/runs/<repo>--<chunk>.json` |
 | Loop heartbeat and board | the controller: `~/.pm-runway/loop.json`, `board.html` |
 | Live workers | Orca |
@@ -119,4 +129,4 @@ The gate reads risk from the journal, `runway.json` from the default branch, and
 
 ## Not proven yet
 
-Written against Orca's source and docs (stablyai/orca at `8d94ed06`, 2026-10-23), not yet run end to end. The first real run (one chunk, three tickets, two Macs) checks: the JSON shapes of `run-create`, `worker-start` and `check` (the loop reads ids tolerantly and fails loudly when it can't find one), reading a run's inbox from a plain terminal with `--run`, and `--on` plus `--repo` placement on a paired Mac.
+Written against Orca's source and docs (stablyai/orca at `8d94ed06`, 2026-10-23), not yet run end to end. The first real run (one chunk, three tickets, two Macs) checks: the JSON shapes of `run-create`, `worker-start` and `check` (the loop reads ids tolerantly and fails loudly when it can't find one), reading a run's inbox from a plain terminal with `--run`, and `--on` plus `--repo` placement on a paired Mac. The usage-limit phrases and `worker-read`'s output shape are from Orca's source too; the first time a limit is hit for real is their test.

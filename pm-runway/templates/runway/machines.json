@@ -1,6 +1,7 @@
 {
   "orca": "orca",
   "builder": "claude",
+  "agents": ["claude", "codex"],
   "max_running": 3,
   "machines": [
     {"name": "controller", "on": null, "slots": 1, "agents": ["claude", "codex"]},

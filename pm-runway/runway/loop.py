@@ -64,6 +64,20 @@ class Orca:
         except LoopError:
             pass  # release is cleanup; a failed one never undoes a recorded result
 
+    def tail(self, dispatch):
+        """The worker's latest output as one string, to spot a usage limit it is parked on."""
+        try:
+            return json.dumps(self.call([self.exe, 'orchestration', 'worker-read', '--dispatch', dispatch,
+                                         '--limit', '40', '--json']))
+        except LoopError:
+            return ''
+
+    def stop(self, dispatch):
+        try:
+            self.call([self.exe, 'orchestration', 'worker-stop', '--dispatch', dispatch, '--json'])
+        except LoopError:
+            pass
+
 
 def find(data, *keys):
     """Pull an id out of a JSON receipt whose exact shape can differ between Orca versions."""
@@ -159,6 +173,14 @@ def tick(data, cfg, orca, git, gh=None, log=print, repo_cfg=None):
     if delivery:
         orca.ack(data['run'], delivery)
 
+    # 1b. A worker whose subscription ran out never reports: it sits on the limit message.
+    # Stop it, rest that agent, and put its ticket back for the next agent that isn't resting.
+    for ev in running_dispatches(data):
+        until = jn.limit_from(orca.tail(ev['dispatch']))
+        if until:
+            orca.stop(ev['dispatch'])
+            hit_limit(data, ev, until, 'a usage limit stopped the worker', log)
+
     # 2. Land every ticket that passed review.
     for tid, s in jn.states(data).items():
         if s['state'] == 'review-passed':
@@ -202,6 +224,11 @@ def handle_message(data, msg, git, orca, log):
         return
     outcome = payload.get('outcome') or 'failed'
     tid = owner.get('ticket')
+    until = jn.limit_from(text) if outcome != 'succeeded' else None
+    if until:
+        hit_limit(data, owner, until, msg.get('subject', '') or 'usage limit', log)
+        orca.release(payload.get('dispatchId'))
+        return
     if owner['kind'] == 'build-dispatched':
         branch = jn.ticket_branch(tid)
         sha = git.remote_sha(branch) if outcome == 'succeeded' else None
@@ -231,10 +258,43 @@ def handle_message(data, msg, git, orca, log):
     orca.release(payload.get('dispatchId'))
 
 
+def running_dispatches(data):
+    """The dispatch events whose worker has not reported yet."""
+    settled = set()
+    for ev in data['events']:
+        if ev['kind'] == 'limited':
+            settled.add(ev['dispatch'])
+    st = jn.states(data)
+    out = []
+    for ev in data['events']:
+        if not ev['kind'].endswith('-dispatched') or ev['dispatch'] in settled:
+            continue
+        if ev['kind'] == 'chunk-review-dispatched':
+            if not any(e['kind'] == 'chunk-reviewed' for e in data['events']):
+                out.append(ev)
+        elif st[ev['ticket']].get('dispatch') == ev['dispatch'] and st[ev['ticket']]['state'] in ('building', 'reviewing'):
+            out.append(ev)
+    return out
+
+
+def hit_limit(data, owner, until, why, log):
+    agent = owner['agent']
+    jn.set_limit(agent, until, why)
+    jn.record(data, 'limited', ticket=owner.get('ticket'), dispatch=owner['dispatch'], agent=agent, until=until,
+              reason=why[:200])
+    when = time.strftime('%H:%MZ', time.gmtime(until))
+    log(f'{agent} hit its usage limit ({owner.get("ticket") or "chunk review"}); it rests until {when}, '
+        'new work goes to the other agent')
+
+
 def finish(data, cfg, orca, git, gh, log, repo_cfg):
     events = {e['kind'] for e in data['events']}
-    if 'chunk-review-dispatched' not in events:
+    limited = {e['dispatch'] for e in data['events'] if e['kind'] == 'limited'}
+    last = next((e for e in reversed(data['events']) if e['kind'] == 'chunk-review-dispatched'), None)
+    if last is None or last['dispatch'] in limited:
         argv = jn.chunk_review_argv(data, cfg)
+        if argv is None:
+            return  # every agent is resting; the next tick after a reset starts it
         dispatch = orca.start(argv)
         jn.record(data, 'chunk-review-dispatched', dispatch=dispatch, agent=argv[argv.index('--agent') + 1])
         log('every ticket has landed; started the whole-chunk review')
@@ -275,7 +335,8 @@ def heartbeat(data, state):
     last = next((e for e in reversed(data['events']) if e['kind'] == 'build-dispatched'), None)
     beat = {'pid': os.getpid(), 'state': state, 'chunk': data['chunk'], 'repo': data['repo'],
             'at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'paused': paused(),
-            'last_pickup': {k: last[k] for k in ('ticket', 'machine', 'agent', 'at')} if last else None}
+            'last_pickup': {k: last[k] for k in ('ticket', 'machine', 'agent', 'at')} if last else None,
+            'resting': {a: time.strftime('%Y-%m-%dT%H:%MZ', time.gmtime(v['until'])) for a, v in jn.limits().items()}}
     (jn.home() / 'loop.json').write_text(json.dumps(beat, indent=2) + '\n')
     bd.write(data, beat)
 
@@ -291,6 +352,8 @@ def screen(data, cfg=None, beat=None):
         lp = beat.get('last_pickup')
         if lp:
             lines.append(f'Last pickup: {lp["ticket"]} on {lp["machine"]} ({lp["agent"]}) at {lp["at"]}')
+        for agent, until in (beat.get('resting') or {}).items():
+            lines.append(f'Resting: {agent} hit its usage limit; it gets new work again after {until}')
     lines.append(f'Chunk {data["chunk"]} -> {data["branch"]} -> {data["base"]}, risk {jn.chunk_risk(data)}')
     groups = [('Building', ('building',)), ('In review', ('reviewing',)),
               ('Waiting to land', ('review-passed', 'built')), ('Fix pass due', ('build-failed', 'review-failed')),

@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 RISKS = ('low', 'not-low')
-MODELS = ('any', 'claude', 'codex')
+MODELS = ('any', 'claude', 'codex', 'pi')
 STATUSES = ('draft', 'ready-for-agent', 'done')
 REQUIRED = ('id', 'chunk', 'spec', 'blocked_by', 'touches', 'risk', 'model', 'status')
 ID_RE = re.compile(r'^[a-z0-9][a-z0-9-]*$')

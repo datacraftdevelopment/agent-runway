@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -110,6 +111,7 @@ class ReadinessTest(Fixture):
 class FakeOrca:
     def __init__(self):
         self.started, self.inbox_msgs, self.acked, self.n = [], [], [], 0
+        self.tails, self.stopped = {}, []
 
     def run_create(self, objective):
         return 'run-1'
@@ -128,6 +130,12 @@ class FakeOrca:
 
     def release(self, dispatch):
         pass
+
+    def tail(self, dispatch):
+        return self.tails.get(dispatch, '')
+
+    def stop(self, dispatch):
+        self.stopped.append(dispatch)
 
     def done(self, dispatch, outcome='succeeded', subject='done', body=''):
         self.inbox_msgs.append({'id': f'm-{dispatch}', 'type': 'worker_done', 'subject': subject, 'body': body,
@@ -312,6 +320,45 @@ class LoopTest(Fixture):
         jn.save(self.path, self.data)
         _, again = jn.load(self.repo, 'inbox')
         self.assertEqual(jn.states(again), jn.states(self.data))
+
+
+    def agent_of(self, ticket, kind='build-dispatched'):
+        return [e['agent'] for e in self.data['events'] if e['kind'] == kind and e.get('ticket') == ticket][-1]
+
+    def test_a_limit_error_moves_the_next_work_to_the_other_agent(self):
+        self.tick()
+        self.assertEqual(self.agent_of('inbox-01'), 'claude')
+        self.orca.done(self.dispatch_of('inbox-01'), outcome='failed',
+                       subject="Claude usage limit reached. Your limit will reset at 3pm|%d" % (time.time() + 3600))
+        self.tick()
+        st = jn.states(self.data)['inbox-01']
+        self.assertEqual(st['state'], 'building')
+        self.assertEqual(self.agent_of('inbox-01'), 'codex')
+        self.assertEqual(st['builds'], 1)          # the limited attempt is not a failed build
+        self.assertIn('claude', jn.limits())
+
+    def test_a_worker_parked_on_the_limit_is_stopped_and_requeued(self):
+        self.tick()
+        d = self.dispatch_of('inbox-03')
+        self.orca.tails[d] = '{"output": "5-hour limit reached \u2219 resets 3pm"}'
+        self.tick()
+        self.assertIn(d, self.orca.stopped)
+        self.assertEqual(self.agent_of('inbox-03'), 'codex')
+
+    def test_a_review_waits_while_the_other_model_rests(self):
+        self.tick()
+        jn.set_limit('codex', time.time() + 600, 'test')
+        self.build_ok('inbox-01')
+        self.tick()
+        self.assertEqual(jn.states(self.data)['inbox-01']['state'], 'built')   # claude built it; codex reviews
+        jn.set_limit('codex', time.time() - 1, 'reset')
+        self.tick()
+        self.assertEqual(jn.states(self.data)['inbox-01']['state'], 'reviewing')
+
+    def test_ordinary_failures_and_rate_limit_tickets_are_not_limits(self):
+        self.assertIsNone(jn.limit_from('tests failed: add a rate limit to the login form (429)'))
+        self.assertIsNotNone(jn.limit_from('Error: usageLimitExceeded'))
+        self.assertIsNone(jn.limit_from('Approaching 5-hour limit'))
 
 
 class GateTest(Fixture):

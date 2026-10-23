@@ -10,6 +10,7 @@ outside the repo, under $PM_RUNWAY_HOME (default ~/.pm-runway/runs/).
 import hashlib
 import json
 import os
+import re
 import time
 from pathlib import Path
 from string import Template
@@ -18,7 +19,15 @@ from . import tickets as tk
 
 PLUGIN = Path(__file__).resolve().parent.parent
 MAX_BUILDS = 2          # the first build plus one fix pass; then a needs-you card
-OTHER = {'claude': 'codex', 'codex': 'claude'}
+AGENTS = ['claude', 'codex']   # machines.json "agents" overrides: the order is the order of preference
+COOLDOWN = 30 * 60      # how long an agent rests after a usage limit that named no reset time
+
+# What Claude Code, Codex and Orca print when a subscription's limit refuses a turn. Phrases, not
+# bare "rate limit" or 429, so a ticket that is about rate limiting does not trip it.
+LIMIT_RE = re.compile(r'usage limit (?:reached|exceeded)|limit reached'
+                      r'|hit your (?:usage )?limit|usage_limit_reached|usageLimitExceeded|rateLimitExceeded'
+                      r'|rate_limit_error|rate limit(?:ed)? (?:reached|exceeded|hit)|out of (?:extra )?usage', re.I)
+RESET_RE = re.compile(r'(?:\|(\d{10})\b|resets_?at\W{1,4}(\d{10}))', re.I)
 
 # Event kinds and the fields each must carry.
 KINDS = {
@@ -35,6 +44,7 @@ KINDS = {
     'chunk-reviewed': ('verdict', 'sha'),
     'pr': ('number',),
     'gated': ('verdict', 'sha'),
+    'limited': ('agent', 'until', 'dispatch'),      # a usage limit ended that dispatch; ticket optional
 }
 
 
@@ -55,6 +65,9 @@ def config():
     cfg.setdefault('orca', 'orca')
     cfg.setdefault('builder', 'claude')
     cfg.setdefault('max_running', sum(m.get('slots', 1) for m in cfg.get('machines', [])))
+    cfg.setdefault('agents', list(AGENTS))
+    if cfg['builder'] not in cfg['agents']:
+        cfg['agents'].insert(0, cfg['builder'])
     if not cfg.get('machines'):
         raise JournalError(f'{path} lists no machines')
     return cfg
@@ -144,6 +157,8 @@ def states(data):
         if st is None:
             continue
         kind = ev['kind']
+        if kind in ('build-dispatched', 'review-dispatched'):
+            st['before'] = {k: v for k, v in st.items() if k != 'before'}
         if kind == 'build-dispatched':
             st.update(state='building', builds=st['builds'] + 1, machine=ev['machine'],
                       built_by=ev['agent'], dispatch=ev['dispatch'])
@@ -162,6 +177,12 @@ def states(data):
             st.update(state='merged', merged_sha=ev['sha'])
         elif kind == 'needs-you':
             st.update(state='needs-you', reason=ev['reason'])
+        elif kind == 'limited':
+            # A usage limit is not the ticket's failure: undo the dispatch, keep the build count.
+            if st.get('dispatch') == ev['dispatch'] and st.get('before'):
+                before = st.pop('before')
+                st.clear()
+                st.update(before)
         elif kind == 'answered':
             if ev['answer'] == 'retry':
                 st.update(state='queued', builds=0)
@@ -196,21 +217,24 @@ def plan(data, cfg):
     for tid in data['order']:
         s, t = st[tid], data['tickets'][tid]
         if s['state'] == 'built':
-            wanted.append(('review', tid, OTHER[s['built_by']]))
+            agent = available([a for a in cfg.get('agents', AGENTS) if a != s['built_by']])
+            if agent:   # none: the other model is resting, and the review waits for it
+                wanted.append(('review', tid, agent))
     for tid in data['order']:
         s, t = st[tid], data['tickets'][tid]
         ready = s['state'] in ('queued', 'build-failed', 'review-failed') and set(t['blocked_by']) <= merged
         if ready and not (set(t['touches']) & busy_areas):
-            agent = t['model'] if t['model'] != 'any' else cfg['builder']
-            wanted.append(('fix' if s['builds'] else 'build', tid, agent))
-            busy_areas |= set(t['touches'])
+            agent = available(builders(cfg, t))
+            if agent:
+                wanted.append(('fix' if s['builds'] else 'build', tid, agent))
+                busy_areas |= set(t['touches'])
 
     starts = []
     for kind, tid, agent in wanted:
         if budget <= 0:
             break
         machine = next((m for m in cfg['machines'] if free.get(m['name'], 0) > 0
-                        and agent in m.get('agents', ('claude', 'codex'))), None)
+                        and agent in m.get('agents', cfg.get('agents', AGENTS))), None)
         if machine is None:
             continue
         free[machine['name']] -= 1
@@ -230,8 +254,11 @@ def fix_note(data, tid):
 
 
 def chunk_review_argv(data, cfg):
-    """The whole-chunk review: one fresh worker on the controller, the other model from the usual builder."""
-    agent = OTHER[cfg['builder']]
+    """The whole-chunk review: one fresh worker on the controller, the other model from the usual
+    builder if it isn't resting. None when every agent is resting."""
+    agent = available([a for a in cfg.get('agents', AGENTS) if a != cfg['builder']] + [cfg['builder']])
+    if agent is None:
+        return None
     machine = cfg['machines'][0]
     spec = Template((PLUGIN / 'templates' / 'runway' / 'chunk-review-spec.md').read_text()).substitute(
         chunk=data['chunk'], chunk_branch=data['branch'], base=data['base'],
@@ -248,6 +275,50 @@ def chunk_review_argv(data, cfg):
     if repo_sel:
         argv += ['--repo', repo_sel]
     return argv
+
+
+def builders(cfg, ticket):
+    """Who may build a ticket, in order: its own model if it names one, else the usual builder first."""
+    if ticket['model'] != 'any':
+        return [ticket['model']]
+    return [cfg['builder']] + [a for a in cfg.get('agents', AGENTS) if a != cfg['builder']]
+
+
+# Usage limits. One file per controller, not per chunk: a subscription's limit is the account's,
+# whichever chunk or Mac ran into it.
+
+def limits(now=None):
+    """{agent: {'until': epoch seconds, 'why': text}} for every agent still resting."""
+    path = home() / 'limits.json'
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    now = time.time() if now is None else now
+    return {a: v for a, v in data.items() if v.get('until', 0) > now}
+
+
+def set_limit(agent, until, why):
+    data = limits()
+    data[agent] = {'until': until, 'why': why[:200]}
+    path = home() / 'limits.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + '\n')
+
+
+def available(agents, now=None):
+    resting = limits(now)
+    return next((a for a in agents if a not in resting), None)
+
+
+def limit_from(text, now=None):
+    """The epoch second an agent can work again, if the text says a usage limit stopped it; else None."""
+    if not text or not LIMIT_RE.search(text):
+        return None
+    now = time.time() if now is None else now
+    m = RESET_RE.search(text)
+    reset = int(m.group(1) or m.group(2)) if m else 0
+    return reset if now < reset < now + 8 * 86400 else int(now + COOLDOWN)
 
 
 def ticket_branch(tid):

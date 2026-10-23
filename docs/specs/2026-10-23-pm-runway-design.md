@@ -14,6 +14,7 @@ Status: agreed in conversation with Joe on 2026-10-23, in the project's prior-ar
 - **Tickets are files** in `docs/maps/<effort>/tickets/`. Run state lives in Orca and in a per-chunk JSON journal on the controller. No SQLite store.
 - **Everything in Orca, no separate app.** An installer app may come later.
 - **Ringer is optional.**
+- **Usage-limit failover** (Joe, 2026-10-23): when a subscription's limit refuses an agent, the loop sends the next tickets to the other agent until the limit resets. The limit error is the trigger; nothing reads remaining usage. Tickets can also name their agent (`model`), including Pi once Orca runs it.
 
 ## Acceptance
 
@@ -21,6 +22,7 @@ Status: agreed in conversation with Joe on 2026-10-23, in the project's prior-ar
 - [ ] A2: The practice chunk (`setup/practice/`, three tickets) runs from `runway start` to merged on main with nobody touching it: practice-01 and practice-03 build at the same time on two different Macs, each reviewed by the other model, then practice-02, then the whole-chunk review and the gate. Verify: the board and `runway status` during the run; `git log --first-parent main` after.
 - [ ] A3: A raised risk or a failing check stops the chunk at the gate with the reasons on the board, and nothing reaches main. Verify: a second run of the practice chunk with one ticket marked `not-low`.
 - [ ] A4: `runway-ask` answers "what's happening with practice-02?" and "what's waiting on me?" from a fresh session, matching the board. Verify: ask it during the A2 run.
+- [ ] A5: When one agent hits its usage limit mid-chunk, its ticket goes back to the queue without using up its fix pass, new `any` tickets start on the other agent, and the board shows the agent resting until its reset. Verify: the next real limit during a run, or a worker that fails with a usage-limit message.
 
 ## Not proven
 

@@ -74,12 +74,14 @@ def render(data, beat=None):
         state = 'paused' if beat.get('paused') else beat.get('state', '?')
     last = (beat or {}).get('last_pickup')
     pickup = f'last pickup {last["ticket"]} on {last["machine"]} at {last["at"]}' if last else 'nothing picked up yet'
+    resting = ''.join(f'<span class="state paused">{html.escape(a)} resting until {html.escape(u)}</span>'
+                      for a, u in ((beat or {}).get('resting') or {}).items())
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="15"><title>Runway board</title><style>{STYLE}</style></head>
 <body><header><h1>{html.escape(data['chunk'])}</h1>
 <span class="state {html.escape(state)}">loop {html.escape(state)}</span>
-<span class="meta">{html.escape(pickup)}</span>
+<span class="meta">{html.escape(pickup)}</span>{resting}
 <span class="meta">{html.escape(data['branch'])} → {html.escape(data['base'])} · risk {jn.chunk_risk(data)}</span>
 <span class="meta">updated {html.escape((beat or {}).get('at', ''))}</span></header>
 <div class="cols">{''.join(cols)}</div></body></html>

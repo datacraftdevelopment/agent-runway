@@ -110,7 +110,7 @@ mkdir -p ~/.pm-runway
 cp "$(dirname "$(readlink -f ~/.local/bin/runway)")/../templates/runway/machines.json" ~/.pm-runway/machines.json
 ```
 
-Edit it: one entry per Mac. The controller has `"on": null`; each worker has `"on": "<the name from step 6>"`. `slots` is how many tickets a Mac builds at once (1 on a laptop, 2 on a desktop Mac is a fair start); `max_running` caps the total. `builder` is the model that builds when a ticket says `any`; reviews always use the other. Remove `agents` entries a Mac can't run.
+Edit it: one entry per Mac. The controller has `"on": null`; each worker has `"on": "<the name from step 6>"`. `slots` is how many tickets a Mac builds at once (1 on a laptop, 2 on a desktop Mac is a fair start); `max_running` caps the total. `builder` is the model that builds when a ticket says `any`; reviews always use a different one. The top-level `agents` list is the order work falls back through when an agent hits its usage limit. Remove a Mac's `agents` entries it can't run.
 
 Check: `bash setup/doctor.sh --controller` passes.
 
