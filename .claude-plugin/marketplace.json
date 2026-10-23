@@ -1,0 +1,13 @@
+{
+  "name": "runway-agent",
+  "owner": {
+    "name": "Runway Agent contributors"
+  },
+  "plugins": [
+    {
+      "name": "runway-agent",
+      "source": "./plugin",
+      "description": "Skills and controller CLI for Runway Agent: file tickets from shaped work, work them unattended on your own Macs through Herdr, review on a second model, merge only low risk through a gate written in code."
+    }
+  ]
+}

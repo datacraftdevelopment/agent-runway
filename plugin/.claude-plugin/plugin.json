@@ -1,0 +1,10 @@
+{
+  "name": "runway-agent",
+  "version": "0.1.0",
+  "description": "Runway Agent's skills and controller CLI: file shaped work as tickets in the controller's SQLite store with risk set (file-tickets), work a dispatched ticket on a worker inside Herdr and report through typed receipts (work-ticket), review the exact head on the other model (review-ticket). The runway-agent CLI owns every rule: the atomic claim at dispatch, outbox pull with dedupe, and the merge gate. Pairs with pm-sp; works without it.",
+  "author": {
+    "name": "Runway Agent contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/datacraftdevelopment/runway-agent"
+}

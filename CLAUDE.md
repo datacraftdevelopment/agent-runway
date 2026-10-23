@@ -13,6 +13,12 @@ holds only what every project uses from day one. Everything else is known but
 not built (the taxonomy below). Agnostic to codebase: the deliverable might be
 FileMaker, web, SaaS or pure consulting.
 
+## Code
+
+`plugin/` is the Claude Code plugin and the controller CLI (`plugin/README.md`); the repo root's
+`.claude-plugin/marketplace.json` lists it. Tests: `python3 -m unittest discover -s tests` (stdlib only).
+The store's tables follow `docs/specs/2026-10-23-controller-database-design.md`; change both together.
+
 ## Day-one layout
 
 ```

@@ -26,21 +26,21 @@ The board reads the database and Herdr; it stores nothing of its own.
 - **The board needs queries** (by machine, by status, needs-you first). Files would need an index anyway.
 - **Every change is also kept as an event row** (append-only), so the history the panel asked for stays: ids on every event, replay is safe, receipts pulled twice are deduplicated by id.
 
-## Tables (first cut)
+## Tables
 
-Kept close to the runway-db draft so that design isn't wasted:
+As built in `plugin/runway_agent/store.py` (first cut plus what the loop needed, marked *added*):
 
-- `projects` (id, key, name, repo, default_branch)
-- `tickets` (id, project_id, number, title, body, risk, status, strategy, spec_path, created_at)
+- `projects` (id, key, name, repo, *path*: the controller's clone the gate reads `runway.json` from, default_branch)
+- `tickets` (id, project_id, number, title, body, risk, *risk_reason*, status, strategy, spec_path, *plan_path*, *acceptance*, *touches*, *model*, created_at)
 - `ticket_blocks` (ticket_id, blocked_by_id)
 - `comments` (id, ticket_id, author, body, created_at)
-- `machines` (id, label, herdr_label, kind: local/ssh/cloud, enabled)
-- `attempts` (id, ticket_id, dispatch_id, machine_id, herdr_session, branch, started_at, ended_at, outcome)
-- `events` (id, at, kind, ticket_id, attempt_id, payload JSON), append-only
+- `machines` (id, label, herdr_label, *ssh_host*, kind: local/ssh/cloud, enabled)
+- `attempts` (id, ticket_id, dispatch_id, machine_id, herdr_session, branch, started_at, ended_at, outcome). A partial unique index allows one live attempt (ended_at null) per ticket: that index is the claim.
+- `events` (id, at, kind, ticket_id, attempt_id, payload JSON), append-only. Receipts keep their own id, so a replay is ignored.
 - `sessions` (machine_id, agent, session_id, folder, started_at, last_seen_at, source)
-- `decisions` (id, ticket_id, question, options, answer, answered_by, answered_at)
+- `decisions` (id, ticket_id, *kind*: build/review/gate, question, options, *recommended*, answer, answered_by, answered_at, *revision*)
 
-Risk is written at filing and can only go up (reviewer raises are events). Status is derived from events, not edited by hand.
+Risk is written at filing and can only go up (reviewer raises are events). `tickets.status` is a cache that only the event writer updates; nothing edits it by hand.
 
 ## How tickets reach a worker
 
