@@ -8,7 +8,7 @@ One board that dispatches coding tickets to agents running on many machines (Mac
 
 **Architecture (decided 2026-10-23): one controller, nothing hosted.**
 
-- **Controller:** one always-on Mac (Joe's desktop Mac). It runs the Runway Agent app, holds the tickets and the board, and is the only place state lives.
+- **Controller:** one always-on Mac (Joe's desktop Mac). It runs the Runway Agent app, holds the board and is the only place run state lives (claims, receipts, verdicts, decisions). Ticket definitions travel by git in each repo.
 - **Worker machines** (the other Macs and laptops) are driven from the controller over SSH (Tailscale SSH, so it works wherever a laptop is). Claude Code and Codex run there, inside tmux or Herdr so a dropped connection or a closed lid doesn't kill the work. No daemon to install on each worker.
 - **Cloud sessions** are started by the controller and report back to its board.
 - **The app is the controller's face.** It shows the board (one machine or the whole fleet), starts, stops and pauses dispatch, and answers decisions for any machine. Nothing hides in the background.
@@ -21,6 +21,8 @@ Risks to test first:
 - The controller has to be awake for dispatch to run.
 - macOS keychain sign-ins (Claude, Codex) are often locked in an SSH session; test on one worker before anything else.
 - Sessions must outlive the SSH connection (tmux or Herdr).
+
+**Design review 2026-10-23** (Astra and Fable, `docs/review/2026-10-23-panel.md`): only the controller claims; workers write receipts to a local outbox the controller pulls over SSH; Herdr state is advisory; the gate reads risk and policy only from what the controller recorded or the default branch; Ringer is opt-in per ticket, not in review.
 
 ## Two kinds of work on the board
 
@@ -79,6 +81,6 @@ Joe first, then a few collaborators. Not a service, and not multi-tenant. Each p
 ## Open questions
 
 - ~~UI stack~~ Decided 2026-10-22: one web UI, served locally by the daemon and hosted, in a Tauri desktop shell.
-- Ticket store: the hub's own store. Joe would rather not use GitHub Issues.
+- ~~Ticket store~~ Decided 2026-10-23: ticket files committed in each repo; run state only on the controller. No GitHub Issues.
 - ~~Herdr or tmux~~ Herdr is the SSH and session layer (2026-10-23). AgentConnect is no longer needed.
 - Plan terms for subscription logins on always-on daemons.
