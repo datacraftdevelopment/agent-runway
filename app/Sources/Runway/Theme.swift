@@ -218,7 +218,7 @@ struct StageBar: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Capsule().fill(fill(index, current)).frame(height: 4)
                     Text(step.label).font(.system(size: 10, weight: index == current ? .bold : .regular))
-                        .foregroundStyle(labelColor(index, current))
+                        .foregroundStyle(labelColor(index, current)).lineLimit(1).fixedSize()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
