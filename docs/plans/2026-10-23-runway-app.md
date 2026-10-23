@@ -14,7 +14,7 @@ Joe's order (2026-10-23): the look first, then the plumbing. The loop is known t
 
 Answer the risks before building on them. Each writes its finding into `docs/quirks.md`.
 
-- [ ] **S1. SwiftUI without Xcode.** On Joe's main Mac (Command Line Tools only), `swift build` a tiny `MenuBarExtra`
+- [x] **S1. SwiftUI without Xcode.** On Joe's main Mac (Command Line Tools only), `swift build` a tiny `MenuBarExtra`
   app plus one window, and open it. If it fails, the fallback is installing Xcode (free) and saying so in setup.
 - [ ] **S2. Sign-ins over SSH.** From the main Mac, `ssh <second Mac> 'claude -p "say ok"'` and
   `ssh <second Mac> 'codex exec "say ok"'`, both non-interactive. If the keychain is locked, find the fix
@@ -30,23 +30,23 @@ Source: Runway v1's SwiftUI app (archived private `runway` repo, `factory/app/`)
 public repo; review every copied file for personal names, paths and client names before committing. Leave out
 Sparkle (updates), Ringside, rounds and Linear-era code. SwiftTerm stays out for now ("Open session" opens Terminal).
 
-- [ ] 1.1 Swift package at `app/`: `RunwayCore` (models, parsing, no UI) and `Runway` (the app). `make-app.sh` wraps
+- [x] 1.1 Swift package at `app/`: `RunwayCore` (models, parsing, no UI) and `Runway` (the app). `make-app.sh` wraps
   it into `Runway.app`. Check: `swift build`, `swift test`.
-- [ ] 1.2 Models in `RunwayCore`: Repo (main computer, runs on), Runner (kind: this Mac, SSH Mac, cloud; slots;
+- [x] 1.2 Models in `RunwayCore`: Repo (main computer, runs on), Runner (kind: this Mac, SSH Mac, cloud; slots;
   state), Agent (Claude Code, Codex; available or resting until), Ticket (column, agent, risk, runs on, stage,
   PR, review, question). Decoded from `runway status --json` shape; fixture `sample-status.json` matches the mock.
   Check: unit tests over the fixture.
-- [ ] 1.3 Shared look: colours and chips (Claude clay, Codex blue, Any grey; risk low green, not low pink), stage bar
+- [x] 1.3 Shared look: colours and chips (Claude clay, Codex blue, Any grey; risk low green, not low pink), stage bar
   with Build, Check, Review, Merge labels. Check: SwiftUI previews.
-- [ ] 1.4 Main window: sidebar (repos with status and main computer; where tickets run with load; agent states),
+- [x] 1.4 Main window: sidebar (repos with status and main computer; where tickets run with load; agent states),
   toolbar (status pill, Runs on menu, Board/Activity, Pause), Board (four columns, no drag and drop), inspector
   (fields, Runs on menu, Needs-you box with Go/No and a note, Open session). Activity tab. From v1's
   `RunwayWindow`/`BoardView`. Check: run the app on the sample.
-- [ ] 1.5 Side panel (keep on top): Needs you, a card per repo with Start/Stop and what runs where with agent colour,
+- [x] 1.5 Side panel (keep on top): Needs you, a card per repo with Start/Stop and what runs where with agent colour,
   agent states. From v1's `SidePanel`. Check: run it.
-- [ ] 1.6 Menu bar: icon with a needs-you count; Needs you, repos, pause for an hour, open panel/window, quit.
+- [x] 1.6 Menu bar: icon with a needs-you count; Needs you, repos, pause for an hour, open panel/window, quit.
   From v1's `RunwayBarApp`. Check: run it.
-- [ ] 1.7 First run screen: the three steps and the live "what setup has found" table (from sample data for now).
+- [x] 1.7 First run screen: the three steps and the live "what setup has found" table (from sample data for now).
   From v1's `SetupSheetView`. Check: run it.
 - [ ] 1.8 Joe clicks through it on his Mac. Changes he asks for land here, before Phase 2.
 
