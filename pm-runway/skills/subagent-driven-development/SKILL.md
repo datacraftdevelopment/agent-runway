@@ -7,6 +7,8 @@ description: Use when executing implementation plans with independent tasks in t
 
 Execute plan by dispatching a fresh implementer subagent per task, a task review (spec compliance + code quality) after each, and a broad whole-branch review at the end.
 
+**pm-runway:** risk-scaled review, parallel lanes: references/lanes-and-risk.md wins.
+
 **Why subagents:** You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
 
 **Core principle:** Fresh subagent per task + task review (spec + quality) + broad final review = high quality, fast iteration
@@ -100,8 +102,7 @@ digraph process {
 
 ## Setup
 
-**Script paths (pm-runway).** `scripts/<name>` here and in the prompts and
-references means
+**Script paths (pm-runway).** `scripts/<name>` here and in prompts means
 `"${CLAUDE_PLUGIN_ROOT}/skills/subagent-driven-development/scripts/<name>"`,
 run from the project worktree root, never the plugin's folder.
 
@@ -145,7 +146,7 @@ ledger.
 
 **pm-runway's tiers** (pm-runway): cheap and standard = `sonnet`; most capable =
 `opus`. Never `haiku`, and never on `fable`, even when this session is on
-Fable. Name the model on every dispatch.
+Fable.
 
 Use the least powerful model that can handle each role to conserve cost and increase speed.
 
@@ -247,7 +248,7 @@ Template: [implementer-prompt.md](implementer-prompt.md)
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** Generate the review package (`bash scripts/review-package PLAN_FILE BASE HEAD`, from the project worktree root, see Script paths — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
+**DONE** (pm-runway: high risk only): Generate the review package (`bash scripts/review-package PLAN_FILE BASE HEAD`, from the project worktree root, see Script paths — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
 
 **Any other status** (DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED): read
 [references/handling-reports.md](references/handling-reports.md) and follow
@@ -260,7 +261,7 @@ rush it into implementation.
 ### 3. Review the task
 
 Per-task reviews are task-scoped gates. The broad review happens once, at the
-final whole-branch review. Never skip the task review, and never accept a
+final whole-branch review. Never skip a high-risk task's review, and never accept a
 report missing either verdict — spec compliance AND task quality are both
 required. Implementer self-review never replaces the task review; both are
 needed.

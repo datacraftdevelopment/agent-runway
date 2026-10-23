@@ -9,15 +9,21 @@ is a commit, never a session.
 ```
 whats-next                        open: where things stand, write the Intent
   brainstorming                   new work: talk it through, mockups, approaches,
+    + design-handoff              screens: data sample, then Claude Design, approved before the doc
     + second-opinion (design)     design doc with ## Acceptance; Sol and Opus read it as builders
   [Joe says go to plan]
-  writing-plans                   one plan, checkbox tasks, lanes when files are disjoint
-  subagent-driven-development     run the whole plan in this session (or executing-plans, inline)
-    nested-sessions               only when lanes exist and Joe wants them at once
+  writing-plans                   one plan, tasks tagged by risk, lanes when files are disjoint
+  subagent-driven-development     lanes run at once; review scaled by risk (or executing-plans, inline)
+    nested-sessions               lanes big enough for a session each (small lanes run in parallel in-session)
   finishing-a-development-branch  tests, second-opinion (branch), merge / PR / keep
   ship-acceptance                 Acceptance checks against the candidate, then production
 stepping-away                     close: session entry, each plan left resumable
 ```
+
+**Screens come first.** Work with screens goes data sample, then screens,
+then build: a small real sample of the data, then `design-handoff` takes it
+into Claude Design, and Joe approves the screens before the design doc is
+done. The build is checked against them by screenshot, on real data.
 
 Not every piece of work takes every step. A quick, fully specified task is
 just done. A small change gets a short design doc agreed in chat. Bugs go to

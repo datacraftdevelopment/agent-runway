@@ -17,7 +17,7 @@ Read [`RUNWAY.md`](./RUNWAY.md) for the ticket format, the loop and the gate, an
 
 ## What's in it
 
-**Everything in pm-sp:** the trimmed Superpowers workflow (brainstorming with the visual companion, writing-plans, subagent-driven-development, finishing a branch, TDD, debugging, verification), Matt Pocock's wayfinder, grilling, domain-modeling, codebase-design, prototype, research and pr, and pm-sp's session layer (whats-next, stepping-away, checkpoint, nested-sessions, second-opinion, ship-acceptance), the credential guard hook, gate-hooks, review-policy and ui-test.
+**Everything in pm-sp:** the trimmed Superpowers workflow (brainstorming with the visual companion, writing-plans, subagent-driven-development, finishing a branch, TDD, debugging, verification), Matt Pocock's wayfinder, grilling, domain-modeling, codebase-design, prototype, research and pr, `design-handoff` (screens shaped in Claude Design on a real data sample before anything is built), and pm-sp's session layer (whats-next, stepping-away, checkpoint, nested-sessions, second-opinion, ship-acceptance), the credential guard hook, gate-hooks, review-policy and ui-test.
 
 **Matt Pocock's ticket flow, as our own versions:** `to-spec`, `to-tickets`, `implement-spec`, plus his `tdd` and `code-review` verbatim.
 

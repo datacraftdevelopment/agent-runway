@@ -161,6 +161,23 @@ would help more than reading:
 Once they've accepted, use it for mockups to react to, side-by-side
 options, and throwaway prototypes they can click.
 
+**Screens are approved before the design is** (pm-runway). When the work has
+screens, the design doc isn't finished until your human partner has
+approved what those screens look like. Work in this order: a small real
+sample of the data first (an extract from the source system, or JSON shaped
+exactly like it), then the screens, then the build. If a wayfinder map
+already approved the screens, design against that. Otherwise use
+pm-runway:design-handoff, telling it to use data mode, so they shape the screens in Claude
+Design on that sample; the visual companion is for a small change, or when
+they'd rather stay here. The design doc links the approved screens, and the
+approved export goes in `resources/design-handoff/`.
+
+**Ask where the data lives first** (pm-runway). When the work pulls from a
+live system, settle which server, which account and which protocol before
+anything else, and read it gently: row counts before rows, a narrow
+selection, paging, a stop at the first slow response, and a check with
+your human partner before changing any server-wide setting.
+
 **Spike to feel things out.** Agentic work is waterfall, but very, very
 fast. A quick throwaway build is often the cheapest way to learn what
 they want or whether something works. Offer one when it would help.
@@ -225,6 +242,9 @@ from without going back to your human partner. Cover:
   the real candidate and production. Shape, not test detail: "uploading
   a 20 MB file finishes and the row appears in the list", not "the
   upload test asserts 201". A small change still gets one or two.
+  When the work has screens, one check is that every view matches the
+  approved screens, on real data at a real window size, by screenshot
+  (pm-runway).
 
 For a small change, the short design covers the same points in a line
 or two each and goes straight to your human partner, without the
@@ -258,6 +278,12 @@ document as that builder yourself.
 pm-runway:second-opinion in design mode, so Sol (another vendor) and a
 fresh Opus read it as builders. Sort their questions into the same three piles,
 in the same single round.
+
+**Late changes are a delta** (pm-runway). Once the document is in front of your
+human partner, an input that arrives late (a new fact, another session's
+ruling) is put to them as a one-line change to approve, not the whole
+document again. Their approval of the design also covers committing its
+amendments; don't ask again for each commit.
 
 <HARD-GATE>
 Nothing gets built until your human partner approves the design doc:

@@ -163,6 +163,21 @@ Then clean up the worktree (Step 6) and force-delete the branch:
 git branch -D <feature-branch>
 ```
 
+## Step 5b: Leave nothing behind (pm-runway)
+
+Before Step 6 removes anything, and for every option, check three things and settle each one
+with your human partner before saying done:
+
+- **Uncommitted files** in this repo and in any other repo this work wrote
+  to (a planning repo holding the design and plan): `git status --short`
+  in each.
+- **Follow-ups outside git:** anything parked only in a ledger, a session
+  scratchpad or a message goes into `docs/inbox.md`.
+- **Processes this session started** (dev servers, watchers, tunnels):
+  stop them by the PID or port you noted when you started them, and only
+  those. Never kill by name or pattern; another session's server may share
+  it.
+
 ## Step 6: Cleanup Workspace
 
 **Runs for Option 1 and confirmed discards.** Options 2 and 3 always
@@ -173,8 +188,8 @@ Step 2, from before that directory change.
 
 **If `GIT_DIR == GIT_COMMON`:** Normal repo, no worktree to clean up. Done.
 
-**If `WORKTREE_PATH` is under `.worktrees/` or `worktrees/`:** Superpowers
-created this worktree — we own cleanup:
+**If `WORKTREE_PATH` is under `.worktrees/`, `worktrees/` or
+`.superpowers/worktrees/` (pm-runway):** Superpowers created this worktree — we own cleanup:
 
 ```bash
 git worktree remove "$WORKTREE_PATH"

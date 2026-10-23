@@ -24,7 +24,11 @@ wrapped in `xargs` or `sh -c`, or a pipeline or background job with an `add`,
 `stage` or `commit` in it) is refused with an explanation. Any other known git
 subcommand (`status`, `log`, `worktree list`, `remote get-url`, `fetch`, `push`,
 `stash` and the rest) may be piped or backgrounded (pm 0.28.3; before that only
-read-only git could be). Unrelated commands and folders that aren't repos pass.
+read-only git could be). A read-only subcommand passes even with a variable or
+substitution in its `-C` path or operands (`git -C "$REPO" show`, pm 0.30.1,
+pm-runway 0.2.7); an option or config that could run a command (a pager, an
+alias, an exec path, a dynamic option) still blocks. Unrelated commands and
+folders that aren't repos pass.
 
 ## When it blocks you
 

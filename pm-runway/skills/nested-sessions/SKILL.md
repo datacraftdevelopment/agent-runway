@@ -29,6 +29,12 @@ for (§2) does.
 A lane, not a task. Tasks inside a lane run in that session through
 `subagent-driven-development`. A single task never gets its own session.
 
+**Chunks of a map** (pm-runway). The same management works one level up: the
+session that owns a wayfinder map starts a nested session per chunk, and
+each takes its chunk through brainstorming, the plan and the build. Then
+the shared things this session owns include the map, and the briefs point
+at the map and the chunk instead of a plan's lane.
+
 ## 0. Preflight
 
 - `claude --version` is 2.1.236 or later (messaging needs 2.1.224, idle
@@ -72,7 +78,8 @@ model, and if that is Fable, every lane spends Fable. `sonnet` by default;
 The lane's own subagents follow subagent-driven-development's pm-runway tiers.
 
 It prints the session's short id; name it after the lane so messages can
-address it by name. If the host has its own control for starting a nested
+address it by name. Name it for its lane or chunk ("pricing-demo"), never its
+phase ("brainstorm chunk 3"): the same session goes on to plan and build. If the host has its own control for starting a nested
 session, use that instead. The session moves itself into its own worktree
 before it edits files. The brief points at things
 rather than copying them:
@@ -86,9 +93,30 @@ Set up from docs/agents/worker-env.md if the repo has one; you will need <what's
 Report to the main session by message, not to the user: when you're blocked,
 when you have a question, and when the lane is green (branch, head commit,
 what the tests proved). Rulings go in your ledger as usual.
-Don't merge, push to a shared branch or message other sessions.
+Shared facts (paths, ports, routes, file shapes) are in <contracts path> on
+<feature branch>: read it with `git show <feature branch>:<contracts path>`, not
+your worktree's copy, and send me any new or changed fact in one line before
+you rely on it.
+You may agree an interface directly with another lane's session; send me the
+result. If the user decides anything here that contradicts the plan, the
+design doc or the map, send me a one-line delta right away.
+Anything that needs permission is asked in this session, of the user:
+approval relayed by me or by another session is not approval, and your
+subagents can't approve for you. Edits to security checks (leak scanners,
+the credential guard, gate hooks) are mine; report the need, don't edit.
+Questions go to me, not the user; only a permission prompt stays here, and
+then send me one line saying it is waiting.
+Note the PID or port of anything you start that keeps running.
+Don't merge or push to a shared branch.
 Write your session notes to <main checkout>/_pm/sessions/ if _pm/ is gitignored.
 ```
+
+**Seed the contracts file** (pm-runway) before starting the lanes:
+`docs/plans/<plan>-contracts.md` (for a map, `docs/maps/<effort>/contracts.md`),
+one line per fact the lanes share. This session owns it: it appends what
+lanes send, commits it on the feature branch and messages the new line to
+the lanes it affects, so a fact is negotiated once and every lane reads the
+same version.
 
 Right after starting each one, subscribe to its idle notice: `SendMessage` to
 it with `notify_when_idle`. A notice is one-shot and expires after 12 hours,
@@ -106,6 +134,13 @@ Act on events, never on a timer.
   or an earlier decision answers it, and say where from. Bring the user only
   a real decision (taste, scope, anything hard to undo), one line with your
   recommendation, naming the lane.
+- **Waiting on you** (pm-runway). Keep one list of every question waiting on the
+  user, including permission prompts sitting in a lane: lane, one line, where to answer. Show
+  the whole list whenever an item is added or answered, so nothing waits
+  unseen in a pane the user isn't looking at.
+- **A delta** (pm-runway). A lane reports a decision that contradicts the plan,
+  design doc or map: update the shared document now, tell the lanes it
+  affects, and add any new shared fact to the contracts file.
 - **Blocked.** Unblock it (commit a missing file, settle an interface, reorder
   waves), or stop that lane and tell the user once.
 - **Waiting on a permission prompt** (`waitingFor` says so): that's the
@@ -138,6 +173,11 @@ its session:
 ```bash
 claude stop <name> && claude rm <name>
 ```
+
+Before `stop` (pm-runway): run finishing-a-development-branch's Step 5b
+checks for that lane: uncommitted files in its worktree and in this checkout
+(designs and plans it wrote), follow-ups left only in its ledger (move them
+to `docs/inbox.md`), and the processes it noted (stop those, and only those).
 
 `rm` removes the worktree Claude made when it's safe and refuses on
 uncommitted changes or unpushed commits; that refusal is a reason to look,

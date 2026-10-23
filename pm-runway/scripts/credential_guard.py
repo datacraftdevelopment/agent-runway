@@ -30,12 +30,61 @@ READ_ONLY_GIT = set('status log diff show branch rev-parse ls-files ls-tree cat-
 OTHER_GIT = READ_ONLY_GIT | set('config init clone fetch pull push remote worktree tag reflog symbolic-ref fsck gc maintenance prune rm mv reset restore checkout switch clean stash merge rebase revert cherry-pick bisect archive apply am format-patch bundle notes submodule sparse-checkout update-index'.split())
 
 
+SAFE_CONFIG = ('user.', 'commit.gpgsign=', 'tag.gpgsign=', 'core.hooksPath=', 'core.quotepath=')
+
+
+# Global options a read-only call may carry. Anything else, or an option built from
+# a variable or substitution (`git -"$OPT" diff`), could run a command.
+SAFE_GLOBAL = {'--no-pager', '-P', '--bare', '--no-replace-objects', '--literal-pathspecs',
+               '--no-optional-locks', '--paginate', '-p'}
+
+
+def read_only_git(args):
+    """True when args (args[0] is git) run a read-only subcommand with no option or
+    config that could run a command (a pager, an alias, an exec path). Only the
+    -C, --git-dir and --work-tree values may be dynamic."""
+    i = 1
+    while i < len(args):
+        value = args[i]; i += 1
+        if value in ('-C', '--git-dir', '--work-tree'):
+            # Quoted "$REPO" stays one word; unquoted expansion or braces could split
+            # into a different subcommand (`git -C $(printf '. commit -a -m') status`).
+            if i == len(args) or not one_word(args[i]): return False
+            i += 1; continue
+        if value.startswith(('--git-dir=', '--work-tree=', '-C')):
+            if not one_word(value): return False
+            continue
+        if any(c in value for c in '$`{') or '__CG_' in value: return False
+        if value == '-c':
+            if i == len(args) or not args[i].startswith(SAFE_CONFIG): return False
+            if any(c in args[i] for c in '$`') or '__CG_' in args[i]: return False
+            i += 1; continue
+        if value.startswith('-'):
+            if value not in SAFE_GLOBAL: return False
+            continue
+        if value == 'grep' and any(opens_pager(a) for a in args[i:]): return False
+        return value in READ_ONLY_GIT
+    return False
+
+
+def one_word(value):
+    return '__CG_WORDS__' not in value and '{' not in value
+
+
+def opens_pager(arg):
+    """git grep -O / --open-files-in-pager (or an abbreviation) runs a command."""
+    if arg.startswith('--'):
+        name = arg[2:].split('=', 1)[0]
+        return len(name) >= 2 and 'open-files-in-pager'.startswith(name)
+    return arg.startswith('-') and 'O' in arg
+
+
 class Unresolved(ValueError):
     pass
 
 
 def literal(value):
-    if any(c in value for c in '$`~') or SUB.search(value):
+    if any(c in value for c in '$`~{') or SUB.search(value):
         raise Unresolved('dynamic repository or path argument')
     return value
 
@@ -225,6 +274,9 @@ def inspect_segment(segment, cwd):
             raise Unresolved('wrapped Git command; use an explicit literal git -C command')
         return None
     if env_sensitive: raise Unresolved('Git environment changes candidate selection')
+    # A read-only subcommand selects nothing to stage, so its repository, options
+    # and operands need no resolving: `git -C "$REPO" show` is fine.
+    if read_only_git(args): return cwd
     if any('__CG_WORDS__' in arg for arg in args):
         raise Unresolved('unquoted expansion can change Git operands; quote message arguments')
     work = cwd; i = 1
@@ -239,12 +291,14 @@ def inspect_segment(segment, cwd):
         elif value == '-c':
             if i == len(args): raise Unresolved('missing Git config')
             config = args[i]; i += 1
-            if not config.startswith(('user.', 'commit.gpgsign=', 'tag.gpgsign=', 'core.hooksPath=', 'core.quotepath=')):
+            if not config.startswith(SAFE_CONFIG):
                 raise Unresolved('Git config may change repository selection')
         elif value.startswith('-'):
             raise Unresolved('unsupported global Git option')
         else:
             if value not in ('add', 'stage', 'commit'):
+                if value == 'grep' and any(opens_pager(a) for a in args[i:]):
+                    raise Unresolved('git grep -O runs a command')
                 if value in OTHER_GIT:
                     return cwd if value in READ_ONLY_GIT else None
                 raise Unresolved('Git alias or unknown subcommand; use its literal expansion')
@@ -263,9 +317,9 @@ def git_kind(segment):
     the repository but selects no files to stage), and 'other' for anything that could
     reach Git unseen: an unknown option or subcommand, a GIT_ environment change, or
     Git wrapped in another command (xargs, sh -c ...)."""
-    args = list(segment)
+    args, env_sensitive = list(segment), False
     while args and (args[0] in ('command', 'builtin', 'env', 'sudo', 'nohup') or re.match(r'^\w+=', args[0])):
-        if args[0].startswith(('GIT_', 'CDPATH=')): return 'other'
+        env_sensitive |= args[0].startswith(('GIT_', 'CDPATH='))
         args.pop(0)
     if not args: return None
     if Path(args[0]).name != 'git':
@@ -274,6 +328,8 @@ def git_kind(segment):
                 args[0] in ('sh', 'bash', 'zsh') and GIT_WORD.search(' '.join(args))):
             return 'other'
         return None
+    if env_sensitive: return 'other'
+    if read_only_git(args): return 'read'
     i = 1
     while i < len(args):
         value = args[i]; i += 1

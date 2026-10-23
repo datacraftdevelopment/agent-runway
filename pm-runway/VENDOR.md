@@ -6,7 +6,7 @@ pm-runway carries everything it uses, so a pm-runway machine installs no other w
 
 All of pm-sp (from `datacraftdevelopment/dc-dev-plugins`, folder `pm-sp/`), which itself vendors a trimmed Superpowers and seven of Matt Pocock's skills. Its own record of those, with every change it made, is kept below under "pm-sp's own record".
 
-- **Upstream:** dc-dev-plugins commit `4783a24` (pm-sp 0.2.6, 2026-10-22).
+- **Upstream:** dc-dev-plugins commit `1eaff6b` (pm-sp 0.2.7, 2026-10-23).
 - **Copied by** `scripts/sync_vendor.py` (git-tracked files only, via `git archive`), every `pm-sp` renamed `pm-runway`. Re-running the script with the same commits gives the same tree.
 - **Kept as pm-runway's own** (the script never overwrites these): `.claude-plugin/plugin.json`, `README.md`, this file, and the two files changed below.
 
@@ -102,6 +102,19 @@ pm-runway carries a trimmed copy of Jesse Vincent's **Superpowers**
    `${CLAUDE_PLUGIN_ROOT}/skills/.../scripts/`, run from the project worktree.
 8. `finishing-a-development-branch`: Step 7 offers ship-acceptance and
    stepping-away. `brainstorming`'s opening checklist asks before planning.
+9. From the first field report (dc-dev-plugins #118, 0.2.7):
+   `brainstorming` approves screens before the design (data sample, then
+   Claude Design through `design-handoff`), asks where the data lives first,
+   adds a screens Acceptance check, and takes late changes as a one-line
+   delta; `writing-plans` tags tasks by risk, always looks for lanes, and
+   dry-runs the repo's guardrails; `subagent-driven-development` runs lanes
+   at once in their own worktrees and reviews per task only for high risk
+   (`references/lanes-and-risk.md`, a pm-runway file), and its pm-runway tiers
+   paragraph drops "Name the model on every dispatch" (upstream's "Always
+   specify the model" says it); `final-review.md` names
+   the unreviewed tasks; `using-git-worktrees` defaults to
+   `.superpowers/worktrees/`; `finishing-a-development-branch` gains Step
+   5b (uncommitted files, follow-ups, processes this session started).
 
 Everything else is upstream text. Search for `pm-runway` in the copied skills to
 see each change in place.
@@ -139,6 +152,14 @@ licensed (`LICENSE.mattpocock`).
    wayfinder") starts it, and its description says to run only when named.
    Map Notes can no longer authorize implementation.
 4. `research` and `codebase-design`'s design-it-twice name their models.
+5. `wayfinder` (0.2.7): screens come first (Data sample and Screens
+   tickets), one owner for the map with map deltas from other sessions, and
+   the destination step asks "proof of concept or product?".
+
+`design-handoff` is not vendored: it is Joe's own, copied from this
+marketplace's `design-dc` plugin (0.2.2) with a pm-runway section on where it
+sits and the handoff path moved to `docs/specs/`. `design-dc` stays its
+source; carry fixes across by hand.
 
 ### The visual companion
 
@@ -157,4 +178,4 @@ Roughly monthly, or when a release note matters:
    above against the previously vendored commit.
 2. Apply upstream changes here, keeping the changes listed above.
 3. Update the commit line at the top, bump pm-runway's version, run
-   `python3 -m pytest tests/test_pm_sp_plugin.py -q` from the marketplace root.
+   `python3 -m pytest tests/test_pm_runway_plugin.py -q` from the marketplace root.

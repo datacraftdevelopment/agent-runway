@@ -45,6 +45,8 @@ around the session.
 - **New work starts in `brainstorming`.** It reads the project first, talks it
   through, shows mockups in a browser tab when seeing beats reading, lays out
   approaches and writes a design doc. A quick, fully specified task skips it.
+- **Screens come first.** Work with screens goes data sample, then screens in
+  Claude Design (`design-handoff`), approved, then build.
 - **Design docs go in `docs/specs/YYYY-MM-DD-<topic>-design.md`, plans in
   `docs/plans/YYYY-MM-DD-<feature>.md`.** Both are committed.
 - **Every design doc has `## Acceptance`:** three or four observable checks as

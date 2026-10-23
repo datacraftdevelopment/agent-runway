@@ -69,12 +69,15 @@ argues from the spec, so the spec travels with it; executors read both]
 
 ## Lanes
 
-[pm-runway. Only when the plan has groups of tasks that touch disjoint files
-and don't depend on each other's output. Name each group as a lane, with
-its tasks and the files it owns, so pm-runway:nested-sessions can run lanes
-side by side. Shared lockfiles, migrations, schema, generated code and
-config registries put two groups in the same lane. Omit this section
-when there is one lane, which is most plans.]
+[pm-runway. Whenever the plan has groups of tasks that touch disjoint files
+and don't depend on each other's output: look for them every time, for
+example several tasks that all build on one shared foundation task. Name
+each group as a lane, with its tasks, the files it owns, and the task it
+waits for, so pm-runway:subagent-driven-development runs the lanes' implementers
+at the same time, each in its own worktree, and pm-runway:nested-sessions can
+give big lanes a session each. Shared lockfiles, migrations, schema,
+generated code and config registries put two groups in the same lane. Omit
+this section only when the tasks really are one chain.]
 
 ## Global Constraints
 
@@ -107,6 +110,8 @@ owns the code, in that task's own step style.]
 - Create: `exact/path/to/file.py`
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
+
+**Risk:** high | ordinary | low  (pm-runway: picks this task's review, see below)
 
 **Interfaces:**
 - Consumes: [what this task uses from earlier tasks — exact signatures]
@@ -145,6 +150,35 @@ git add tests/path/test.py src/path/file.py
 git commit -m "feat: add specific feature"
 ```
 ````
+
+## Risk Tiers (pm-runway)
+
+Tag every task with the risk of shipping it wrong. The executor scales the
+review to it, so the reviews go where the bugs are:
+
+- **high:** data correctness (what gets read, written, dropped or
+  blanked), security and credentials, external contracts (APIs, file
+  formats, other systems). Reviewed after the task, every time.
+- **ordinary:** code whose mistakes the tests and the final review would
+  catch, and that touches no high-risk area. Covered by the whole-branch review at the
+  end of the plan, not one per task.
+- **low:** docs, styling, test-only changes, scaffolding. The
+  implementer's tests and self-review, then the whole-branch review.
+
+When in doubt, go one tier up. A task that builds or changes a screen ends
+with a step that screenshots every view it touches, on real data at a real
+window size, and compares them with the approved screens.
+
+## Repo Guardrails (pm-runway)
+
+Before handing the plan over, read the target repo's guardrails (Claude
+Code hooks in `.claude/settings.json`, git hooks, pre-commit, leak or
+secret scanners, gate-hooks, path rules in `CLAUDE.md`) and dry-run them
+against what the plan will write: its paths (anything outside the repo?),
+and any text a scanner could flag (auth headers, fake test credentials).
+Record every constraint you find in Global Constraints, and change the
+tasks that would trip one. A plan built on an assumption the repo's hooks
+reject costs a round trip per task.
 
 ## What a Step Contains
 

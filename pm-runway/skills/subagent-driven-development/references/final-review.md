@@ -13,6 +13,9 @@ pm-runway:requesting-code-review's
 [code-reviewer.md](../../requesting-code-review/code-reviewer.md). Point it at
 the ledger's deferred-minor and parked lines so it can triage which must be
 fixed before merge.
+Also list the tasks that skipped their task review (risk ordinary or low,
+pm-runway): this review is their only independent read, so it reads them as
+closely as a task review would.
 
 If the final whole-branch review returns findings, dispatch ONE fix subagent
 with the complete findings list — not one fixer per finding.

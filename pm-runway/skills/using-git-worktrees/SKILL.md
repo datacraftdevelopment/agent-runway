@@ -68,12 +68,13 @@ Follow this priority order. Explicit user preference always beats observed files
 
 2. **Check for an existing project-local worktree directory:**
    ```bash
+   ls -d .superpowers/worktrees 2>/dev/null  # pm-runway default
    ls -d .worktrees 2>/dev/null     # Preferred (hidden)
    ls -d worktrees 2>/dev/null      # Alternative
    ```
    If found, use it. If both exist, `.worktrees` wins.
 
-3. **If there is no other guidance available**, default to `.worktrees/` at the project root.
+3. **If there is no other guidance available**, default to `.worktrees/` at the project root. (pm-runway: default to `.superpowers/worktrees/`, already gitignored, so worktrees stay with the project instead of in a session's temporary folder.)
 
 #### Safety Verification (project-local directories only)
 
@@ -81,6 +82,8 @@ Follow this priority order. Explicit user preference always beats observed files
 
 ```bash
 git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
+# pm-runway: for .superpowers/worktrees/
+git check-ignore -q .superpowers 2>/dev/null
 ```
 
 **If NOT ignored:** Add to .gitignore, commit the change, then proceed.
@@ -150,7 +153,7 @@ Ready to implement <feature-name>
 | `.worktrees/` exists | Use it (verify ignored) |
 | `worktrees/` exists | Use it (verify ignored) |
 | Both exist | Use `.worktrees/` |
-| Neither exists | Check instruction file, then default `.worktrees/` |
+| Neither exists | Check instruction file, then default `.worktrees/` (pm-runway: `.superpowers/worktrees/`) |
 | Directory not ignored | Add to .gitignore + commit |
 | Permission error on create | Sandbox fallback, work in place |
 | Tests fail during baseline | Report failures + ask |
