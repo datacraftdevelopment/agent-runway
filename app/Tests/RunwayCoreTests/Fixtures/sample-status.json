@@ -1,1 +1,116 @@
-{}
+{
+  "version": 1,
+  "generated_at": "2026-10-23T19:16:00",
+  "paused_until": null,
+  "repos": [
+    { "name": "recipe-app", "state": "running", "status_line": "Running · 2 need you", "main_computer": "This Mac", "runs_on": "any" },
+    { "name": "my-website", "state": "idle", "status_line": "Idle · nothing queued", "main_computer": "Mac mini", "runs_on": "any" },
+    { "name": "invoice-tool", "state": "paused", "status_line": "Paused until tomorrow", "main_computer": "Work Mac", "runs_on": "main" }
+  ],
+  "runners": [
+    { "name": "This Mac", "kind": "this_mac", "slots_used": 1, "slots_total": 2, "state": "online" },
+    { "name": "Mac mini", "kind": "ssh_mac", "slots_used": 1, "slots_total": 2, "state": "online" },
+    { "name": "Work Mac", "kind": "ssh_mac", "slots_used": 0, "slots_total": 2, "state": "asleep" },
+    { "name": "Cloud", "kind": "cloud", "slots_used": 1, "slots_total": 3, "state": "online" }
+  ],
+  "agents": [
+    { "kind": "claude", "resting_until": "2026-10-23T19:30:00" },
+    { "kind": "codex", "resting_until": null }
+  ],
+  "tickets": [
+    {
+      "id": "T-14", "repo": "recipe-app", "title": "Let people sign in with a magic link", "column": "needs_you",
+      "agent": "claude", "risk": "not_low", "runs_on": "This Mac", "pinned": false,
+      "pr": "#41", "review": "Codex: pass, risk raised (touches auth)",
+      "question": { "text": "The build and review passed, but this touches sign-in, so it never merges on its own. Merge PR #41?", "go_label": "Merge", "no_label": "Not yet" },
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T18:42:00", "waits_on": [],
+      "summary": "Sign-in path is sensitive, so this waits for you whatever the review says."
+    },
+    {
+      "id": "T-17", "repo": "recipe-app", "title": "Pick a date format for the shopping list", "column": "needs_you",
+      "agent": "codex", "risk": "low", "runs_on": "Mac mini", "pinned": false,
+      "question": { "text": "The ticket doesn’t say which date format to use. Recommended: “Mon 26 Oct”, matching the recipe pages.", "go_label": "Use recommended", "no_label": "Answer differently" },
+      "filed_from": "Codex on Mac mini", "filed_at": "2026-10-23T18:55:00", "waits_on": [],
+      "summary": "The worker stopped with one question before building."
+    },
+    {
+      "id": "T-18", "repo": "recipe-app", "title": "Add a print view for a single recipe", "column": "up_next",
+      "agent": "any", "risk": "low", "runs_on": null, "pinned": false,
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T19:01:00", "waits_on": [],
+      "summary": "Starts when a Mac has a free slot."
+    },
+    {
+      "id": "T-19", "repo": "recipe-app", "title": "Show cooking time on recipe cards", "column": "up_next",
+      "agent": "any", "risk": "low", "runs_on": "Mac mini", "pinned": true,
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T19:01:00", "waits_on": [],
+      "summary": "Pinned to Mac mini, where the test photos folder lives. Starts when Mac mini has a free slot, even if other runners are free."
+    },
+    {
+      "id": "T-20", "repo": "recipe-app", "title": "Search recipes by ingredient", "column": "up_next",
+      "agent": "claude", "risk": "not_low", "runs_on": null, "pinned": false,
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T19:01:00", "waits_on": ["T-18"],
+      "summary": "Waits for T-18 to finish first."
+    },
+    {
+      "id": "T-15", "repo": "recipe-app", "title": "Fix the empty-state message on the pantry page", "column": "running",
+      "agent": "codex", "risk": "low", "runs_on": "Mac mini", "pinned": false, "stage": "review",
+      "pr": "#42 (draft)", "review": "Claude: reviewing",
+      "filed_from": "Codex on Mac mini", "filed_at": "2026-10-23T18:47:00", "waits_on": [], "elapsed": 850,
+      "summary": "Built and checked; Claude is reviewing commit 3f2a91c."
+    },
+    {
+      "id": "T-16", "repo": "recipe-app", "title": "Remember the last servings number per recipe", "column": "running",
+      "agent": "claude", "risk": "low", "runs_on": "This Mac", "pinned": false, "stage": "build",
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T18:50:00", "waits_on": [], "elapsed": 362,
+      "summary": "Building, 6 min in."
+    },
+    {
+      "id": "T-21", "repo": "recipe-app", "title": "Write tests for the unit converter", "column": "running",
+      "agent": "codex", "risk": "low", "runs_on": "Cloud", "pinned": false, "stage": "build",
+      "filed_from": "Claude Code cloud session", "filed_at": "2026-10-23T18:56:00", "waits_on": [], "elapsed": 580,
+      "summary": "Building in a Codex cloud task; its PR comes back like any other."
+    },
+    {
+      "id": "T-11", "repo": "recipe-app", "title": "Larger tap targets on the timer", "column": "done",
+      "agent": "claude", "risk": "low", "runs_on": "This Mac", "pinned": false,
+      "pr": "#38 merged", "review": "Codex: pass",
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T17:30:00", "waits_on": [],
+      "summary": "Merged on its own: low risk, review passed, checks green."
+    },
+    {
+      "id": "T-12", "repo": "recipe-app", "title": "Typo in the onboarding copy", "column": "done",
+      "agent": "claude", "risk": "low", "runs_on": "Cloud", "pinned": false,
+      "pr": "#39 merged", "review": "Codex: pass",
+      "filed_from": "Codex on Mac mini", "filed_at": "2026-10-23T17:32:00", "waits_on": [],
+      "summary": "Merged on its own."
+    },
+    {
+      "id": "T-13", "repo": "recipe-app", "title": "Sort favourites by last cooked", "column": "done",
+      "agent": "claude", "risk": "not_low", "runs_on": "This Mac", "pinned": false,
+      "pr": "#40 merged by you", "review": "Codex: pass",
+      "filed_from": "Claude Code on this Mac", "filed_at": "2026-10-23T17:40:00", "waits_on": [],
+      "summary": "You merged it at 18:20."
+    }
+  ],
+  "activity": [
+    { "at": "2026-10-23T17:30:00", "kind": "filed", "repo": "recipe-app", "text": "3 tickets from Claude Code on this Mac (T-11, T-12, T-13)" },
+    { "at": "2026-10-23T17:31:00", "kind": "start", "repo": "recipe-app", "text": "T-11 on This Mac with Claude Code" },
+    { "at": "2026-10-23T17:31:00", "kind": "start", "repo": "recipe-app", "text": "T-12 in the cloud with Claude Code" },
+    { "at": "2026-10-23T17:52:00", "kind": "review", "repo": "recipe-app", "text": "T-11 Codex: pass on 81c0d2e" },
+    { "at": "2026-10-23T17:53:00", "kind": "merged", "repo": "recipe-app", "text": "T-11 PR #38 (low risk, checks green)" },
+    { "at": "2026-10-23T18:20:00", "kind": "merged", "repo": "recipe-app", "text": "T-13 PR #40, merged by you" },
+    { "at": "2026-10-23T18:42:00", "kind": "filed", "repo": "recipe-app", "text": "T-14 from Claude Code on this Mac" },
+    { "at": "2026-10-23T18:47:00", "kind": "filed", "repo": "recipe-app", "text": "T-15 from Codex on Mac mini" },
+    { "at": "2026-10-23T18:49:00", "kind": "limit", "text": "Claude Code hit its usage limit; Any tickets go to Codex until 19:30" },
+    { "at": "2026-10-23T18:56:00", "kind": "filed", "repo": "recipe-app", "text": "T-21 from a Claude Code cloud session (via the tickets branch)" },
+    { "at": "2026-10-23T18:57:00", "kind": "start", "repo": "recipe-app", "text": "T-21 in the cloud with Codex" },
+    { "at": "2026-10-23T18:58:00", "kind": "needs_you", "repo": "recipe-app", "text": "T-17 asked which date format to use" },
+    { "at": "2026-10-23T19:04:00", "kind": "needs_you", "repo": "recipe-app", "text": "T-14 touches sign-in, waiting for your merge" },
+    { "at": "2026-10-23T19:06:00", "kind": "review", "repo": "recipe-app", "text": "T-15 Claude reviewing 3f2a91c" }
+  ],
+  "setup": [
+    { "runner": "This Mac", "reachable": "yes", "claude": "yes", "codex": "yes", "github": "yes" },
+    { "runner": "Mac mini", "reachable": "yes", "claude": "yes", "codex": "checking", "github": "yes" },
+    { "runner": "Cloud", "reachable": "yes", "claude": "yes", "codex": "sign_in", "github": "yes" }
+  ]
+}
