@@ -37,4 +37,4 @@ npm globals).
 `swift build` of a `MenuBarExtra` + `WindowGroup` app (macOS 14 target) builds and opens a window with only Command
 Line Tools selected (Swift 6.4; two harmless `ld` search-path warnings). Xcode 27.1 is installed but `xcode-select`
 points at CLT, so `xcodebuild` fails; `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build` works
-without changing the system setting. `swift test` with XCTest is checked in Phase 1.
+without changing the system setting. `swift test` runs XCTest under CLT too (checked in task 1.1).
