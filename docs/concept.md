@@ -26,7 +26,7 @@ Risks to test first:
 
 ## Two kinds of work on the board
 
-- **Steered sessions.** Joe shapes the work by hand (new repo, wayfinder, chunks, specs), talking as much as it needs. These sessions show on the board too.
+- **Steered sessions.** Joe shapes the work by hand (new repo, wayfinder, chunks, specs), talking as much as it needs. These sessions show on the board too, found by the controller rather than reported by a hook (see the controller database design, "Steered sessions").
 - **Unattended tickets.** What shaping produces. They run off on whichever machine takes them, get reviewed, and merge on their own only when they are low risk.
 
 ## Merge rule
@@ -47,7 +47,7 @@ Risks to test first:
 The daemon is plumbing. The real product is a contract that skills and plugins follow, so pm-sp (and others, such as Matt Pocock's skills) work with it:
 
 1. A skill that files tickets into the hub at the end of shaping, with risk set.
-2. A session hook so every session, including ones started by hand, registers itself and reports status.
+2. ~~A session hook so every session registers itself~~ (2026-10-23: Claude Code desktop doesn't run plugin hooks). The controller finds hand-started sessions itself by scanning each machine's Claude Code session logs over SSH. A hook can still add detail where it runs, but nothing depends on it.
 3. Worker skills that claim a ticket, do it, and leave receipts (claimed, blocked, needs you, done, failed).
 
 ## Who it's for
