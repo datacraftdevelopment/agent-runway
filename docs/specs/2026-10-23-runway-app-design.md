@@ -57,7 +57,7 @@ what's up next, what's running, what needs you and what's done, in the look of R
 | `work-ticket` skill | What a headless worker follows: build in the worktree, open a draft PR, write the outcome file. | PR #2 |
 | `review-ticket` skill | The other agent's review and verdict. | PR #2 |
 | `runway` skill | From any session: what's running, what needs me, pause, resume, go/no. | v1's `runway` skill idea |
-| The app | Menu bar + side panel + one window. | Runway v1's SwiftUI app (archived `runway` repo) |
+| The app | SwiftUI: menu bar + side panel + one window. | Runway v1's SwiftUI app (archived `runway` repo) |
 
 ## The app (Runway v1's look, new insides)
 
@@ -87,9 +87,9 @@ what's up next, what's running, what needs you and what's done, in the look of R
 
 ## Open, to settle while building
 
-- **App stack.** SwiftUI (Joe liked v1's app; its code can be copied from the archive) or a web UI in a Tauri shell
-  (the earlier choice, works beyond macOS). Asked of Joe. v1 built with
-  `swift build`; whether Command Line Tools alone are enough for SwiftUI is untested.
+- **App stack: decided SwiftUI** (Joe, 2026-10-23), reusing v1's views from the archive copy (the `runway` repo
+  stays archived). Mac only. Whether Command Line Tools alone are enough for `swift build` of a SwiftUI app is
+  untested; check it first.
 - **Keychain over SSH.** Claude and Codex sign-ins may be locked in a non-interactive SSH session. Test on a second Mac
   before building the multi-Mac part; one Mac (A1 to A3) doesn't depend on it.
 - **Codex headless flags** (`codex exec --json`, `codex resume`) to confirm against the installed version.
