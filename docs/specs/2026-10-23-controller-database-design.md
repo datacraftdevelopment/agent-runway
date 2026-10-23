@@ -1,0 +1,60 @@
+# Controller database and Herdr first
+
+Status: decided 2026-10-23 in conversation with Joe. Amends ruling 3 of `docs/review/2026-10-23-panel.md` (where ticket definitions live).
+
+## Decision
+
+1. **Herdr is the worker layer, and we start with it.** BB was the other candidate; it keeps sessions alive across machines and is good to watch, but it can't start work or report agent state to a script. Herdr does both over SSH with JSON output. BB could come later as a viewer if it earns a place.
+2. **The app gets a database: one SQLite file on the controller.** No server, nothing hosted, nothing for a new user to set up. It ships with macOS and every language we'd use.
+3. **The database is also the ticket tracker.** This was always the plan (the old hosted runway-db); it just moves onto the controller. It replaces the panel's "ticket files committed in each repo".
+
+## What lives where
+
+| Fact | Where | Who writes it |
+|---|---|---|
+| Projects, tickets, what blocks what, comments | Controller SQLite | The filing skill (through the controller's CLI), Joe from the app |
+| Claims, attempts, receipts, review verdicts, decisions | Controller SQLite | The controller only |
+| Machines and their settings | Controller SQLite | Setup |
+| Specs, plans, design docs | Git, in each repo | Shaping sessions |
+| Live agent state (idle, working, blocked, done) | Herdr on each worker | Herdr; read, never stored as truth |
+
+The board reads the database and Herdr; it stores nothing of its own.
+
+## Why SQLite and not log files
+
+- **Claims must be atomic.** Two dispatches must never both win a ticket. A SQLite transaction guarantees that; appending to a file does not.
+- **The board needs queries** (by machine, by status, needs-you first). Files would need an index anyway.
+- **Every change is also kept as an event row** (append-only), so the history the panel asked for stays: ids on every event, replay is safe, receipts pulled twice are deduplicated by id.
+
+## Tables (first cut)
+
+Kept close to the runway-db draft so that design isn't wasted:
+
+- `projects` (id, key, name, repo, default_branch)
+- `tickets` (id, project_id, number, title, body, risk, status, strategy, spec_path, created_at)
+- `ticket_blocks` (ticket_id, blocked_by_id)
+- `comments` (id, ticket_id, author, body, created_at)
+- `machines` (id, label, herdr_label, kind: local/ssh/cloud, enabled)
+- `attempts` (id, ticket_id, dispatch_id, machine_id, herdr_session, branch, started_at, ended_at, outcome)
+- `events` (id, at, kind, ticket_id, attempt_id, payload JSON), append-only
+- `decisions` (id, ticket_id, question, options, answer, answered_by, answered_at)
+
+Risk is written at filing and can only go up (reviewer raises are events). Status is derived from events, not edited by hand.
+
+## How tickets reach a worker
+
+The controller passes the ticket body, its spec path and the dispatch id when it starts the session through Herdr (`herdr --machine <label> agent start …`). The worker never reads the database; it reports through its local outbox, which the controller pulls over SSH, as the panel ruled. Cloud sessions get the same packet in their start prompt and report through result files on their branch.
+
+## Consequences
+
+- The gate's trust problem gets simpler: ticket definitions are no longer in the repo the builder edits, so a builder can't rewrite its own ticket or risk.
+- Tickets don't travel with the code. If a repo moves to another person's controller, its open tickets need an export. Acceptable for v1.
+- Back up one file (`~/.runway-agent/runway.db`). Time Machine covers it.
+- The filing skill writes through the controller's CLI, so a shaping session on another Mac files over SSH (`ssh controller runway-agent ticket add …`). Shaping on the controller itself is the common case.
+
+## Acceptance
+
+- [ ] A1: `runway-agent ticket add` on the controller creates a ticket row and a `filed` event, and `runway-agent ticket list` shows it.
+- [ ] A2: Two dispatches of the same ticket started at once: exactly one gets a claim, the other is refused.
+- [ ] A3: One low-risk ticket runs on a worker through Herdr, its receipt is pulled into the database, and the board shows it done.
+- [ ] A4: Pulling the same receipts twice leaves one event per receipt.
