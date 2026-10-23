@@ -5,9 +5,9 @@
   },
   "plugins": [
     {
-      "name": "runway-agent",
-      "source": "./plugin",
-      "description": "Skills and controller CLI for Runway Agent: file tickets from shaped work, work them unattended on your own Macs through Herdr, review on a second model, merge only low risk through a gate written in code."
+      "name": "pm-runway",
+      "source": "./pm-runway",
+      "description": "The whole way of working in one plugin: session and shaping skills, Matt Pocock's spec-to-tickets flow as our own versions, and Runway, which runs a chunk's tickets unattended on your own Macs through Orca, reviews each on the other model, and merges to main through a gate only when low risk."
     }
   ]
 }

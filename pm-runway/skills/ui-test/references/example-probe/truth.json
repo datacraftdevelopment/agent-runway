@@ -1,0 +1,16 @@
+{
+  "case_id": "probefile-capability-2026-09-12",
+  "assertions": {
+    "RecordID": "1",
+    "kTrue": "1",
+    "CreationTimestamp": "2026-09-12 2:01:48 PM",
+    "CreationAccount": "Admin",
+    "fk_XXX_ID": "?",
+    "record_count": "1",
+    "layout": "BASE"
+  },
+  "artifacts_required": [
+    "evidence/probefile.png"
+  ],
+  "mutations_allowed": false
+}

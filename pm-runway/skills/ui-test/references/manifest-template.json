@@ -1,0 +1,45 @@
+{
+  "run_name": "<job-name-in-the-humans-words>",
+  "workdir": "<absolute scratch dir outside any repo>",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "<case_id>-run",
+      "engine": "codex",
+      "task_type": "ui-test",
+      "timeout_s": 900,
+      "max_attempts": 1,
+      "expect_files": [
+        "receipt.json",
+        "evidence/<case_id>-before.png",
+        "evidence/<case_id>-dialog.png",
+        "evidence/<case_id>-after.png"
+      ],
+      "spec": "<worker preamble from the ringer skill>\n\n<instruction from references/instruction-template.md, fully filled>",
+      "check": "python3 '<ui-test-plugin-root>/skills/ui-test/scripts/check_receipt.py' --truth '<workdir>/<case_id>/truth.json'",
+      "verified": "Mechanical receipt validation: matching case_id, nonempty assertions, required artifacts listed and PNGs decoded, exact reads match truth; runner check success is not the product verdict or capture authenticity."
+    },
+    {
+      "key": "<case_id>-verify",
+      "engine": "codex",
+      "task_type": "ui-test-verify",
+      "timeout_s": 600,
+      "max_attempts": 1,
+      "expect_files": [
+        "verdict.json"
+      ],
+      "spec": "<worker preamble>\n\nROLE: You are the VERIFIER for UI test case <case_id> in <App>. Read <workdir>/<case_id>-run/receipt.json and open every PNG it lists. Do not read the runner's notes or execution_outcome as evidence \u2014 transcribe each assertion's value from the screenshots yourself (use view_image). Write ./verdict.json with case_id exactly matching truth.json, per the verdict schema: one per_assertion row per assertion id in <workdir>/<case_id>/truth.json with observed_by_verifier, artifact_ref, result. verdict is PASS only if every row passes. A BLOCKED receipt is verdict BLOCKED; a FAIL receipt cannot yield PASS. For FAIL/BLOCKED, state the reason in basis; unavailable evidence need not have assertion rows. Never modify the receipt or artifacts.",
+      "check": "python3 '<ui-test-plugin-root>/skills/ui-test/scripts/check_verdict.py' --truth '<workdir>/<case_id>/truth.json' --receipt '<workdir>/<case_id>-run/receipt.json'",
+      "verified": "Mechanical validation of the verifier product PASS: receipt integrity, matching case_id, unique assertion rows, artifact membership, and literal values; does not establish capture authenticity or independent transcription."
+    }
+  ],
+  "_notes": [
+    "max_parallel stays 1: one desktop, one GUI worker.",
+    "Task keys run in manifest order; the verify task's spec points at the run task's directory by absolute path.",
+    "Before dispatch, the orchestrator resolves <ui-test-plugin-root> from the loaded ui-test skill location (plugin root containing skills/ui-test/scripts). Use that same procedure in Claude Code and Codex. Fill every command with absolute, shell-quoted paths; verify the scripts and requirements.txt exist there. Worker cwd and host environment variables are not runtime locators.",
+    "max_attempts 1 on the run task: a retry would re-perform mutating actions against dirty state. Reset, then re-run the whole case.",
+    "Fill runner expect_files with receipt.json plus every truth.artifacts_required path, relative to the runner receipt directory. Add every planned capture, including evidence referenced by assertions, so PNGs reach Ringer artifact harvest; a directory or wildcard is not a file entry.",
+    "Before dispatch, compare the filled truth.artifacts_required against runner expect_files; every required capture must be included. Use unique basenames and PNGs at most 20 MB for the current Ringer harvester, which flattens paths. Retain the original receipt/evidence directory for replay; the harvested copies alone do not preserve its relative paths.",
+    "FAIL/BLOCKED may legitimately lack captures. The checks return nonzero with the reported outcome/reason; Ringer may also report missing expect_files. Keep receipt.json, surface the blocker, and reset before replay; never synthesize captures to satisfy harvest."
+  ]
+}

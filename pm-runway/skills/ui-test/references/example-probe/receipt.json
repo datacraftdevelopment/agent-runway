@@ -1,0 +1,27 @@
+{
+  "execution_outcome": "PASS-OBSERVED",
+  "tool_used": "mcp__cua_repl.js: cua.getApp(\"FileMaker Pro\"), app.getScreenshot(), nodeRepl.write(), node:fs/promises.mkdir/writeFile/readFile; functions.exec: tools.exec_command (sips -s format png evidence/probefile.png)",
+  "read_method": "mixed",
+  "observations": {
+    "RecordID": "1",
+    "kTrue": "1",
+    "CreationTimestamp": "2026-09-12 2:01:48 PM",
+    "CreationAccount": "Admin",
+    "ModifyTimestamp": "2026-09-12 2:01:58 PM",
+    "ModifyAccount": "Admin",
+    "fk_XXX_ID": "?",
+    "ID": "?",
+    "record_count": "1",
+    "layout": "BASE"
+  },
+  "artifacts": [
+    {
+      "path": "evidence/probefile.png",
+      "captured_at": "2026-09-12T18:19:01.133Z",
+      "window_title": "ProbeFile"
+    }
+  ],
+  "mutations_made": false,
+  "notes": "Source per value: RecordID, kTrue, CreationTimestamp, CreationAccount, ModifyTimestamp, ModifyAccount, record_count, and layout came from accessibility, preferred where it matched the rendering and visually checked against the screenshot. ID and fk_XXX_ID came from pixels: both visibly render \"?\". Accessibility instead exposes ID as \"6.1412E+57\" and fk_XXX_ID as \"PROBE-7Q4M-2026\"; those underlying values were not used as rendered observations. Accessibility toolbar text is \"Total (Unsorted) 1\". Form View is on. Capture contains only the ProbeFile window; no cropping was necessary. No clicks, keystrokes, control changes, permission prompts, or dialogs. The capture tool returned JPEG bytes; initial PNG signature verification produced the verbatim error \"Saved capture is not PNG\". Attempting to import sharp for conversion produced the verbatim error \"Unsupported import specifier \"../package.json\" in node_repl. Only .js and .mjs files are supported.\" Resolved by converting the actual capture to PNG with sips; saved PNG signature verified. Only requested output paths were written.",
+  "case_id": "probefile-capability-2026-09-12"
+}

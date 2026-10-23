@@ -1,0 +1,10 @@
+{
+  "orca": "orca",
+  "builder": "claude",
+  "max_running": 3,
+  "machines": [
+    {"name": "controller", "on": null, "slots": 1, "agents": ["claude", "codex"]},
+    {"name": "worker-1", "on": "worker-1", "slots": 2, "agents": ["claude", "codex"],
+     "repos": {"my-app": "<the repo selector Orca on worker-1 shows for my-app>"}}
+  ]
+}

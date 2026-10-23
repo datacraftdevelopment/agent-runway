@@ -1,0 +1,10 @@
+{
+  "name": "pm-runway",
+  "version": "0.1.0",
+  "description": "One plugin for the whole way of working: pm-sp's session and shaping layer (whats-next, stepping-away, brainstorming, wayfinder, grilling, second-opinion, ship-acceptance, the credential guard and gates) on a trimmed copy of Superpowers, our own versions of Matt Pocock's to-spec, to-tickets, implement-spec, tdd and code-review, and Runway: chunks cut into tickets that run unattended on your own Macs through Orca, each built by one model and reviewed by the other, landed on the chunk's branch by a plain loop script, and merged to main by a gate in code only when low risk. Uses your own Claude Code and Codex CLI sign-ins. Install instead of pm-sp or pm, never alongside them.",
+  "author": {
+    "name": "Runway Agent contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/datacraftdevelopment/runway-agent"
+}

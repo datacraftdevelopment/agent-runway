@@ -1,5 +1,0 @@
-#!/bin/sh
-# runway-agent: the controller CLI (and the worker's claim-check and receipt commands).
-# Link this onto PATH on every machine: ln -s "<plugin root>/bin/runway-agent" ~/.local/bin/runway-agent
-here=$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)
-PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m runway_agent "$@"

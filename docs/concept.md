@@ -1,6 +1,8 @@
 # Runway Agent: concept
 
-Status: concept, 2026-10-22. Nothing built yet. Shaped in conversation with Joe the day Runway v1 was retired.
+Status: concept, 2026-10-22. Shaped in conversation with Joe the day Runway v1 was retired.
+
+> **Superseded in part, 2026-10-23.** The build is now the `pm-runway` plugin (`docs/specs/2026-10-23-pm-runway-design.md`): Orca replaces Herdr, SSH dispatch and our own app; tickets are files, not rows in a controller database; the loop is a plain script in an Orca tab with a board page; one integration branch per chunk, gated once. The sections below are the earlier thinking and are kept for the record.
 
 ## What it is
 

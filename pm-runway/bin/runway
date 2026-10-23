@@ -1,0 +1,4 @@
+#!/bin/sh
+# pm-runway's CLI. Link it onto PATH: ln -s "<plugin root>/bin/runway" ~/.local/bin/runway
+here=$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")" && pwd)
+exec python3 "$here/../runway/runway.py" "$@"

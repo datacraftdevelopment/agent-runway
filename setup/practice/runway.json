@@ -1,0 +1,6 @@
+{
+  "check_cmd": "python3 -m unittest -q",
+  "sensitive_paths": [],
+  "merge_method": "merge",
+  "auto_merge": true
+}

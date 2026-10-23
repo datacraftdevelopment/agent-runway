@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pm-runway Setup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one readable column, a preflight checklist of numbered steps, each tagged with who does it. */
+:root {
+  --bg: #f5f7f9; --surface: #ffffff; --fg: #17202b; --muted: #5b6878; --line: #dbe1e8;
+  --accent: #1f5fae; --accent-soft: #e4edf8; --you: #8a4b0f; --you-soft: #f6ebdf; --code: #eef2f6;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Instrument Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161c; --surface: #18202a; --fg: #e6ebf1; --muted: #98a5b5; --line: #2a3542;
+  --accent: #7fb0f0; --accent-soft: #1b2b40; --you: #f0b27a; --you-soft: #3a2a1c; --code: #1f2834; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #18202a; --fg: #e6ebf1; --muted: #98a5b5; --line: #2a3542;
+  --accent: #7fb0f0; --accent-soft: #1b2b40; --you: #f0b27a; --you-soft: #3a2a1c; --code: #1f2834; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 64px; }
+main { max-width: 44rem; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 6vw, 2.75rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.25rem; }
+p { margin: 0; }
+.lede { font-size: 1.125rem; color: var(--muted); max-width: 38rem; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 12px; }
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 12px; }
+.role { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+.role strong { font-family: var(--display); font-size: 1.05rem; }
+.role span { color: var(--muted); font-size: 0.95rem; }
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: step; }
+.step { counter-increment: step; display: grid; grid-template-columns: 2.5rem 1fr; gap: 0 14px; padding: 18px 0; border-top: 1px solid var(--line); }
+.step::before { content: counter(step); font: 700 1.1rem/1 var(--display); color: var(--accent); background: var(--accent-soft);
+  width: 2.25rem; height: 2.25rem; border-radius: 50%; display: grid; place-items: center; }
+.step > div { display: grid; gap: 6px; min-width: 0; }
+.step h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.who { font: 500 0.7rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.who.you { background: var(--you-soft); color: var(--you); }
+.where { color: var(--muted); font-size: 0.9rem; }
+code { font: 0.88em var(--mono); background: var(--code); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 8px; }
+.note h2 { font-size: 1.05rem; }
+.note ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 4px; }
+footer { color: var(--muted); font-size: 0.9rem; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">pm-runway · setup</span>
+    <h1>Set up your Macs to build while you're away</h1>
+    <p class="lede">You shape the work. Your Macs build it, review it with a second model, and land it. This is the short version for you. Hand <code>SETUP-AGENT.md</code> to Claude Code and it does the typing; you do the parts that need your hands.</p>
+  </header>
+
+  <section class="roles" aria-label="Machines">
+    <div class="role"><strong>The controller</strong><span>One Mac that's usually awake. Runs Orca, the loop and the board. Builds too.</span></div>
+    <div class="role"><strong>Workers</strong><span>Your other Macs. They run Orca and build or review whatever the loop sends them.</span></div>
+  </section>
+
+  <ol class="steps">
+    <li class="step"><div>
+      <h2>Basics on every Mac <span class="who">agent</span></h2>
+      <p>Apple's command line tools, Homebrew, and the GitHub CLI. You sign in to GitHub once when asked.</p>
+      <p class="where">Every Mac</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Claude Code and Codex <span class="who you">you sign in</span></h2>
+      <p>The command-line versions of both, not the desktop apps. You sign in to each with your own subscription: <code>/login</code> in Claude, <code>codex login</code> for Codex. Nothing else pays for the work.</p>
+      <p class="where">Every Mac</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Tailscale <span class="who you">you sign in</span></h2>
+      <p>Puts your Macs on one private network so they can reach each other from anywhere. Use the same account on every Mac.</p>
+      <p class="where">Every Mac</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Orca <span class="who">agent</span></h2>
+      <p>The app where all the sessions run. When it first opens, let it read your home folder and import your Claude and Codex settings.</p>
+      <p class="where">Every Mac</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>The pm-runway plugin <span class="who">agent</span></h2>
+      <p>One plugin with the whole workflow. If pm-sp or pm is installed, you uninstall it first; the agent tells you the command.</p>
+      <p class="where">Every Mac</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Pair the Macs in Orca <span class="who you">you click</span></h2>
+      <p>On each worker: Settings, Remote Orca Servers, New Link, then copy it. On the controller: Add Server, give it the worker's name, paste. Treat that link like a password.</p>
+      <p class="where">Controller and each worker</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Your repo, everywhere <span class="who">agent</span></h2>
+      <p>The agent clones it on each Mac, adds it in Orca, and commits a small <code>runway.json</code> that names your test command.</p>
+      <p class="where">Every Mac</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Tell the controller about the Macs <span class="who">agent</span></h2>
+      <p>A short list of your Macs and how many tickets each may build at once. It stays on the controller, never in a repo.</p>
+      <p class="where">Controller</p>
+    </div></li>
+    <li class="step"><div>
+      <h2>Run the practice chunk <span class="who you">you watch</span></h2>
+      <p>A tiny practice repo with three tickets. Two should start at once on different Macs, the third after both land, then the whole thing merges to main on its own. In Orca, open a terminal tab and run <code>runway loop --chunk practice</code>, and open the board in a browser tab beside it.</p>
+      <p class="where">Controller</p>
+    </div></li>
+  </ol>
+
+  <section class="note">
+    <h2>Every day after that</h2>
+    <ul>
+      <li>Shape a chunk with Claude: talk it through, <code>to-spec</code>, <code>to-tickets</code>, and say go.</li>
+      <li><code>runway start</code>, then <code>runway loop</code> in an Orca tab. Walk away.</li>
+      <li>The board shows Queued, Implementing, In review, Merged and Waiting on you. Orca flags any session that needs you.</li>
+      <li>Ask a Claude session "what's happening with this ticket?" any time. <code>runway pause</code> stops new work from starting.</li>
+    </ul>
+  </section>
+
+  <footer>Keep the controller and any busy worker awake and online while work runs. Everything else is in <code>SETUP-AGENT.md</code>.</footer>
+</main>
+</body>
+</html>

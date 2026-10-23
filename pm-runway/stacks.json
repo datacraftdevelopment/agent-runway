@@ -1,0 +1,32 @@
+{
+  "_comment": "Stack table for /pm-scaffold. A stack names the Claude Code plugins a repo of that kind needs, so they are enabled per repo and stay out of the global setup. Edit this list to change what a stack gets; scripts/stacks.py reads it. 'detect' entries are paths relative to the repo root (a trailing / means a folder, a leading *. means any file with that extension at the root).",
+  "stacks": {
+    "vercel": {
+      "label": "Web app deployed on Vercel",
+      "detect": ["vercel.json", ".vercel/", "next.config.js", "next.config.mjs", "next.config.ts"],
+      "plugins": [
+        "vercel@claude-plugins-official",
+        "frontend-design@claude-plugins-official",
+        "context7@claude-plugins-official"
+      ]
+    },
+    "supabase": {
+      "label": "Supabase backend",
+      "detect": ["supabase/config.toml", "supabase/"],
+      "plugins": [
+        "supabase@claude-plugins-official"
+      ]
+    },
+    "filemaker": {
+      "label": "FileMaker file built through Claris ADT and FM Lens",
+      "detect": ["adt.json", "*.fmp12"],
+      "plugins": [
+        "filemaker-agentic-development@claris",
+        "adt-standards-default@claris",
+        "fm-lens@fm-agent-lens",
+        "agenticdev-filemaker-standards@fm-agent-lens"
+      ],
+      "note": "The claris and fm-agent-lens marketplaces are added per machine; a machine without them cannot install these."
+    }
+  }
+}

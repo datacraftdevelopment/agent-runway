@@ -1,0 +1,6 @@
+{
+  "check_cmd": "replace with the repo's real test command, e.g. npm test",
+  "sensitive_paths": [],
+  "merge_method": "merge",
+  "auto_merge": true
+}
