@@ -1,6 +1,6 @@
 # Contributing to Agent Runway
 
-Bugs and ideas are welcome as [issues](https://github.com/datacraftdevelopment/runway-agent/issues/new/choose). This
+Bugs and ideas are welcome as [issues](https://github.com/datacraftdevelopment/agent-runway/issues/new/choose). This
 repository is public: leave out secrets, tokens, private repo names and anyone else's code.
 
 ## Pull requests

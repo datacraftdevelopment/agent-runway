@@ -25,7 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-document: https://github.com/datacraftdevelopment/runway-agent/blob/main/CLA.md
+          path-to-document: https://github.com/datacraftdevelopment/agent-runway/blob/main/CLA.md
           # Signatures live on their own branch so the check never pushes to main.
           branch: cla-signatures
           path-to-signatures: signatures/cla.json

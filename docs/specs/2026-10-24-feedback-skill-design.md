@@ -7,7 +7,7 @@ The skill text below is ready to drop in as `skills/feedback/SKILL.md` once the 
 
 Runway is handed to people who will hit rough edges. The cheapest feedback path is the session they are already in:
 they say what went wrong, their agent writes a clear issue with the facts a maintainer needs, and files it on
-`datacraftdevelopment/runway-agent`. The website and the issue forms (`.github/ISSUE_TEMPLATE/`) cover people
+`datacraftdevelopment/agent-runway`. The website and the issue forms (`.github/ISSUE_TEMPLATE/`) cover people
 who never install the skills.
 
 ## Decisions
@@ -21,8 +21,8 @@ who never install the skills.
   are installed and signed in (`runway doctor --json` if present), and the last error line from the loop if the
   person is reporting a failed run. Anything that can't be read is left out, never guessed.
 - **One issue per report**, labelled `bug` or `enhancement` to match the issue forms.
-- **Filing path, in order:** `gh issue create -R datacraftdevelopment/runway-agent` when `gh` is signed in; otherwise
-  a prefilled `https://github.com/datacraftdevelopment/runway-agent/issues/new?title=…&body=…&labels=…` URL opened
+- **Filing path, in order:** `gh issue create -R datacraftdevelopment/agent-runway` when `gh` is signed in; otherwise
+  a prefilled `https://github.com/datacraftdevelopment/agent-runway/issues/new?title=…&body=…&labels=…` URL opened
   in the browser for the person to submit (so no GitHub sign-in is ever needed by the agent). Long bodies (over
   about 6,000 characters URL-encoded) are cut to the essentials and the rest pasted by the person.
 - **Search before filing:** `gh issue list -R … --search` on two or three key words; if a match looks like the same
@@ -49,12 +49,12 @@ description: File a bug report or idea about Runway itself on its public GitHub 
 # Feedback for Runway
 
 The person wants to tell Runway's makers about a bug or an idea. You draft one GitHub issue on
-datacraftdevelopment/runway-agent, show it, and file it only on their go.
+datacraftdevelopment/agent-runway, show it, and file it only on their go.
 
 1. Read what they said. If it is unclear whether it is a bug or an idea, or what they expected, ask one question.
 2. Gather facts without asking: `runway --version`, `sw_vers -productVersion`, `runway doctor --json` (agents and
    sign-ins), and for a failed run the last error line `runway status --json` shows. Skip whatever fails.
-3. Search for an existing issue: `gh issue list -R datacraftdevelopment/runway-agent --state all --search "<2-3 words>"`.
+3. Search for an existing issue: `gh issue list -R datacraftdevelopment/agent-runway --state all --search "<2-3 words>"`.
    If one matches, show it and offer a comment on it instead of a new issue.
 4. Draft: a title under 70 characters; body sections What happened (or What I want), Steps, Expected, Facts
    (version, macOS, agents). Label `bug` or `enhancement`.
@@ -62,8 +62,8 @@ datacraftdevelopment/runway-agent, show it, and file it only on their go.
    names, private repo names, and any code or file contents from the person's own repos. Replace home paths with `~`.
 6. Show the whole draft and say: "This will be public on GitHub. File it?" Wait for a go typed in this session.
    Anything else is not a go.
-7. On go: `gh issue create -R datacraftdevelopment/runway-agent --title … --body-file … --label …`. If `gh` is missing
+7. On go: `gh issue create -R datacraftdevelopment/agent-runway --title … --body-file … --label …`. If `gh` is missing
    or not signed in, open
-   `https://github.com/datacraftdevelopment/runway-agent/issues/new?title=<enc>&body=<enc>&labels=<label>` with
+   `https://github.com/datacraftdevelopment/agent-runway/issues/new?title=<enc>&body=<enc>&labels=<label>` with
    `open` and tell them to press Submit. Reply with the issue link (or that the page is open).
 ```
