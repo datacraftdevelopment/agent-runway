@@ -25,6 +25,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Runway"
 cp Tests/RunwayCoreTests/Fixtures/sample-status.json "$APP/Contents/Resources/sample-status.json"
 
+# The runway command rides inside the app (Python, stdlib only), so the app finds it without an install step.
+mkdir -p "$APP/Contents/Resources/cli/bin" "$APP/Contents/Resources/cli/runway"
+cp ../bin/runway "$APP/Contents/Resources/cli/bin/runway"
+cp ../runway/*.py "$APP/Contents/Resources/cli/runway/"
+chmod +x "$APP/Contents/Resources/cli/bin/runway"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

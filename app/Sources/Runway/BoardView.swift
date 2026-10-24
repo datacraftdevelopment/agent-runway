@@ -107,7 +107,7 @@ private struct Inspector: View {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 label("PR")
                 if let pr = ticket.pr {
-                    Button(pr) { model.act("open PR \(pr) for \(ticket.id)") }.buttonStyle(.plain)
+                    Button(pr) { model.openPR(ticket) }.buttonStyle(.plain)
                         .foregroundStyle(Palette.link)
                 } else {
                     Text("not opened")
@@ -123,7 +123,7 @@ private struct Inspector: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         Spacer()
-        Button { model.act("open session for \(ticket.id)") } label: {
+        Button { model.openSession(ticket.id) } label: {
             Text("Open session").frame(maxWidth: .infinity)
         }
         .buttonStyle(PlainBoxButtonStyle())
@@ -142,11 +142,11 @@ private struct Inspector: View {
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.controlBorder))
             }
             HStack(spacing: 8) {
-                Button { model.act("go \(ticket.id)\(note.isEmpty ? "" : " --note \"\(note)\"")") } label: {
+                Button { model.run(["go", ticket.id] + (note.isEmpty ? [] : ["--note", note])) } label: {
                     Text(question.goLabel).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                Button { model.act("no \(ticket.id)\(note.isEmpty ? "" : " --note \"\(note)\"")") } label: {
+                Button { model.run(["no", ticket.id] + (note.isEmpty ? [] : ["--note", note])) } label: {
                     Text(question.noLabel).frame(maxWidth: .infinity).padding(.vertical, 2)
                 }
                 .buttonStyle(PlainBoxButtonStyle())
@@ -159,10 +159,10 @@ private struct Inspector: View {
 
     private func runsOnMenu(_ ticket: Ticket) -> some View {
         Menu {
-            Button("Any free runner") { model.act("runs-on \(ticket.id) any") }
+            Button("Any free runner") { model.run(["runs-on", ticket.id, "any"]) }
             Divider()
             ForEach(status.runners) { runner in
-                Button("\(runner.name) only") { model.act("runs-on \(ticket.id) \"\(runner.name)\"") }
+                Button("\(runner.name) only") { model.run(["runs-on", ticket.id, runner.name]) }
             }
         } label: {
             MenuLabel(text: ticket.placeLine, small: true)

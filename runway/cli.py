@@ -153,7 +153,8 @@ def cmd_session(con, a):
 def cmd_loop(con, a):
     from . import loop
     con.close()
-    return loop.run_forever(every=a.every, once=a.once, parent=a.parent_pid)
+    stamp = lambda m: print(f'{__import__("time").strftime("%H:%M:%S")} {m}', flush=True)
+    return loop.run_forever(every=a.every, once=a.once, parent=a.parent_pid, log=stamp)
 
 
 def login_shell(cmd):

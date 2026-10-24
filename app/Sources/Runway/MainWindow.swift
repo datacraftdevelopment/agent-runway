@@ -70,8 +70,8 @@ private struct Sidebar: View {
             }
             .font(.system(size: 11)).foregroundStyle(Palette.textMuted)
             .padding(.horizontal, 8).padding(.top, 6).padding(.bottom, 8)
-            sideButton("Add a repo…", symbol: "plus.circle") { model.act("add repo") }
-            sideButton("Add a Mac or cloud…", symbol: "display") { model.act("add runner") }
+            sideButton("Add a repo…", symbol: "plus.circle") { model.act("Add a repo: runway repo add <path> (setup does this in Phase 3)") }
+            sideButton("Add a Mac or cloud…", symbol: "display") { model.act("Other Macs and cloud come with their runners") }
         }
         .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 14)
         .frame(width: 220)
@@ -133,6 +133,9 @@ private struct Toolbar: View {
         HStack(spacing: 12) {
             Text(model.selectedRepo ?? "").font(.system(size: 15, weight: .bold))
             if let repo = model.repo { StatusPill(repo: repo, status: status) }
+            if model.source == .sample {
+                Chip(text: "Sample data", foreground: Palette.needsYouText, background: Palette.needsYouFill)
+            }
             Spacer()
             if let action = model.lastAction {
                 Text(action).font(.system(size: 11)).foregroundStyle(Palette.textMuted).lineLimit(1)
@@ -140,7 +143,7 @@ private struct Toolbar: View {
             if let repo = model.repo { runsOnMenu(repo) }
             Segmented(options: [(AppModel.Tab.board, "Board"), (.activity, "Activity")], selection: $model.tab)
             Button(model.repo?.state == .paused ? "Resume" : "Pause") {
-                model.act("\(model.repo?.state == .paused ? "resume" : "pause") \(model.selectedRepo ?? "")")
+                model.run([model.repo?.state == .paused ? "resume" : "pause", model.selectedRepo ?? ""])
             }
             .buttonStyle(PlainBoxButtonStyle())
         }
@@ -150,8 +153,8 @@ private struct Toolbar: View {
 
     private func runsOnMenu(_ repo: Repo) -> some View {
         Menu {
-            Button("Any runner") { model.act("runs-on \(repo.name) any") }
-            Button("Main computer only (\(repo.mainComputer))") { model.act("runs-on \(repo.name) main") }
+            Button("Any runner") { model.run(["runs-on", repo.name, "any"]) }
+            Button("Main computer only (\(repo.mainComputer))") { model.run(["runs-on", repo.name, "main"]) }
         } label: {
             MenuLabel(prefix: "Runs on", text: repo.runsOn == .any ? "Any runner" : "\(repo.mainComputer) only")
         }

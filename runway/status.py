@@ -27,7 +27,7 @@ def paused_until(con):
     return float(v) if v and float(v) > db.now() else None
 
 
-def ticket_json(con, t, run):
+def ticket_json(con, t, run, slugs=None):
     column, stage = db.STATES.get(t['state'], ('up_next', None))
     open_blockers = [b for b in db.blockers(con, t['id'])
                      if con.execute("SELECT 1 FROM tickets WHERE id=? AND state NOT IN ('done', 'dropped')",
@@ -44,7 +44,9 @@ def ticket_json(con, t, run):
     return {
         'id': t['id'], 'repo': t['repo'], 'title': t['title'], 'column': column, 'stage': stage,
         'agent': t['agent'], 'risk': t['risk'], 'runs_on': runs_on, 'pinned': bool(t['pinned']),
-        'pr': pr_label(t), 'review': t['review'], 'question': question if column == 'needs_you' else None,
+        'pr': pr_label(t), 'review': t['review'],
+        'pr_url': f'https://github.com/{slugs[t["repo"]]}/pull/{t["pr"]}' if t['pr'] and (slugs or {}).get(t['repo'])
+        else None, 'question': question if column == 'needs_you' else None,
         'filed_from': t['filed_from'], 'filed_at': iso(t['filed_at']), 'waits_on': open_blockers,
         'elapsed': int(db.now() - run['started_at']) if run else None,
         'summary': summary(t, run, open_blockers),
@@ -103,7 +105,8 @@ def repo_json(con, r, tickets, pause):
 
 def snapshot(con):
     runs = {r['ticket']: r for r in live_runs(con)}
-    tickets = [ticket_json(con, t, runs.get(t['id']))
+    slugs = {r['name']: r['slug'] for r in con.execute('SELECT name, slug FROM repos')}
+    tickets = [ticket_json(con, t, runs.get(t['id']), slugs)
                for t in con.execute('SELECT * FROM tickets ORDER BY filed_at, CAST(SUBSTR(id, 3) AS INTEGER)')]
     pause = paused_until(con)
     used = {}
