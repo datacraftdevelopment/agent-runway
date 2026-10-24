@@ -5,6 +5,8 @@
 #   bash make-app.sh --release           # sign with Developer ID, notarize, staple, zip, sign the zip for Sparkle,
 #                                        # write appcast.xml, tag v<VERSION> and publish the GitHub release
 #   bash make-app.sh --release --dry-run # all of that except notarize and publish; output in build/release/
+#   bash make-app.sh --release --no-publish # signed, notarized and stapled into build/release/, from any branch,
+#                                        # with no tag and no GitHub release: a build to try as a new user would
 # Works with Command Line Tools alone. --release needs, from the environment (RELEASING.md has the one-time setup):
 #   RUNWAY_SIGN_IDENTITY   the Developer ID Application identity, e.g. "Developer ID Application: Name (TEAMID)"
 #   notarization, one of:  RUNWAY_NOTARY_PROFILE (a notarytool keychain profile)
@@ -12,16 +14,19 @@
 #   SPARKLE_KEY_FILE       optional: the Sparkle private key as a file (CI). Without it sign_update reads the keychain.
 # No secret is ever written into the repo, the app or the log.
 set -euo pipefail
-OPEN=0; RELEASE=0; DRY=0
+OPEN=0; RELEASE=0; DRY=0; NOPUB=0
 for arg in "$@"; do
   case "$arg" in
     --open) OPEN=1 ;;
     --release) RELEASE=1 ;;
     --dry-run) DRY=1 ;;
+    --no-publish) NOPUB=1 ;;
     *) echo "make-app.sh: unknown option $arg" >&2; exit 2 ;;
   esac
 done
 [ "$DRY" = 1 ] && [ "$RELEASE" = 0 ] && { echo "make-app.sh: --dry-run only goes with --release" >&2; exit 2; }
+[ "$NOPUB" = 1 ] && [ "$RELEASE" = 0 ] && { echo "make-app.sh: --no-publish only goes with --release" >&2; exit 2; }
+[ "$NOPUB" = 1 ] && [ "$DRY" = 1 ] && { echo "make-app.sh: pick one of --dry-run and --no-publish" >&2; exit 2; }
 [ "$OPEN" = 1 ] && [ "$RELEASE" = 1 ] && { echo "make-app.sh: --open and --release don't mix" >&2; exit 2; }
 cd "$(dirname "$0")"
 
@@ -40,12 +45,16 @@ die() { echo "make-app.sh: $*" >&2; exit 1; }
 refuse() {
   if [ "$DRY" = 1 ]; then echo "make-app.sh: would refuse: $*" >&2; else die "refusing to release: $*"; fi
 }
+# Checks that only guard publishing: --no-publish publishes nothing, so they only warn.
+refuse_publish() {
+  if [ "$NOPUB" = 1 ]; then echo "make-app.sh: note (not publishing): $*" >&2; else refuse "$@"; fi
+}
 
 if [ "$RELEASE" = 1 ]; then
-  [ -z "$(git -C "$REPO" status --porcelain)" ] || refuse "working tree is dirty (commit first)"
+  [ -z "$(git -C "$REPO" status --porcelain)" ] || refuse_publish "working tree is dirty (commit first)"
   BRANCH="$(git -C "$REPO" rev-parse --abbrev-ref HEAD)"
   # CI checks out the tag's commit detached; RUNWAY_RELEASE_REF=main says it is main's head.
-  [ "$BRANCH" = main ] || [ "${RUNWAY_RELEASE_REF:-}" = main ] || refuse "not on main (on $BRANCH)"
+  [ "$BRANCH" = main ] || [ "${RUNWAY_RELEASE_REF:-}" = main ] || refuse_publish "not on main (on $BRANCH)"
   if [ -z "${RUNWAY_SIGN_IDENTITY:-}" ]; then
     # A dry run without a certificate signs ad hoc (still with the hardened runtime), so the packaging is tested.
     [ "$DRY" = 1 ] || die "RUNWAY_SIGN_IDENTITY is not set (the Developer ID Application identity)"
@@ -56,12 +65,14 @@ if [ "$RELEASE" = 1 ]; then
   fi
   [ -s sparkle-public-key ] || refuse "app/sparkle-public-key is missing; run Sparkle's generate_keys and commit the public key"
   # A missing or signed-out gh would make "no release" look like the answer, so check it first.
-  { command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; } || refuse "gh is missing or not signed in (gh auth login)"
-  if gh release view "$TAG" -R "$GH_REPO" >/dev/null 2>&1; then refuse "$TAG already exists as a GitHub release"; fi
-  # A tag that already points elsewhere would let the binary and the tagged source disagree. CI runs on the tag
-  # itself, so a tag on HEAD is fine.
-  if TAGGED="$(git -C "$REPO" rev-parse -q --verify "refs/tags/$TAG^{commit}")"; then
-    [ "$TAGGED" = "$(git -C "$REPO" rev-parse HEAD)" ] || refuse "$TAG already exists on another commit"
+  if [ "$NOPUB" = 0 ]; then
+    { command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; } || refuse "gh is missing or not signed in (gh auth login)"
+    if gh release view "$TAG" -R "$GH_REPO" >/dev/null 2>&1; then refuse "$TAG already exists as a GitHub release"; fi
+    # A tag that already points elsewhere would let the binary and the tagged source disagree. CI runs on the tag
+    # itself, so a tag on HEAD is fine.
+    if TAGGED="$(git -C "$REPO" rev-parse -q --verify "refs/tags/$TAG^{commit}")"; then
+      [ "$TAGGED" = "$(git -C "$REPO" rev-parse HEAD)" ] || refuse "$TAG already exists on another commit"
+    fi
   fi
   echo "== check"
   CHECK_CMD="${RUNWAY_RELEASE_CHECK_CMD:-cd $REPO && python3 -m unittest discover -s tests -t . && cd app && swift test}"
@@ -196,6 +207,10 @@ if [ "$RELEASE" = 1 ]; then
 APPCAST
   if [ "$DRY" = 1 ]; then
     echo "Dry run done: $(pwd)/$ZIP and $(pwd)/$REL_DIR/appcast.xml (not notarized, not published)"
+    exit 0
+  fi
+  if [ "$NOPUB" = 1 ]; then
+    echo "Built $(pwd)/$ZIP: signed, notarized and stapled (not tagged, not published)"
     exit 0
   fi
   echo "== publish $TAG"

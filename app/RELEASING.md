@@ -26,6 +26,10 @@ Both run the same `make-app.sh --release`, which refuses on a dirty tree, off `m
 or when the tests fail. `--release --dry-run` does everything except notarize and publish, needs no secrets, and runs
 in CI on every PR.
 
+`--release --no-publish` signs, notarizes and staples `build/release/Runway.zip` from any branch, with no tag and no
+release: the build to download onto a clean Mac and try as a new user would. It needs the same identity and notary
+settings as a real release.
+
 A release can't be quietly taken back: copies that already updated keep it. Fix forward with a higher version.
 
 ## One-time setup (the Apple Developer account holder)
