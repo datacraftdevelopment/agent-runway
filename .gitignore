@@ -22,3 +22,6 @@ _pm/transcripts/
 
 # Plan worktrees (using-git-worktrees).
 .worktrees/
+
+# Built installers (make-app.sh output copied for hand-testing), never committed.
+dist/
