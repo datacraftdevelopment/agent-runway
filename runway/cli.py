@@ -92,6 +92,62 @@ def cmd_status(con, a):
         print(f'{ag["kind"]}: ' + (f'resting until {ag["resting_until"]}' if ag['resting_until'] else 'available'))
 
 
+# ---- the person's decisions --------------------------------------------------------------------------------------
+
+def cmd_go(con, a):
+    from . import actions
+    print(actions.answer(con, a.ticket, 'go', a.note))
+
+
+def cmd_no(con, a):
+    from . import actions
+    print(actions.answer(con, a.ticket, 'no', a.note))
+
+
+def cmd_pause(con, a):
+    from . import actions
+    print(actions.pause(con, a.target, getattr(a, 'for')))
+
+
+def cmd_resume(con, a):
+    from . import actions
+    print(actions.resume(con, a.target))
+
+
+def cmd_start(con, a):
+    from . import actions
+    print(actions.start_stop(con, a.repo, True))
+
+
+def cmd_stop(con, a):
+    from . import actions
+    print(actions.start_stop(con, a.repo, False))
+
+
+def cmd_runs_on(con, a):
+    from . import actions
+    print(actions.runs_on(con, a.target, a.where))
+
+
+def cmd_session(con, a):
+    """Where a ticket's last run lives and the line that reopens it (the app's Open session)."""
+    db.ticket(con, a.ticket)
+    run = con.execute('SELECT * FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (a.ticket,)).fetchone()
+    if not run:
+        raise db.RunwayError(f'{a.ticket} has not run yet')
+    if run['ended_at'] is None and run['tmux']:
+        line = f'tmux attach -t {run["tmux"]}'
+    elif run['agent'] == 'claude' and run['session_id']:
+        line = f'claude --resume {run["session_id"]}'
+    elif run['agent'] == 'codex' and run['session_id']:
+        line = f'codex resume {run["session_id"]}'
+    else:
+        line = None
+    info = {'ticket': a.ticket, 'run': run['id'], 'kind': run['kind'], 'agent': run['agent'], 'runner': run['runner'],
+            'dir': run['dir'], 'live': run['ended_at'] is None, 'command': line}
+    out(info) if a.json else print(f'cd {run["dir"]} && {line}' if line else f'{run["dir"]} (no session to resume)')
+
+
 # ---- parser ------------------------------------------------------------------------------------------------------
 
 def parser():
@@ -124,6 +180,30 @@ def parser():
     x = sub.add_parser('status', help='what is up next, running, needing you and done')
     x.add_argument('--json', action='store_true', help='the snapshot the app reads')
     x.set_defaults(fn=cmd_status)
+
+    for name, fn, text in (('go', cmd_go, 'go on a needs-you ticket'), ('no', cmd_no, 'no on a needs-you ticket')):
+        x = sub.add_parser(name, help=text)
+        x.add_argument('ticket')
+        x.add_argument('--note', help='anything the agent should know (the answer, for "no" on a question)')
+        x.set_defaults(fn=fn)
+    for name, fn in (('pause', cmd_pause), ('resume', cmd_resume)):
+        x = sub.add_parser(name, help=f'{name} everything, one repo or one runner')
+        x.add_argument('target', nargs='?')
+        if name == 'pause':
+            x.add_argument('--for', help='30m, 1h, 2d; default: until you resume')
+        x.set_defaults(fn=fn)
+    for name, fn in (('start', cmd_start), ('stop', cmd_stop)):
+        x = sub.add_parser(name, help=f'{name} picking up new tickets for a repo')
+        x.add_argument('repo')
+        x.set_defaults(fn=fn)
+    x = sub.add_parser('runs-on', help='where a repo (any|main) or a ticket (any|<runner>) runs')
+    x.add_argument('target')
+    x.add_argument('where')
+    x.set_defaults(fn=cmd_runs_on)
+    x = sub.add_parser('session', help="where a ticket's last run is and how to reopen it")
+    x.add_argument('ticket')
+    x.add_argument('--json', action='store_true')
+    x.set_defaults(fn=cmd_session)
 
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p
