@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Agent Runway website
+    url: https://agent-runway.vercel.app
+    about: What Runway is and where it stands.
