@@ -90,6 +90,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/Runway" "$APP/Contents/MacOS/Runway"
 cp Tests/RunwayCoreTests/Fixtures/sample-status.json "$APP/Contents/Resources/sample-status.json"
+# The licence (with its Required Notice line) travels with every copy of the app.
+cp "$REPO/LICENSE" "$APP/Contents/Resources/LICENSE"
 
 # Sparkle's framework rides in Contents/Frameworks; the binary finds it through an rpath.
 cp -R "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/"
@@ -118,6 +120,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Copyright 2026 DataCraft Development. Agent Runway, https://agentrunway.dev</string>
 $SPARKLE_KEYS
 </dict>
 </plist>
