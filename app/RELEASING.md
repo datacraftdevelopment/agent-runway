@@ -8,9 +8,9 @@ the matching command with it.
 
 | What | Where |
 | --- | --- |
-| Download (website link, always the newest) | `https://github.com/datacraftdevelopment/runway-agent/releases/latest/download/Runway.zip` |
-| Update feed (built into the app) | `https://github.com/datacraftdevelopment/runway-agent/releases/latest/download/appcast.xml` |
-| One version | `https://github.com/datacraftdevelopment/runway-agent/releases/tag/v<VERSION>` |
+| Download (website link, always the newest) | `https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/Runway.zip` |
+| Update feed (built into the app) | `https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/appcast.xml` |
+| One version | `https://github.com/datacraftdevelopment/agent-runway/releases/tag/v<VERSION>` |
 
 Only app releases are published on this repo, because "latest" must always be the newest app.
 

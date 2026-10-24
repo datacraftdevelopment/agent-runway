@@ -32,7 +32,7 @@ TAG="v$VERSION"
 REL_DIR="build/release"
 # Releases, their downloads and the update feed live on this (public) repo. The website links
 # https://github.com/$GH_REPO/releases/latest/download/Runway.zip, so the asset name never changes.
-GH_REPO="${RUNWAY_RELEASE_REPO:-datacraftdevelopment/runway-agent}"
+GH_REPO="${RUNWAY_RELEASE_REPO:-datacraftdevelopment/agent-runway}"
 FEED_URL="https://github.com/$GH_REPO/releases/latest/download/appcast.xml"
 
 die() { echo "make-app.sh: $*" >&2; exit 1; }
