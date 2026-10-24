@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Python tests
@@ -30,3 +30,7 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' build/Runway.app/Contents/Info.plist
           grep -q '<enclosure url="https://github.com/datacraftdevelopment/runway-agent/releases/download/v' build/release/appcast.xml
           ls -l build/release
+      - name: The build leaves the tree clean (a real release refuses a dirty one)
+        run: |
+          git status --porcelain
+          test -z "$(git status --porcelain)"
