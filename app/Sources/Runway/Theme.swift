@@ -153,6 +153,8 @@ extension ActivityLine.Kind {
         case .merged: return (Color(hex: 0x1F3A26), Color(hex: 0x7EE59A))
         case .needsYou: return (Palette.needsYouFill, Palette.needsYouText)
         case .limit, .failed: return (Color(hex: 0x4A1F1F), Color(hex: 0xFF9A94))
+        case .answer: return (Color(hex: 0x13304F), Color(hex: 0x8CC4FF))
+        case .setup, .other: return (Palette.selectedRow, Palette.textSoft)
         }
     }
 }

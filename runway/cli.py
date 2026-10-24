@@ -75,6 +75,23 @@ def cmd_file(con, a):
     print(f'filed {len(ids)} to {repo}: {", ".join(ids)}')
 
 
+# ---- status ------------------------------------------------------------------------------------------------------
+
+def cmd_status(con, a):
+    from . import status
+    snap = status.snapshot(con)
+    if a.json:
+        out(snap)
+        return
+    for r in snap['repos']:
+        print(f'{r["name"]}: {r["status_line"]}')
+        for t in [t for t in snap['tickets'] if t['repo'] == r['name'] and t['column'] != 'done']:
+            where = f' on {t["runs_on"]}' if t['runs_on'] else ''
+            print(f'  {t["id"]:6} {t["column"]:9} {t["stage"] or "":7} {t["title"]}{where}')
+    for ag in snap['agents']:
+        print(f'{ag["kind"]}: ' + (f'resting until {ag["resting_until"]}' if ag['resting_until'] else 'available'))
+
+
 # ---- parser ------------------------------------------------------------------------------------------------------
 
 def parser():
@@ -103,6 +120,10 @@ def parser():
     x.add_argument('--repo')
     x.add_argument('--filed-from', help='where the batch came from, e.g. "Claude Code on this Mac"')
     x.set_defaults(fn=cmd_file)
+
+    x = sub.add_parser('status', help='what is up next, running, needing you and done')
+    x.add_argument('--json', action='store_true', help='the snapshot the app reads')
+    x.set_defaults(fn=cmd_status)
 
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p

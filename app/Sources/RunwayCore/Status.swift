@@ -195,7 +195,15 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
 }
 
 public struct ActivityLine: Codable, Equatable, Identifiable, Sendable {
-    public enum Kind: String, Codable, Sendable { case filed, start, review, merged, needsYou = "needs_you", limit, failed }
+    public enum Kind: String, Codable, Sendable {
+        case filed, start, review, merged, needsYou = "needs_you", limit, failed, setup, answer, other
+
+        /// A kind this build doesn't know shows as `other`, so one new event never blanks the whole status.
+        public init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Kind(rawValue: raw) ?? .other
+        }
+    }
 
     public var at: Date
     public var kind: Kind

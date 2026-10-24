@@ -78,6 +78,14 @@ final class StatusDecodingTests: XCTestCase {
         XCTAssertEqual(try Status.decode(status.encoded()), status)
     }
 
+    func testUnknownActivityKindIsOther() throws {
+        let json = #"{"version":1,"generated_at":"2026-10-23T19:16:00Z","paused_until":null,"repos":[],"runners":[],"#
+            + #""agents":[],"tickets":[],"setup":[],"activity":[{"at":"2026-10-23T19:16:00Z","kind":"teleport","#
+            + #""repo":null,"text":"x"},{"at":"2026-10-23T19:16:00Z","kind":"setup","repo":"r","text":"y"}]}"#
+        let status = try Status.decode(Data(json.utf8))
+        XCTAssertEqual(status.activity.map(\.kind), [.other, .setup])
+    }
+
     func testRejectsUnknownColumn() {
         let bad = #"{"version":1,"generated_at":"2026-10-23T19:16:00Z","repos":[],"runners":[],"agents":[],"#
             + #""tickets":[{"id":"T-1","repo":"r","title":"t","column":"limbo","agent":"any","risk":"low","#
