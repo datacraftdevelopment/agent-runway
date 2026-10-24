@@ -15,7 +15,7 @@ struct RunwayApp: App {
     var body: some Scene {
         Window("Runway", id: "runway") {
             MainWindow(model: model)
-                .background(LaunchOpener())
+                .background(LaunchOpener(model: model))
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 800)
@@ -53,6 +53,7 @@ struct RunwayApp: App {
 /// `RUNWAY_OPEN=panel,menu,setup` (comma-separated) opens more windows at launch, for screenshots and trying the app.
 /// It runs once, from whichever scene appears first.
 private struct LaunchOpener: View {
+    let model: AppModel
     @Environment(\.openWindow) private var openWindow
     @MainActor private static var done = false
 
@@ -62,6 +63,11 @@ private struct LaunchOpener: View {
             Self.done = true
             let wanted = (ProcessInfo.processInfo.environment["RUNWAY_OPEN"] ?? "").split(separator: ",")
             for id in wanted { openWindow(id: "runway-\(id)") }
+            // First run: until a repo is watched, the setup screen opens on top of the main window.
+            for _ in 0..<20 where model.status == nil && model.source == .live {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+            if model.needsSetup && !wanted.contains("setup") { openWindow(id: "runway-setup") }
         }
     }
 }

@@ -2,60 +2,35 @@ import AppKit
 import SwiftUI
 import RunwayCore
 
-/// First run, on one screen: what Runway did itself, the agent that finishes setup, more places to run, and a live
-/// table of what setup has found per runner (from the status file's `setup` rows).
+/// First run, on one screen, as the design has it:
+///   1. What Runway does itself: the command (inside the app), the database, the command in Terminal (asks first), and
+///      the skills (said plainly when they don't exist yet).
+///   2. This Mac's tools and sign-ins, each missing one with the line that fixes it.
+///   3. A first repo: a folder picker, then its check command.
+/// Below, the live table of what setup has found per runner. Every check and change is a `runway` command.
 struct FirstRunView: View {
-    let model: AppModel
-    @State private var agent: AgentKind = .claude
-    @State private var copied = false
-
-    /// What the app lays down before handing over. Fixed text until Phase 3 makes these real steps.
-    private let done = ["Installed the runway command", "Created the ticket database",
-                        "Added the Runway skills to Claude Code", "Added the Runway skills to Codex"]
+    @Bindable var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Set up Runway").font(.system(size: 20, weight: .bold))
-                Text("Runway lays the groundwork; your agent finishes the setup on each computer.")
+                Text("Runway checks this Mac, shows the fix for anything missing, then watches your first repo.")
                     .foregroundStyle(Palette.textMuted)
             }
             HStack(alignment: .top, spacing: 12) {
-                step(1, "Runway does this") {
-                    ForEach(done, id: \.self) { line in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("✓").foregroundStyle(Palette.green)
-                            Text(line).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                step(2, "Your agent finishes", highlighted: true) {
-                    Segmented(options: [(AgentKind.claude, "Claude Code"), (.codex, "Codex")], selection: $agent,
-                              stretch: true)
-                    Text("It checks the sign-ins, adds this Mac as a place tickets run, and asks which repos to watch.")
-                        .foregroundStyle(Palette.textSoft).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-                    CodeLine(text: setupCommand)
-                    Button { model.act("open \(agent.name) on setup: \(setupCommand)") } label: {
-                        Text("Open \(agent.name)").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                }
-                step(3, "More places to run") {
-                    Text("On each other Mac, run the same setup with “join”. For cloud, the agent connects your Claude and Codex cloud accounts.")
-                        .foregroundStyle(Palette.textSoft).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
-                    CodeLine(text: joinCommand)
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(joinCommand, forType: .string)
-                        copied = true
-                        model.act("copied: \(joinCommand)")
-                    } label: {
-                        Text(copied ? "Copied" : "Copy").frame(maxWidth: .infinity).padding(.vertical, 2)
-                    }
-                    .buttonStyle(PlainBoxButtonStyle(fill: Palette.window))
+                step(1, "Runway does this") { runwayStep }
+                step(2, "Check this Mac", highlighted: !(model.setup?.ready ?? false)) { macStep }
+                step(3, "Your first repo", highlighted: model.setup?.ready == true && model.setup?.repos.isEmpty == true) {
+                    repoStep
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
+            if let message = model.setupMessage {
+                Text(message).font(.system(size: 12)).foregroundStyle(Palette.textSoft).lineLimit(3)
+                    .textSelection(.enabled)
+            }
             found
         }
         .font(.system(size: 13))
@@ -64,14 +39,130 @@ struct FirstRunView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.window)
         .ignoresSafeArea()
-        // The hidden title bar adds its 28 points above this, so the window comes out 760 × 580 as in the mock.
-        .frame(width: 760, height: 552)
+        // The hidden title bar adds its 28 points above this, so the window comes out 900 × 660.
+        .frame(width: 900, height: 632)
         .preferredColorScheme(.dark)
-        .onChange(of: agent) { copied = false }
+        .task {
+            if model.setup == nil { model.runDoctor() }
+            // RUNWAY_PICK=<folder> stands in for the folder picker, for trying step 3 without clicking.
+            if let pick = ProcessInfo.processInfo.environment["RUNWAY_PICK"] { model.chooseRepo(at: pick) }
+        }
     }
 
-    private var setupCommand: String { agent == .claude ? #"claude "/runway:setup""# : #"codex "$runway-setup""# }
-    private var joinCommand: String { agent == .claude ? #"claude "/runway:setup join""# : #"codex "$runway-setup join""# }
+    // MARK: 1. Runway does this
+
+    @ViewBuilder private var runwayStep: some View {
+        if let setup = model.setup {
+            line(true, "The runway command, inside the app")
+            line(true, "The ticket database", detail: shortPath(setup.database))
+            if setup.command.linked {
+                line(true, "runway in Terminal", detail: shortPath(setup.command.link)
+                     + (setup.command.linkDirOnPath ? "" : " (add its folder to PATH)"))
+            } else {
+                line(false, "runway in Terminal", detail: "optional; asks before adding a link", warn: true)
+                Button("Add it to Terminal…") { model.installCommand() }.buttonStyle(PlainBoxButtonStyle(small: true))
+            }
+            line(setup.skills.built, setup.skills.built ? "Runway skills in Claude Code and Codex"
+                 : "Runway skills: not built yet", detail: setup.skills.built ? nil : setup.skills.note, warn: true)
+        } else {
+            checkingLine
+        }
+    }
+
+    // MARK: 2. This Mac
+
+    @ViewBuilder private var macStep: some View {
+        if let setup = model.setup {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(setup.tools) { tool in
+                        line(tool.ok, tool.name, detail: tool.ok ? tool.why : nil, fix: tool.fix)
+                    }
+                    ForEach(setup.signins) { signin in
+                        line(signin.ok, "\(signin.label) signed in", fix: signin.fix)
+                    }
+                }
+            }
+            .scrollIndicators(.never)
+            Button { model.runDoctor() } label: {
+                Text(model.checking ? "Checking…" : setup.ready ? "All set · check again" : "Check again")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PlainBoxButtonStyle(fill: Palette.window))
+            .disabled(model.checking)
+        } else {
+            checkingLine
+        }
+    }
+
+    // MARK: 3. First repo
+
+    @ViewBuilder private var repoStep: some View {
+        if let repos = model.setup?.repos, !repos.isEmpty, model.pendingRepo == nil {
+            line(true, "Watching \(repos.joined(separator: ", "))")
+            Text("File tickets with `runway file`, then watch them on the board.")
+                .foregroundStyle(Palette.textSoft).fixedSize(horizontal: false, vertical: true)
+            Button { open("runway") } label: { Text("Open Runway").frame(maxWidth: .infinity) }
+                .buttonStyle(PrimaryButtonStyle())
+            Button("Add another repo…") { model.chooseRepo() }.buttonStyle(PlainBoxButtonStyle(small: true))
+        } else if let repo = model.pendingRepo {
+            line(repo.git && repo.slug != nil, repo.name,
+                 detail: repo.slug ?? (repo.git ? "no GitHub origin: Runway needs one for pull requests"
+                                                : "not a git clone"))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Check command (runs before every PR)").font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                TextField("", text: $model.pendingCheck, prompt: Text("e.g. npm test").foregroundStyle(Palette.grey))
+                    .textFieldStyle(.plain).font(.system(size: 12, design: .monospaced))
+                    .padding(.horizontal, 8).padding(.vertical, 7)
+                    .background(Palette.code, in: RoundedRectangle(cornerRadius: 6))
+            }
+            Button { model.addPendingRepo() } label: { Text("Watch \(repo.name)").frame(maxWidth: .infinity) }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(repo.slug == nil)
+            Button("Pick another folder…") { model.chooseRepo() }.buttonStyle(PlainBoxButtonStyle(small: true))
+        } else {
+            Text("Pick the local clone of a GitHub repo. Runway works in fresh copies of it and never touches your "
+                 + "working folder.")
+                .foregroundStyle(Palette.textSoft).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+            Button { model.chooseRepo() } label: { Text("Choose a folder…").frame(maxWidth: .infinity) }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(model.setup == nil)
+        }
+    }
+
+    // MARK: Pieces
+
+    private var checkingLine: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Checking this Mac…").foregroundStyle(Palette.textSoft)
+        }
+    }
+
+    private func line(_ ok: Bool, _ title: String, detail: String? = nil, fix: String? = nil,
+                      warn: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(ok ? "✓" : warn ? "–" : "✗").foregroundStyle(ok ? Palette.green : warn ? Palette.needsYouText
+                                                                  : Color(hex: 0xFF9A94))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail).font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let fix {
+                    HStack(spacing: 6) {
+                        Text(fix).font(.system(size: 11, design: .monospaced)).foregroundStyle(Color(hex: 0xE5E5EA))
+                            .textSelection(.enabled).lineLimit(2)
+                        Button("Copy") { model.copy(fix) }.buttonStyle(.plain).font(.system(size: 11))
+                            .foregroundStyle(Palette.link)
+                    }
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Palette.code, in: RoundedRectangle(cornerRadius: 4))
+                }
+            }
+        }
+    }
 
     private func step<Content: View>(_ number: Int, _ title: String, highlighted: Bool = false,
                                      @ViewBuilder content: () -> Content) -> some View {
@@ -106,20 +197,21 @@ struct FirstRunView: View {
                 }
             }
             .font(.system(size: 12))
+            Text("Other Macs and the cloud join later; this version runs tickets on this Mac.")
+                .font(.system(size: 11)).foregroundStyle(Palette.textMuted)
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
     }
-}
 
-private struct CodeLine: View {
-    let text: String
+    private func shortPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+    }
 
-    var body: some View {
-        Text(text).font(.system(size: 12, design: .monospaced)).foregroundStyle(Color(hex: 0xE5E5EA))
-            .textSelection(.enabled)
-            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.code, in: RoundedRectangle(cornerRadius: 6))
+    private func open(_ id: String) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        openWindow(id: id)
     }
 }
