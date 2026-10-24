@@ -2,7 +2,7 @@
 
 One board that dispatches coding tickets to agents on many machines and cloud sessions. Concept: `docs/concept.md`.
 
-Website: `site/` (static, hosted on Vercel at agentrunway.dev). Bugs and ideas: [open an issue](https://github.com/datacraftdevelopment/agent-runway/issues/new/choose).
+Website: `site/` (static, hosted on Vercel at agentrunway.app). Bugs and ideas: [open an issue](https://github.com/datacraftdevelopment/agent-runway/issues/new/choose).
 
 Project-management scaffold for this project. Light by design: only the
 day-one folders exist; everything else is created on first use (the taxonomy
