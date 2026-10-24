@@ -53,6 +53,28 @@ def cmd_where(con, a):
     print(db.db_path())
 
 
+# ---- filing ------------------------------------------------------------------------------------------------------
+
+def cmd_file(con, a):
+    """runway file < batch.json, or runway file --repo r ticket.md ... (the person's go is the approval)."""
+    from . import tickets
+    if a.files:
+        if not a.repo:
+            raise db.RunwayError('--repo is required with ticket files')
+        batch = [tickets.parse_markdown(Path(f).read_text()) for f in a.files]
+        for f, t in zip(a.files, batch):
+            t.setdefault('key', t.get('id') or Path(f).stem)
+        repo, filed_from = a.repo, a.filed_from or 'a terminal'
+    else:
+        data = json.loads(sys.stdin.read())
+        repo = a.repo or data.get('repo')
+        if not repo:
+            raise db.RunwayError('name the repo: --repo, or "repo" in the JSON')
+        batch, filed_from = data.get('tickets', []), a.filed_from or data.get('filed_from') or 'a terminal'
+    ids = tickets.file_batch(con, repo, batch, filed_from=filed_from)
+    print(f'filed {len(ids)} to {repo}: {", ".join(ids)}')
+
+
 # ---- parser ------------------------------------------------------------------------------------------------------
 
 def parser():
@@ -75,6 +97,12 @@ def parser():
     x.add_argument('name')
     x.add_argument('slots', type=int)
     x.set_defaults(fn=cmd_runner_set)
+
+    x = sub.add_parser('file', help='file a batch: JSON on stdin, or Markdown ticket files')
+    x.add_argument('files', nargs='*')
+    x.add_argument('--repo')
+    x.add_argument('--filed-from', help='where the batch came from, e.g. "Claude Code on this Mac"')
+    x.set_defaults(fn=cmd_file)
 
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p
