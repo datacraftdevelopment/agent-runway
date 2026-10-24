@@ -287,12 +287,17 @@ class Loop:
                 # A fix pass carries on from the pushed branch; a first build starts from the base.
                 start_ref = f'origin/{branch}' if t['fix_passes'] and self.runner.has_ref(repo, f'origin/{branch}') \
                     else f'origin/{t["base"]}'
+                # Earlier runs' worktrees still hold the ticket's branch, and git won't reset a branch checked out
+                # elsewhere, so a fix pass clears them first.
+                for old in self.con.execute('SELECT dir FROM runs WHERE ticket=? AND id != ? AND dir IS NOT NULL '
+                                            'AND ended_at IS NOT NULL', (t['id'], run_id)).fetchall():
+                    self.runner.remove(repo, old['dir'])
                 wt = self.runner.worktree(repo, t['id'], run_id, start_ref, branch=branch)
-                prompt = worker.build_prompt(t, repo['name'], start_ref, check, run_dir / 'outcome.json')
+                prompt = worker.build_prompt(t, repo['name'], start_ref, check, run_dir / 'outcome.json', commands)
             else:
                 wt = self.runner.worktree(repo, t['id'], run_id, t['sha'])
                 prompt = worker.review_prompt(t, repo['name'], t['sha'], f'origin/{t["base"]}', check,
-                                              run_dir / 'review.json')
+                                              run_dir / 'review.json', commands)
         except db.RunwayError:
             self.con.execute("UPDATE runs SET ended_at=?, outcome='failed' WHERE id=?", (db.now(), run_id))
             raise

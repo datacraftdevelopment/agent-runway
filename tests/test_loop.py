@@ -193,6 +193,11 @@ class LoopTest(unittest.TestCase):
         t = db.ticket(self.con, tid)
         self.assertEqual((t['state'], t['fix_passes']), ('building', 1))
         self.assertIn('failed the review', t['note'])
+        # The fix pass cleared the first build's and the review's worktrees, which still held the branch.
+        self.assertEqual(len(self.runner.removed), 2)
+        prompt = (self.runner.run_dir(self.live_run(tid)['id']) / 'prompt.md').read_text()
+        self.assertIn('Only these are allowed', prompt)
+        self.assertIn('failed the review', prompt)
         self.build_done(tid)
         self.loop.tick()
         self.review(tid, verdict='fail')

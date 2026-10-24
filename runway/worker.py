@@ -36,6 +36,9 @@ Repo: {repo}, in this folder (a fresh worktree started from {start}).
 5. If you are truly blocked on a decision only the person can make, stop and ask one crisp question (below) with
    the option you recommend. Otherwise make the call and say why in your summary.
 
+Shell commands: run each one on its own, exactly as written, with nothing chained (no &&, ;, | or cd in front; this
+folder is already the repo). Only these are allowed: {allowed}. If one is refused, run it again on its own.
+
 ## When you finish
 
 Write exactly one JSON file to {outcome} and then stop:
@@ -73,6 +76,9 @@ See the change with: git diff {base_ref}...HEAD
 4. Risk only rises: say "not_low" if the change touches anything risky the ticket didn't expect (auth, money, data,
    migrations, CI, secrets, a public interface). Otherwise repeat the ticket's risk: {risk}.
 
+Shell commands: run each one on its own, exactly as written, with nothing chained (no &&, ;, | or cd in front; this
+folder is already the repo). Only these are allowed: {allowed}. If one is refused, run it again on its own.
+
 ## When you finish
 
 Write exactly one JSON file to {outcome} and then stop:
@@ -88,16 +94,24 @@ def acceptance_lines(t):
     return '\n'.join(f'- {a}' for a in lines) or '- (none given)'
 
 
-def build_prompt(t, repo, start, check, outcome):
+def allowed_list(check_commands):
+    """The shell commands a worker may run, as the prompt lists them."""
+    cmds = ['git status', 'git diff ...', 'git log ...', 'git show ...', 'ls ...'] + [c for c in check_commands if c]
+    return ', '.join(f'`{c}`' for c in cmds)
+
+
+def build_prompt(t, repo, start, check, outcome, check_commands=()):
     note = f'\n## Note for this run\n\n{t["note"]}\n' if t['note'] else ''
     return BUILD.format(id=t['id'], title=t['title'], repo=repo, start=start, body=t['body'] or '(no body)',
-                        acceptance=acceptance_lines(t), note=note, check=check or 'the repo\'s tests', outcome=outcome)
+                        acceptance=acceptance_lines(t), note=note, check=check or 'the repo\'s tests', outcome=outcome,
+                        allowed=allowed_list(check_commands or [check]))
 
 
-def review_prompt(t, repo, sha, base_ref, check, outcome):
+def review_prompt(t, repo, sha, base_ref, check, outcome, check_commands=()):
     return REVIEW.format(id=t['id'], title=t['title'], repo=repo, sha=sha, base_ref=base_ref,
                          body=t['body'] or '(no body)', acceptance=acceptance_lines(t),
-                         check=check or 'the repo\'s tests', risk=t['risk'], outcome=outcome)
+                         check=check or 'the repo\'s tests', risk=t['risk'], outcome=outcome,
+                         allowed=allowed_list(check_commands or [check]))
 
 
 def allowed_tools(check_commands, run_dir):
