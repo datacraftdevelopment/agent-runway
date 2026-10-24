@@ -148,6 +148,44 @@ def cmd_session(con, a):
     out(info) if a.json else print(f'cd {run["dir"]} && {line}' if line else f'{run["dir"]} (no session to resume)')
 
 
+# ---- the loop and setup checks -----------------------------------------------------------------------------------
+
+def cmd_loop(con, a):
+    from . import loop
+    con.close()
+    return loop.run_forever(every=a.every, once=a.once, parent=a.parent_pid)
+
+
+def login_shell(cmd):
+    """A command as the person's login shell runs it, so PATH matches what they use in Terminal."""
+    shell = __import__('os').environ.get('SHELL', '/bin/zsh')
+    return subprocess.run([shell, '-lc', cmd], capture_output=True, text=True, timeout=60)
+
+
+def cmd_doctor(con, a):
+    """Checks this Mac: the tools, and whether Claude Code, Codex and GitHub are signed in. Fills the first-run table."""
+    def claude_ok():
+        res = login_shell('claude auth status')
+        try:
+            return json.loads(res.stdout).get('loggedIn') is True
+        except (json.JSONDecodeError, AttributeError):
+            return False
+    checks = {
+        'claude': claude_ok(),
+        'codex': login_shell('codex login status').returncode == 0,
+        'github': login_shell('gh auth status').returncode == 0,
+    }
+    tools = {t: login_shell(f'command -v {t}').returncode == 0 for t in ('git', 'tmux', 'claude', 'codex', 'gh')}
+    yes = lambda ok: 'yes' if ok else 'sign_in'
+    con.execute('INSERT OR REPLACE INTO setup(runner, reachable, claude, codex, github, at) VALUES (?, ?, ?, ?, ?, ?)',
+                ('This Mac', 'yes', yes(checks['claude']), yes(checks['codex']), yes(checks['github']), db.now()))
+    for agent in ('claude', 'codex'):
+        con.execute('UPDATE agents SET signed_in=? WHERE kind=?', (int(checks[agent]), agent))
+    for name, ok in {**tools, **{f'{k} signed in': v for k, v in checks.items()}}.items():
+        print(f'{"ok " if ok else "NO "} {name}')
+    return 0 if all(tools.values()) and all(checks.values()) else 1
+
+
 # ---- parser ------------------------------------------------------------------------------------------------------
 
 def parser():
@@ -205,6 +243,13 @@ def parser():
     x.add_argument('--json', action='store_true')
     x.set_defaults(fn=cmd_session)
 
+    x = sub.add_parser('loop', help='run the loop (the app starts this; one at a time)')
+    x.add_argument('--every', type=int, default=15, help='seconds between ticks')
+    x.add_argument('--once', action='store_true', help='one tick, then exit')
+    x.add_argument('--parent-pid', type=int, help='stop when this process (the app) goes away')
+    x.set_defaults(fn=cmd_loop)
+    sub.add_parser('doctor', help="check this Mac's tools and sign-ins").set_defaults(fn=cmd_doctor)
+
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p
 
@@ -213,10 +258,9 @@ def main(argv=None):
     a = parser().parse_args(argv)
     con = db.connect()
     try:
-        a.fn(con, a)
+        return a.fn(con, a) or 0
     except db.RunwayError as e:
         print(f'runway: {e}', file=sys.stderr)
         return 1
     finally:
         con.close()
-    return 0
