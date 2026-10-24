@@ -43,13 +43,19 @@ the right shape. What has to change before SSH lands:
 - the loop holds a runner per row of `runners`, chosen by `kind` (`this_mac` → `LocalRunner`, `ssh_mac` →
   `SSHRunner`, which runs the same git/tmux commands through `ssh <host>`), registered through the extension list
   above rather than an `if kind ==` chain;
-- run files are read through the runner (`runner.read(run_id, 'outcome.json')`), not from a local `run_dir` path,
-  because on an SSH Mac they are on that Mac (`loop.py` reads `run_dir / 'outcome.json'` and friends directly today).
+- everything the loop does on a run goes through the runner, keyed by run id: `read`, `write` (the prompt),
+  `exec` in the worktree (check, commit, push, PR), `start`, `alive`, `stop`. `run_dir` becomes private to
+  `LocalRunner`, because on an SSH Mac the run files live on that Mac (`loop.py` reads and writes `run_dir / …`
+  directly today);
+- each runner knows where each repo is cloned on it (a per-runner, per-repo path), which is also what makes a repo's
+  main computer real.
 
 **Seam B: the app talks to its Runway Mac through a connection.** `RunwayCLI.swift` runs `runway <args>` in the local
 login shell. Give it a connection setting: this Mac (as now), or another Mac over SSH (`ssh <host> runway <args>`,
 same JSON back). Then the laptop's app can show and drive the board on the desktop without the database moving, and
-switching which Mac is "home" is one setting. The app stays logic-free either way.
+switching which Mac is "home" is one setting. Only the home Mac's app runs the loop (as its child, so still no
+daemon, but the home Mac must be awake with the app open); an app connected over SSH is a remote control and never
+starts a second loop, so `RunwayCLI` refuses `loop` on an SSH connection. The app stays logic-free either way.
 
 Both seams are small, keep the free model daemon-free, and leave room for other connection and runner types later.
 
