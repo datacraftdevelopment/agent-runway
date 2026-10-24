@@ -25,6 +25,34 @@ feature flags, no extension code in this repo.
 3. **Status passes through what it doesn't know.** `RunwayCore`'s status decoding keeps any `extensions` object as raw
    JSON, so an extension's panel can read its own data without the core models changing.
 
+## Other Macs: how they connect today, and the two seams it needs
+
+Checked 2026-10-24 against the app branch (`runway-app/local-run`, PR #6).
+
+**Today.** One Mac runs Runway: it holds `~/.runway/runway.db` and runs the loop as the app's child. Tickets run only
+on that Mac (`free_slots` only counts `kind='this_mac'`; `ssh_mac` and `cloud` exist in the `runners` table but
+nothing runs there yet). There is no SSH code yet.
+
+**The free model, without a daemon.** A Mac you sit at (say a laptop) and a Mac that stays home (say a desktop) both
+have the app, and one of them is the Runway Mac. Other Macs are reached over plain SSH, with Tailscale so it works away
+from home. Nothing listens or runs in the background on them: tickets run there inside tmux, started over SSH.
+
+**Seam A: one runner object per runner, not one for the loop.** The loop already goes through a single `LocalRunner`
+(`runway/runner.py`: `worktree`, `start`, `alive`, `stop`, `check`, `commit`, `push`, `remove`, `config`), which is
+the right shape. What has to change before SSH lands:
+- the loop holds a runner per row of `runners`, chosen by `kind` (`this_mac` → `LocalRunner`, `ssh_mac` →
+  `SSHRunner`, which runs the same git/tmux commands through `ssh <host>`), registered through the extension list
+  above rather than an `if kind ==` chain;
+- run files are read through the runner (`runner.read(run_id, 'outcome.json')`), not from a local `run_dir` path,
+  because on an SSH Mac they are on that Mac (`loop.py` reads `run_dir / 'outcome.json'` and friends directly today).
+
+**Seam B: the app talks to its Runway Mac through a connection.** `RunwayCLI.swift` runs `runway <args>` in the local
+login shell. Give it a connection setting: this Mac (as now), or another Mac over SSH (`ssh <host> runway <args>`,
+same JSON back). Then the laptop's app can show and drive the board on the desktop without the database moving, and
+switching which Mac is "home" is one setting. The app stays logic-free either way.
+
+Both seams are small, keep the free model daemon-free, and leave room for other connection and runner types later.
+
 ## Not now
 
 Loading extensions from the app's own settings screen, or any marketplace for them. App Store distribution is out: the Mac App Store requires the App Sandbox, and anything a sandboxed app starts inherits
