@@ -38,3 +38,8 @@ RUNWAY_OPEN=panel build/Runway.app/Contents/MacOS/Runway
 ```
 
 Screenshots of each screen: `docs/shipped/screens/`.
+
+## Releases and updates
+
+The app updates itself with Sparkle from this repo's GitHub Releases. `RELEASING.md` covers cutting a release
+(`make-app.sh --release`, or the `release` workflow) and the one-time signing setup.

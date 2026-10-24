@@ -1,0 +1,32 @@
+# Every push and PR: the Python tests, the Swift tests, and a release dry run (built, signed ad hoc, zipped,
+# appcast written; not notarized, not published). Needs no secrets.
+name: app
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Python tests
+        run: python3 -m unittest discover -s tests -t .
+      - name: Swift tests
+        working-directory: app
+        run: swift test
+      - name: Release dry run
+        working-directory: app
+        run: RUNWAY_RELEASE_CHECK_CMD=true bash make-app.sh --release --dry-run
+      - name: Check the dry-run app
+        working-directory: app
+        run: |
+          codesign --verify --deep --strict build/Runway.app
+          test -d build/Runway.app/Contents/Frameworks/Sparkle.framework
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' build/Runway.app/Contents/Info.plist
+          grep -q '<enclosure url="https://github.com/datacraftdevelopment/runway-agent/releases/download/v' build/release/appcast.xml
+          ls -l build/release

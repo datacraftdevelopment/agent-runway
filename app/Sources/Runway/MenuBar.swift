@@ -62,6 +62,22 @@ struct MenuBarContent: View {
             item(id: "window") { open("runway") } label: { Text("Open Runway") }
             item(id: "setup") { open("runway-setup") } label: { Text("Set up Runway…") }
             divider
+            if let note = AppUpdater.shared.state.menuNote {
+                Text("Runway \(AppUpdater.shared.version) · \(note)")
+                    .font(.system(size: 11)).foregroundStyle(Palette.textMuted).padding(.horizontal, 8).padding(.vertical, 6)
+            } else {
+                item(id: "updates") {
+                    dismiss?()
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    AppUpdater.shared.checkForUpdates()
+                } label: {
+                    HStack {
+                        Text("Check for Updates…")
+                        Spacer()
+                        Text(AppUpdater.shared.version).font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                    }
+                }
+            }
             item(id: "quit") { NSApplication.shared.terminate(nil) } label: {
                 Text("Quit (running tickets keep going)").foregroundStyle(Palette.textMuted)
             }

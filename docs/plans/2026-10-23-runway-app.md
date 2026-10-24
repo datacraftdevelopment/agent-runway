@@ -89,4 +89,4 @@ Sparkle (updates), Ringside, rounds and Linear-era code. SwiftTerm stays out for
 
 ## Not in this plan
 
-Auto-update, code signing and notarisation, a website, Windows or Linux, an in-app terminal.
+Auto-update, code signing and notarisation (since moved in: `docs/specs/2026-10-24-app-updates-design.md`), a website, Windows or Linux, an in-app terminal.
