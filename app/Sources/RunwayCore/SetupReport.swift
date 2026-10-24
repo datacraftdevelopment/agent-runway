@@ -28,8 +28,13 @@ public struct SetupReport: Codable, Equatable, Sendable {
     }
 
     public struct Skills: Codable, Equatable, Sendable {
+        /// This copy of Runway carries the skills.
         public var built: Bool
+        /// Installed in Claude Code / Codex, as their own plugin lists say.
+        public var claude: Bool?
+        public var codex: Bool?
         public var note: String
+        public var installed: Bool { (claude ?? false) && (codex ?? false) }
     }
 
     public var command: Command

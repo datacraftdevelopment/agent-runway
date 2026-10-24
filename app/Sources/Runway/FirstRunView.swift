@@ -62,8 +62,14 @@ struct FirstRunView: View {
                 line(false, "runway in Terminal", detail: "optional; asks before adding a link", warn: true)
                 Button("Add it to Terminal…") { model.installCommand() }.buttonStyle(PlainBoxButtonStyle(small: true))
             }
-            line(setup.skills.built, setup.skills.built ? "Runway skills in Claude Code and Codex"
-                 : "Runway skills: not built yet", detail: setup.skills.built ? nil : setup.skills.note, warn: true)
+            if setup.skills.installed {
+                line(true, "Runway skills in Claude Code and Codex", detail: "file-tickets, runway, setup")
+            } else {
+                line(false, "Runway skills", detail: setup.skills.note, warn: true)
+                if setup.skills.built {
+                    Button("Add the skills…") { model.installSkills() }.buttonStyle(PlainBoxButtonStyle(small: true))
+                }
+            }
         } else {
             checkingLine
         }
@@ -100,7 +106,8 @@ struct FirstRunView: View {
     @ViewBuilder private var repoStep: some View {
         if let repos = model.setup?.repos, !repos.isEmpty, model.pendingRepo == nil {
             line(true, "Watching \(repos.joined(separator: ", "))")
-            Text("File tickets with `runway file`, then watch them on the board.")
+            Text("In a normal Claude Code or Codex session in that repo, ask it to file tickets for Runway (the "
+                 + "file-tickets skill); they show up on the board.")
                 .foregroundStyle(Palette.textSoft).fixedSize(horizontal: false, vertical: true)
             Button { open("runway") } label: { Text("Open Runway").frame(maxWidth: .infinity) }
                 .buttonStyle(PrimaryButtonStyle())

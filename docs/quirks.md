@@ -4,6 +4,20 @@ Non-obvious gotchas worth remembering. Check before re-inventing fixes.
 
 > Format: short heading, one or two sentences. Date-stamped. Add new entries at the top. The point is fast scanning, not exhaustive documentation.
 
+## An allow-listed command must be run by name, without a heredoc (2026-10-24)
+
+With `--allowedTools 'Bash(runway:*)'`, a session that found runway with `command -v` and then ran it by its full
+path was refused, and so was `runway file <<'EOF' … EOF`. The skills say to run plain `runway`, and the batch goes
+in a file: `runway file --batch <file.json>`.
+
+## Codex loads Claude-format marketplaces, and repo skills under .agents/skills (2026-10-24)
+
+`codex plugin marketplace add <folder with .claude-plugin/marketplace.json>` then `codex plugin add name@market`
+works with the same plugin Claude Code installs (`claude plugin marketplace add`, `claude plugin install`); a
+`.codex-plugin/plugin.json` beside `.claude-plugin/plugin.json` adds Codex's own fields. Symlinked skills in a repo's
+`.agents/skills/` show up named after the plugin they resolve into. `CLAUDE_CONFIG_DIR` and `CODEX_HOME` point both at
+throwaway config folders for testing installs.
+
 ## Claude's allow-list refuses chained commands (2026-10-24)
 
 With `--permission-mode dontAsk --allowedTools 'Bash(python3 -m unittest -q:*)' 'Bash(git diff:*)'`, a reviewer that
