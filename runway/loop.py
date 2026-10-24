@@ -95,7 +95,7 @@ class Loop:
             return self.failed(t, 'the worker said done but changed nothing')
         db.update_ticket(self.con, t['id'], state='checking', stage='check', sha=sha)
         cfg = self.runner.config(repo)
-        ok, output = self.runner.check(run['dir'], cfg.get('check_cmd'))
+        ok, output = self.runner.check(run['dir'], check_command(repo, cfg))
         if not ok:
             self.end(run, 'failed')
             return self.failed(t, f'the check failed after the build: {output[-600:]}')
@@ -279,7 +279,7 @@ class Loop:
         run_id = cur.lastrowid
         run_dir = self.runner.run_dir(run_id)
         cfg = self.runner.config(repo)
-        check = cfg.get('check_cmd')
+        check = check_command(repo, cfg)
         commands = [check] + list(cfg.get('worker_commands', []))
         branch = t['branch'] or f'rw/{t["id"]}'
         try:
@@ -314,6 +314,11 @@ class Loop:
         what = f'{t["id"]} review by {NAMES[agent]}' if kind == 'review' else f'{t["id"]} {where} with {NAMES[agent]}'
         db.event(self.con, 'start' if kind == 'build' else 'review', what, repo=t['repo'], ticket=t['id'])
         self.log(f'started {what}')
+
+
+def check_command(repo, cfg):
+    """runway.json's check_cmd (as the base branch has it) wins; else the one given when the repo was added."""
+    return cfg.get('check_cmd') or (repo['check_cmd'] if 'check_cmd' in repo.keys() else None)
 
 
 def read(path):

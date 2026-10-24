@@ -26,14 +26,26 @@ def git_slug(path):
 
 
 def cmd_repo_add(con, a):
+    from . import setup
     path = Path(a.path).expanduser().resolve()
     if not (path / '.git').exists():
         raise db.RunwayError(f'{path} is not a git clone')
+    slug = git_slug(path)
+    if not slug:
+        raise db.RunwayError(f'{path} has no GitHub origin; Runway opens and merges pull requests on GitHub')
     name = a.name or path.name
-    con.execute('INSERT OR REPLACE INTO repos(name, path, slug, base, main_computer, runs_on) VALUES (?, ?, ?, ?, ?, ?)',
-                (name, str(path), git_slug(path), a.base, a.main, a.runs_on))
-    db.event(con, 'setup', f'watching {name} ({path})', repo=name)
-    print(f'watching {name}: {path} (base {a.base}, main computer {a.main})')
+    check = a.check or setup.suggest_check(path)
+    con.execute('INSERT OR REPLACE INTO repos(name, path, slug, base, main_computer, runs_on, check_cmd) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?)', (name, str(path), slug, a.base, a.main, a.runs_on, check))
+    db.event(con, 'setup', f'watching {name} ({slug})', repo=name)
+    print(f'watching {name}: {path} (base {a.base}, main computer {a.main}, check: {check or "none"})')
+
+
+def cmd_repo_suggest(con, a):
+    from . import setup
+    path = Path(a.path).expanduser().resolve()
+    out({'path': str(path), 'name': path.name, 'git': (path / '.git').exists(), 'slug': git_slug(path),
+         'check': setup.suggest_check(path)})
 
 
 def cmd_repo_list(con, a):
@@ -157,34 +169,26 @@ def cmd_loop(con, a):
     return loop.run_forever(every=a.every, once=a.once, parent=a.parent_pid, log=stamp)
 
 
-def login_shell(cmd):
-    """A command as the person's login shell runs it, so PATH matches what they use in Terminal."""
-    shell = __import__('os').environ.get('SHELL', '/bin/zsh')
-    return subprocess.run([shell, '-lc', cmd], capture_output=True, text=True, timeout=60)
-
-
 def cmd_doctor(con, a):
     """Checks this Mac: the tools, and whether Claude Code, Codex and GitHub are signed in. Fills the first-run table."""
-    def claude_ok():
-        res = login_shell('claude auth status')
-        try:
-            return json.loads(res.stdout).get('loggedIn') is True
-        except (json.JSONDecodeError, AttributeError):
-            return False
-    checks = {
-        'claude': claude_ok(),
-        'codex': login_shell('codex login status').returncode == 0,
-        'github': login_shell('gh auth status').returncode == 0,
-    }
-    tools = {t: login_shell(f'command -v {t}').returncode == 0 for t in ('git', 'tmux', 'claude', 'codex', 'gh')}
-    yes = lambda ok: 'yes' if ok else 'sign_in'
-    con.execute('INSERT OR REPLACE INTO setup(runner, reachable, claude, codex, github, at) VALUES (?, ?, ?, ?, ?, ?)',
-                ('This Mac', 'yes', yes(checks['claude']), yes(checks['codex']), yes(checks['github']), db.now()))
-    for agent in ('claude', 'codex'):
-        con.execute('UPDATE agents SET signed_in=? WHERE kind=?', (int(checks[agent]), agent))
-    for name, ok in {**tools, **{f'{k} signed in': v for k, v in checks.items()}}.items():
-        print(f'{"ok " if ok else "NO "} {name}')
-    return 0 if all(tools.values()) and all(checks.values()) else 1
+    from . import setup
+    rep = setup.report(con)
+    if a.json:
+        out(rep)
+        return 0
+    for t in rep['tools']:
+        print(f'{"ok " if t["ok"] else "NO "} {t["name"]}' + ('' if t['ok'] else f'   fix: {t["fix"]}'))
+    for s in rep['signins']:
+        print(f'{"ok " if s["ok"] else "NO "} {s["label"]} signed in' + ('' if s['ok'] else f'   fix: {s["fix"]}'))
+    c = rep['command']
+    print(f'{"ok " if c["linked"] else "-- "} runway in Terminal' + ('' if c['linked'] else '   fix: runway install-command'))
+    print(f'-- skills: {rep["skills"]["note"]}')
+    return 0 if rep['ready'] else 1
+
+
+def cmd_install_command(con, a):
+    from . import setup
+    print(setup.install_command(a.to))
 
 
 # ---- parser ------------------------------------------------------------------------------------------------------
@@ -200,7 +204,11 @@ def parser():
     x.add_argument('--base', default='main')
     x.add_argument('--main', default='This Mac', help='the runner where this clone lives')
     x.add_argument('--runs-on', default='any', choices=['any', 'main'])
+    x.add_argument('--check', help="the repo's test command, used when it has no runway.json (default: a guess)")
     x.set_defaults(fn=cmd_repo_add)
+    x = r.add_parser('suggest-check', help='what Runway would guess for a clone: name, GitHub slug, check command')
+    x.add_argument('path')
+    x.set_defaults(fn=cmd_repo_suggest)
     r.add_parser('list').set_defaults(fn=cmd_repo_list)
 
     r = sub.add_parser('runner', help='places tickets run').add_subparsers(dest='sub', required=True)
@@ -249,7 +257,12 @@ def parser():
     x.add_argument('--once', action='store_true', help='one tick, then exit')
     x.add_argument('--parent-pid', type=int, help='stop when this process (the app) goes away')
     x.set_defaults(fn=cmd_loop)
-    sub.add_parser('doctor', help="check this Mac's tools and sign-ins").set_defaults(fn=cmd_doctor)
+    x = sub.add_parser('doctor', help="check this Mac's tools and sign-ins, with the fix for each")
+    x.add_argument('--json', action='store_true', help='what the first-run screen shows')
+    x.set_defaults(fn=cmd_doctor)
+    x = sub.add_parser('install-command', help='link runway into ~/.local/bin so Terminal finds it')
+    x.add_argument('--to', help='another folder for the link')
+    x.set_defaults(fn=cmd_install_command)
 
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p
