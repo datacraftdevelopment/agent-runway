@@ -34,7 +34,7 @@ enum RenderMode {
         model.showAllNotes()
         write(WhatsNewView(model: model), "whats-new", folder)
         write(MainWindow(model: model).frame(width: 1280, height: 800), "board", folder)
-        if model.source == .live { await model.refreshStats() }
+        if model.source == .live && !model.firstLaunch { await model.refreshStats() }   // stats would make ~/.runway
         model.tab = .activity
         write(MainWindow(model: model).frame(width: 1280, height: 800), "activity", folder)
         model.tab = .stats

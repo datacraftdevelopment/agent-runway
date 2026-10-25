@@ -48,10 +48,19 @@ final class SetupGuideTests: XCTestCase {
         XCTAssertEqual(fresh.map(\.done), [false, false, false])
         XCTAssertEqual(fresh.last?.title, "The Agent Runway skills in Claude Code")
         XCTAssertFalse(fresh.last?.skipped ?? true)
-        let noEngine = SetupGuide.items(try report { $0.engines = []; $0.skills.installed = false })
+        // Installed but signed out still gets the skills: the plugin commands need no sign-in.
+        let signedOut = SetupGuide.items(try report { $0.engines = []; $0.skills.installed = false })
+        XCTAssertFalse(signedOut.last?.skipped ?? true)
+        let noEngine = SetupGuide.items(try report {
+            $0.skills.installed = false
+            for i in $0.tools.indices where ["claude", "codex"].contains($0.tools[i].name) { $0.tools[i].ok = false }
+        })
         XCTAssertTrue(noEngine.last?.skipped ?? false)
         XCTAssertEqual(noEngine.last?.title, "The Agent Runway skills in Claude Code or Codex")
-        let both = SetupGuide.items(try report { $0.engines = ["claude", "codex"]; $0.skills.installed = true })
+        let both = SetupGuide.items(try report {
+            for i in $0.tools.indices { $0.tools[i].ok = true }
+            $0.skills.installed = true
+        })
         XCTAssertEqual(both.last?.title, "The Agent Runway skills in Claude Code and Codex")
         XCTAssertTrue(both.last?.done ?? false)
         XCTAssertTrue(both.first?.done ?? false)        // an older runway (no database_exists) counts it as there

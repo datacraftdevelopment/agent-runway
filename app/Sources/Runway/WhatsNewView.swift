@@ -28,7 +28,7 @@ struct WhatsNewView: View {
         .foregroundStyle(Palette.text)
         .padding(.horizontal, 30).padding(.top, 34).padding(.bottom, 24)
         .frame(width: 640, alignment: .topLeading)
-        .frame(minHeight: 300, maxHeight: 640, alignment: .topLeading)
+        .frame(minHeight: 300, maxHeight: RenderMode.folder == nil ? 640 : nil, alignment: .topLeading)
         .background(Palette.window)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)

@@ -115,7 +115,7 @@ struct SetupGuideView: View {
                         engine("claude", "Claude Code", setup)
                         engine("codex", "Codex", setup)
                         if setup.engines?.isEmpty ?? true {
-                            Text("Install and sign in to either one. Runway uses whichever you have.")
+                            Text("Runway needs one of these installed and signed in. Either is enough.")
                                 .font(.system(size: 11)).foregroundStyle(Palette.needsYouText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -270,8 +270,9 @@ struct SetupGuideView: View {
             case .check:
                 Button(model.checking ? "Checking…" : "Check again") { Task { await model.checkMac() } }
                     .buttonStyle(PlainBoxButtonStyle()).disabled(model.checking)
+                let ready = model.setup.map(SetupGuide.macReady) ?? false
                 Button("Continue") { go(1) }.buttonStyle(PrimaryButtonStyle())
-                    .disabled(!(model.setup.map(SetupGuide.macReady) ?? false))
+                    .disabled(!ready).opacity(ready ? 1 : 0.4)
             case .install:
                 if let setup = model.setup,
                    SetupGuide.items(setup).allSatisfy({ $0.done || $0.skipped || model.installed.contains($0.kind) }),
@@ -283,6 +284,7 @@ struct SetupGuideView: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.installing != nil || model.setup == nil)
+                    .opacity(model.installing != nil ? 0.6 : 1)
                 }
             case .next:
                 Button("Open Runway") {

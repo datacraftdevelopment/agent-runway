@@ -48,7 +48,9 @@ public enum SetupGuide {
 
     /// What "Set it up" puts in place, in order, and what is already there.
     public static func items(_ report: SetupReport) -> [Item] {
-        let engines = (report.engines ?? []).map { $0 == "codex" ? "Codex" : "Claude Code" }
+        // The skills go into each engine that is installed; installing them needs no sign-in.
+        let engines = report.tools.filter { ($0.name == "claude" || $0.name == "codex") && $0.ok }
+            .map { $0.name == "codex" ? "Codex" : "Claude Code" }
         let into = engines.isEmpty ? "Claude Code or Codex" : engines.joined(separator: " and ")
         return [
             Item(kind: .database, title: "Runway's folder and database",
