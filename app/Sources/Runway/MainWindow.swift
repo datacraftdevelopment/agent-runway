@@ -63,8 +63,9 @@ private struct Sidebar: View {
                 .padding(.horizontal, 8).padding(.vertical, 5)
             }
             VStack(alignment: .leading, spacing: 3) {
-                ForEach(AgentKind.allCases, id: \.self) { kind in
-                    agentLine(kind.choice, text: agentText(status.agent(kind), kind))
+                // Only the engines this Mac has: one is enough.
+                ForEach(status.agents) { agent in
+                    agentLine(agent.kind.choice, text: agentText(agent, agent.kind))
                 }
                 agentLine(.any, text: "Any: whichever is free")
             }

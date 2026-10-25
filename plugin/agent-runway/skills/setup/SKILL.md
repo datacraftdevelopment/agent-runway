@@ -15,14 +15,16 @@ The Runway app's setup screen does the same checks. This is that, from inside an
 runway doctor
 ```
 
-It lists git, gh, tmux, claude and codex, then the Claude Code, Codex and GitHub sign-ins, each with `ok` or `NO` and
-the line that fixes it.
+It lists git, gh, tmux, claude and codex, then the Claude Code, Codex and GitHub sign-ins, each with `ok`, `NO` and
+the line that fixes it, or `--` for an engine that is optional because the other one is ready.
 
 - **Tools:** show each missing tool's fix line and offer to run it. Run an install only when the person says yes.
 - **Sign-ins:** the person signs in themselves (`claude auth login`, `codex login`, `gh auth login` open a browser or
   ask for a code). Never type, ask for or handle a password, token or key. Wait for them to say they're done.
-- Run `runway doctor` again until everything is `ok`. Both agents signed in matters: a ticket built by one is reviewed
-  by the other, and with only one, every ticket waits for the person.
+- Run `runway doctor` again until it says ready. **One engine is enough**: Claude Code or Codex, installed and
+  signed in. The other shows as optional; don't push the person to add it. With two, Runway prefers the other engine
+  for the code review; with one, both reviews run on it in fresh sessions, and low-risk tickets still merge on their
+  own.
 
 ## 2. runway in Terminal (optional)
 

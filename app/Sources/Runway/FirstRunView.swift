@@ -62,8 +62,8 @@ struct FirstRunView: View {
                 line(false, "runway in Terminal", detail: "optional; asks before adding a link", warn: true)
                 Button("Add it to Terminal…") { model.installCommand() }.buttonStyle(PlainBoxButtonStyle(small: true))
             }
-            if setup.skills.installed {
-                line(true, "Runway skills in Claude Code and Codex", detail: "file-tickets, runway, setup")
+            if setup.skills.installed == true {
+                line(true, "Runway skills", detail: "file-tickets, runway, setup")
             } else {
                 line(false, "Runway skills", detail: setup.skills.note, warn: true)
                 if setup.skills.built {
@@ -82,10 +82,23 @@ struct FirstRunView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(setup.tools) { tool in
-                        line(tool.ok, tool.name, detail: tool.ok ? tool.why : nil, fix: tool.fix)
+                        if tool.optional == true {
+                            line(false, tool.name, detail: "optional: one engine is enough", warn: true)
+                        } else {
+                            line(tool.ok, tool.name, detail: tool.ok ? tool.why : nil, fix: tool.fix)
+                        }
                     }
                     ForEach(setup.signins) { signin in
-                        line(signin.ok, "\(signin.label) signed in", fix: signin.fix)
+                        if signin.optional == true {
+                            line(false, "\(signin.label) signed in", detail: "optional", warn: true)
+                        } else {
+                            line(signin.ok, "\(signin.label) signed in", fix: signin.fix)
+                        }
+                    }
+                    if setup.engines?.isEmpty ?? false {
+                        Text("Runway needs Claude Code or Codex, either one, installed and signed in.")
+                            .font(.system(size: 11)).foregroundStyle(Palette.needsYouText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -106,8 +119,8 @@ struct FirstRunView: View {
     @ViewBuilder private var repoStep: some View {
         if let repos = model.setup?.repos, !repos.isEmpty, model.pendingRepo == nil {
             line(true, "Watching \(repos.joined(separator: ", "))")
-            Text("In a normal Claude Code or Codex session in that repo, ask it to file tickets for Runway (the "
-                 + "file-tickets skill); they show up on the board.")
+            Text("In a normal session in that repo, ask your agent to file tickets for Runway (the file-tickets "
+                 + "skill); they show up on the board.")
                 .foregroundStyle(Palette.textSoft).fixedSize(horizontal: false, vertical: true)
             Button { open("runway") } label: { Text("Open Runway").frame(maxWidth: .infinity) }
                 .buttonStyle(PrimaryButtonStyle())

@@ -38,14 +38,14 @@ final class AppModel {
             polling = Task { [weak self] in
                 while !Task.isCancelled {
                     await self?.refresh()
-                    if let self, RenderMode.folder != nil { return RenderMode.renderAndQuit(self) }
+                    if let self, RenderMode.folder != nil { return await RenderMode.renderAndQuit(self) }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                 }
             }
         } else {
             loadSample()
             if RenderMode.folder != nil {
-                Task { [weak self] in if let self { RenderMode.renderAndQuit(self) } }
+                Task { [weak self] in if let self { await RenderMode.renderAndQuit(self) } }
             }
         }
     }

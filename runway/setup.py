@@ -56,25 +56,38 @@ def signed_in(name):
     return login_shell('gh auth status').returncode == 0
 
 
+ENGINES = ('claude', 'codex')
+
+
 def report(con, check_signins=True):
-    """Everything first run shows, and the setup row and agent sign-ins it records."""
+    """Everything first run shows, and the setup row and agent sign-ins it records.
+
+    One engine is enough: Claude Code or Codex, signed in, is a full green. The other one, when it is missing, is
+    marked optional rather than failed, and ready doesn't wait for it."""
     tools = []
     for name, why, fix in TOOLS:
         res = login_shell(f'command -v {name}')
         path = res.stdout.strip() if res.returncode == 0 else None
-        tools.append({'name': name, 'ok': bool(path), 'path': path, 'why': why, 'fix': None if path else fix})
+        tools.append({'name': name, 'ok': bool(path), 'path': path, 'why': why, 'fix': None if path else fix,
+                      'optional': False})
     have = {t['name'] for t in tools if t['ok']}
     need = {'claude': 'claude', 'codex': 'codex', 'github': 'gh'}
     signins = []
     for name, label, fix in SIGNINS:
         ok = need[name] in have and check_signins and signed_in(name)
-        signins.append({'name': name, 'label': label, 'ok': ok,
+        signins.append({'name': name, 'label': label, 'ok': ok, 'optional': False,
                         'fix': None if ok else (fix if need[name] in have else f'install {need[name]} first')})
     ok = {s['name']: s['ok'] for s in signins}
-    yes = lambda v: 'yes' if v else 'sign_in'
+    engines = [e for e in ENGINES if ok[e]]
+    if engines:
+        # With one engine ready, the other is optional: shown without a red mark, never blocking.
+        for row in tools + signins:
+            if row['name'] in ENGINES and not ok[row['name']]:
+                row['optional'] = True
+    mark = lambda name: 'yes' if ok[name] else ('optional' if name in ENGINES and engines else 'sign_in')
     con.execute('INSERT OR REPLACE INTO setup(runner, reachable, claude, codex, github, at) VALUES (?, ?, ?, ?, ?, ?)',
-                ('This Mac', 'yes', yes(ok['claude']), yes(ok['codex']), yes(ok['github']), db.now()))
-    for agent in ('claude', 'codex'):
+                ('This Mac', 'yes', mark('claude'), mark('codex'), mark('github'), db.now()))
+    for agent in ENGINES:
         con.execute('UPDATE agents SET signed_in=? WHERE kind=?', (int(ok[agent]), agent))
     link = link_target()
     return {
@@ -83,9 +96,10 @@ def report(con, check_signins=True):
         'database': str(db.db_path()),
         'tools': tools,
         'signins': signins,
+        'engines': engines,
         'skills': skills_status(),
         'repos': [r['name'] for r in con.execute('SELECT name FROM repos ORDER BY name')],
-        'ready': all(t['ok'] for t in tools) and all(s['ok'] for s in signins),
+        'ready': bool(engines) and all(r['ok'] or r['optional'] for r in tools + signins),
     }
 
 
@@ -170,15 +184,20 @@ def skills_status():
     built = (plugin_dir() / PLUGIN / 'skills').is_dir()
     have = {a: bool(shutil.which(a) or login_shell(f'command -v {a}').returncode == 0) for a in ('claude', 'codex')}
     status = {a: built and have[a] and installed_in(a) for a in ('claude', 'codex')}
+    names = {'claude': 'Claude Code', 'codex': 'Codex'}
+    present = [a for a in ('claude', 'codex') if have[a]]
     if not built:
         note = 'This copy of Runway has no skills folder.'
-    elif all(status.values()):
-        note = 'file-tickets, runway and setup are in Claude Code and Codex.'
+    elif not present:
+        note = 'Install Claude Code or Codex first; the skills go into whichever you use.'
+    elif all(status[a] for a in present):
+        note = 'file-tickets, runway and setup are in ' + ' and '.join(names[a] for a in present) + '.'
     else:
-        missing = ' and '.join(n for a, n in (('claude', 'Claude Code'), ('codex', 'Codex')) if not status[a])
+        missing = ' and '.join(names[a] for a in present if not status[a])
         note = f'Not in {missing} yet: runway install-skills adds them.'
+    # installed: in every engine this Mac has (one is enough).
     return {'built': built, 'claude': status['claude'], 'codex': status['codex'], 'path': str(plugin_dir()),
-            'note': note}
+            'installed': bool(present) and all(status[a] for a in present), 'note': note}
 
 
 def install_skills(agents=('claude', 'codex')):

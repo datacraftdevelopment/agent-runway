@@ -5,8 +5,9 @@ description: "Propose tickets for Runway from this session, and file them only w
 
 # File tickets for Runway
 
-Runway runs each ticket headless on a free runner, has the other agent review it, and brings it back as a pull
-request: merged on its own when it is low risk, otherwise waiting for the person. This skill turns part of the work in
+Runway runs each ticket headless on a free runner, reviews it in two fresh sessions (the code, then the function
+against its Acceptance lines), and brings it back as a pull request: merged on its own when it is low risk, otherwise
+waiting for the person. One engine (Claude Code or Codex) is enough. This skill turns part of the work in
 this session into a small batch of tickets. **The person's typed go is the approval. Never file without it.**
 
 ## 1. Find Runway and the repo
@@ -41,7 +42,9 @@ the person can make. Two to five tickets is a good batch. Show it as one table, 
 
 - **risk** is `low` only with a one-line reason. When unsure, it is `not low`: that ticket waits for the person
   instead of merging on its own. Anything touching auth, payments, data migrations, CI or secrets is `not low`.
-- **agent** is `any`, `claude` or `codex`. Prefer `any` unless one of them is clearly better for it.
+- **agent** is `any`, or an engine this Mac has. Check which with `RUNWAY status --json` (its `agents` list holds
+  only the engines that are set up), and propose only those. With one engine, use `any`. Runway refuses a ticket
+  for an engine it doesn't have.
 - **waits on** names another key in this batch, or a ticket id already filed (T-12), or nothing.
 - **runs on** is `any`, or one runner by name when the work needs something only that machine has.
 

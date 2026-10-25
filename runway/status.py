@@ -44,7 +44,7 @@ def ticket_json(con, t, run, slugs=None):
     return {
         'id': t['id'], 'repo': t['repo'], 'title': t['title'], 'column': column, 'stage': stage,
         'agent': t['agent'], 'risk': t['risk'], 'runs_on': runs_on, 'pinned': bool(t['pinned']),
-        'pr': pr_label(t), 'review': t['review'],
+        'pr': pr_label(t), 'review': t['review'], 'function_review': t['function_review'],
         'pr_url': f'https://github.com/{slugs[t["repo"]]}/pull/{t["pr"]}' if t['pr'] and (slugs or {}).get(t['repo'])
         else None, 'question': question if column == 'needs_you' else None,
         'filed_from': t['filed_from'], 'filed_at': iso(t['filed_at']), 'waits_on': open_blockers,
@@ -67,6 +67,9 @@ def summary(t, run, open_blockers):
     if state == 'queued':
         if open_blockers:
             return f'Waits for {", ".join(open_blockers)} to finish first.'
+        parked = resting_for(t)
+        if parked:
+            return parked
         if t['pinned'] and t['runs_on']:
             return f'Pinned to {t["runs_on"]}. Starts when it has a free slot, even if other runners are free.'
         return 'Starts when a runner has a free slot.' + (f' Next run carries a note: {t["note"]}' if t['note'] else '')
@@ -75,12 +78,32 @@ def summary(t, run, open_blockers):
     if state == 'checking':
         return 'Running the repo\'s check command on the built commit.'
     if state == 'reviewing' and run:
-        return f'{who} is reviewing commit {(run["sha"] or "")[:7]}.'
+        role = run['role'] or 'code'
+        return f'{who} is doing the {role} review of commit {(run["sha"] or "")[:7]}.'
+    if state == 'reviewing':
+        return resting_for(t) or 'Waiting for a free slot for its reviews.'
     if state == 'merging':
         return 'Waiting for the PR\'s checks before the gate merges it.'
     if state == 'dropped':
         return 'Dropped.'
     return t['note'] if state == 'done' else None
+
+
+_CON = None
+
+
+def resting_for(t):
+    """'Waits for Claude Code's usage limit to reset at 19:30' when no engine the ticket can use is free."""
+    if _CON is None:
+        return None
+    rows = {a['kind']: a for a in _CON.execute('SELECT * FROM agents WHERE signed_in = 1')}
+    wanted = [t['agent']] if t['agent'] != 'any' and t['state'] == 'queued' else list(rows)
+    resting = [rows[a] for a in wanted if a in rows and rows[a]['resting_until'] and rows[a]['resting_until'] > db.now()]
+    if wanted and len(resting) == len([a for a in wanted if a in rows]) and resting:
+        soonest = min(resting, key=lambda a: a['resting_until'])
+        return (f'Waits for {AGENT_NAMES[soonest["kind"]]}\'s usage limit to reset at '
+                f'{clock(soonest["resting_until"])}.')
+    return None
 
 
 def repo_json(con, r, tickets, pause):
@@ -104,6 +127,8 @@ def repo_json(con, r, tickets, pause):
 
 
 def snapshot(con):
+    global _CON
+    _CON = con
     runs = {r['ticket']: r for r in live_runs(con)}
     slugs = {r['name']: r['slug'] for r in con.execute('SELECT name, slug FROM repos')}
     tickets = [ticket_json(con, t, runs.get(t['id']), slugs)
@@ -121,10 +146,11 @@ def snapshot(con):
         'runners': [{'name': r['name'], 'kind': r['kind'], 'slots_used': used.get(r['name'], 0),
                      'slots_total': r['slots'], 'state': r['state']}
                     for r in con.execute("SELECT * FROM runners ORDER BY kind != 'this_mac', name")],
+        # Only the engines this Mac has: one is enough, and the board never shows one you don't use.
         'agents': [{'kind': a['kind'],
                     'resting_until': iso(a['resting_until']) if a['resting_until'] and a['resting_until'] > db.now()
                     else None}
-                   for a in con.execute('SELECT * FROM agents ORDER BY kind')],
+                   for a in con.execute('SELECT * FROM agents WHERE signed_in = 1 ORDER BY kind')],
         'tickets': tickets,
         'activity': [{'at': iso(e['at']), 'kind': e['kind'] if e['kind'] in EVENT_KINDS else 'other',
                       'repo': e['repo'], 'text': e['text']} for e in events],

@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 MIGRATIONS = {
     1: """
@@ -112,6 +112,12 @@ MIGRATIONS = {
     2: """
     ALTER TABLE repos ADD COLUMN check_cmd TEXT;
     """,
+    # Review is two fresh sessions (Joe, 2026-10-25): a code review and a function review, each its own run.
+    3: """
+    ALTER TABLE runs ADD COLUMN role TEXT;
+    ALTER TABLE tickets ADD COLUMN function_review TEXT;
+    UPDATE runs SET role = 'code' WHERE kind = 'review';
+    """,
 }
 
 # Ticket states and the board column and stage each shows as.
@@ -164,7 +170,7 @@ def migrate(con):
 
 
 def seed(con):
-    """A fresh database knows this Mac and both agents; setup fills in the rest."""
+    """A fresh database knows this Mac and the two engines it can use; setup records which are signed in."""
     con.execute("INSERT OR IGNORE INTO runners(name, kind, slots) VALUES ('This Mac', 'this_mac', 2)")
     for kind in ('claude', 'codex'):
         con.execute('INSERT OR IGNORE INTO agents(kind) VALUES (?)', (kind,))

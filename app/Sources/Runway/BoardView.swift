@@ -113,7 +113,8 @@ private struct Inspector: View {
                     Text("not opened")
                 }
             }
-            row("Review", ticket.review ?? "not yet")
+            row("Code review", ticket.review ?? "not yet")
+            row("Function review", ticket.functionReview ?? "not yet")
             if !ticket.waitsOn.isEmpty { row("Waits on", ticket.waitsOn.joined(separator: ", ")) }
         }
         .font(.system(size: 12))
@@ -179,6 +180,6 @@ private struct Inspector: View {
     }
 
     private func label(_ name: String) -> some View {
-        Text(name).foregroundStyle(Palette.textMuted).frame(width: 76, alignment: .leading)
+        Text(name).foregroundStyle(Palette.textMuted).frame(width: 104, alignment: .leading)
     }
 }

@@ -54,6 +54,11 @@ def validate(con, repo, tickets):
     if not tickets:
         raise db.RunwayError('the batch is empty')
     runners = {r['name'] for r in con.execute('SELECT name FROM runners')}
+    # One engine is enough; a ticket can only ask for one this Mac has (as the last setup check found).
+    engines = [r['kind'] for r in con.execute('SELECT kind FROM agents WHERE signed_in = 1 ORDER BY kind')]
+    if not engines:
+        raise db.RunwayError('no engine is signed in: Runway needs Claude Code or Codex (runway doctor)')
+    names = {'claude': 'Claude Code', 'codex': 'Codex'}
     keys = [t.get('key') for t in tickets if t.get('key')]
     if len(keys) != len(set(keys)):
         raise db.RunwayError('two tickets in the batch share a key')
@@ -72,6 +77,9 @@ def validate(con, repo, tickets):
         agent = (t.get('agent') or 'any').strip()
         if agent not in AGENTS:
             raise db.RunwayError(f'{where}: agent is any, claude or codex, not {agent!r}')
+        if agent != 'any' and agent not in engines:
+            raise db.RunwayError(f'{where}: {names[agent]} is not set up on this Mac; use agent "any" (runs on '
+                                 f'{" or ".join(names[e] for e in engines)})')
         runs_on = t.get('runs_on') or None
         if runs_on and runs_on not in runners:
             raise db.RunwayError(f'{where}: no runner called {runs_on!r} (have: {", ".join(sorted(runners))})')

@@ -10,8 +10,13 @@ enum RenderMode {
         ProcessInfo.processInfo.environment["RUNWAY_RENDER"].map { URL(fileURLWithPath: $0) }
     }
 
-    static func renderAndQuit(_ model: AppModel) {
+    static func renderAndQuit(_ model: AppModel) async {
         guard let folder else { return }
+        // The setup screen shows the doctor report, so wait for it (live only).
+        if model.source == .live && model.setup == nil {
+            model.runDoctor()
+            for _ in 0..<120 where model.setup == nil { try? await Task.sleep(nanoseconds: 250_000_000) }
+        }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         write(MainWindow(model: model).frame(width: 1280, height: 800), "board", folder)
         model.tab = .activity

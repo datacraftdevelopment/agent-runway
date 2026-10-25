@@ -6,6 +6,7 @@
     "path": "/Applications/Runway.app/Contents/Resources/cli/bin/runway"
   },
   "database": "/Users/you/.runway/runway.db",
+  "engines": ["claude"],
   "ready": false,
   "repos": [],
   "signins": [
@@ -17,6 +18,7 @@
     "built": true,
     "claude": true,
     "codex": false,
+    "installed": false,
     "note": "Not in Codex yet: runway install-skills adds them.",
     "path": "/Applications/Runway.app/Contents/Resources/cli/plugin"
   },
@@ -25,6 +27,6 @@
     { "fix": null, "name": "gh", "ok": true, "path": "/opt/homebrew/bin/gh", "why": "pull requests and merges" },
     { "fix": null, "name": "tmux", "ok": true, "path": "/opt/homebrew/bin/tmux", "why": "keeps runs going when the app closes" },
     { "fix": null, "name": "claude", "ok": true, "path": "/Users/you/.local/bin/claude", "why": "Claude Code, a worker and reviewer" },
-    { "fix": "npm install -g @openai/codex", "name": "codex", "ok": false, "path": null, "why": "Codex, a worker and reviewer" }
+    { "fix": "npm install -g @openai/codex", "name": "codex", "ok": false, "optional": true, "path": null, "why": "Codex, a worker and reviewer" }
   ]
 }

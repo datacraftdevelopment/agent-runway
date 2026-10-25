@@ -50,9 +50,11 @@ Write exactly one JSON file to {outcome} and then stop:
 "done" only when the check passes and every Acceptance line holds.
 """
 
-REVIEW = """\
-You are a Runway reviewer: the other agent from the one that built this. You read and run; you never edit, commit or
-push. Nobody is watching this session: review, write your verdict file, stop.
+# Review is two fresh sessions, each with its own prompt and none of the builder's context (Joe, 2026-10-25).
+REVIEW_HEAD = """\
+You are a Runway {role_name}, in a fresh session: you didn't build this and you have none of the builder's context.
+You read and run; you never edit, commit or push. Nobody is watching this session: review, write your verdict file,
+stop.
 
 Ticket {id}: {title}
 Repo: {repo}. This folder is checked out at commit {sha}, the exact commit you are reviewing.
@@ -66,27 +68,56 @@ See the change with: git diff {base_ref}...HEAD
 
 {acceptance}
 
-## How to review
+"""
+
+REVIEW_CODE = """\
+## How to review the code
 
 1. Read the diff and the code around it.
-2. Run the repo's check: `{check}`, and anything an Acceptance line says to verify.
-3. Judge on three things only: every Acceptance line holds at this commit; it does what the ticket says and nothing it
-   doesn't; and no lowered bar (skipped, deleted or weakened tests, stubs, loosened checks). A finding names a
-   file:line and what it breaks. Style preferences are notes, not findings.
-4. Risk only rises: say "not_low" if the change touches anything risky the ticket didn't expect (auth, money, data,
-   migrations, CI, secrets, a public interface). Otherwise repeat the ticket's risk: {risk}.
-
-Shell commands: run each one on its own, exactly as written, with nothing chained (no &&, ;, | or cd in front; this
-folder is already the repo). Only these are allowed: {allowed}. If one is refused, run it again on its own.
-
+2. Judge: correctness and bugs (edge cases, error paths, anything that breaks existing behaviour); risk; sensitive
+   paths (auth, payments, data and migrations, CI, secrets, a public interface); and tests worth having that are
+   missing. Also any lowered bar: skipped, deleted or weakened tests, stubs, loosened checks. That fails it.
+3. A finding names a file:line and what it breaks. Style preferences are notes, not findings.
+4. Risk only rises: say "not_low" if the change touches anything risky the ticket didn't expect. Otherwise repeat the
+   ticket's risk: {risk}.
+{rules}
 ## When you finish
 
 Write exactly one JSON file to {outcome} and then stop:
 
-{{"verdict": "pass", "risk": "{risk}", "sha": "{sha}", "findings": [], "summary": "what you checked and saw"}}
+{{"verdict": "pass", "risk": "{risk}", "sha": "{sha}", "findings": [], "summary": "what you read and saw"}}
 
 "verdict" is "pass" or "fail"; "sha" is the commit you reviewed.
 """
+
+REVIEW_FUNCTION = """\
+## How to review the function
+
+1. Run the repo's check: `{check}`. It must pass.
+2. Walk each Acceptance line above, in order: do what its Verify says (run the command, or exercise the behaviour
+   it describes) at this commit, and record pass or fail with the evidence (the command and what it printed, or what
+   you saw). A line you can't verify here is a fail, with the reason.
+3. Pass only when the check passes and every Acceptance line passes. Risk only rises: say "not_low" if running it
+   showed something risky the ticket didn't expect. Otherwise repeat the ticket's risk: {risk}.
+{rules}
+## When you finish
+
+Write exactly one JSON file to {outcome} and then stop:
+
+{{"verdict": "pass", "risk": "{risk}", "sha": "{sha}", "check": "pass",
+  "lines": [{{"line": "A1: ...", "pass": true, "evidence": "the command and its output"}}],
+  "summary": "what you ran and saw"}}
+
+"verdict" is "pass" or "fail"; "sha" is the commit you reviewed; one entry in "lines" per Acceptance line.
+"""
+
+REVIEW_RULES = """
+Shell commands: run each one on its own, exactly as written, with nothing chained (no &&, ;, | or cd in front; this
+folder is already the repo). Only these are allowed: {allowed}. If one is refused, run it again on its own.
+"""
+
+ROLES = ('code', 'function')
+ROLE_NAMES = {'code': 'code reviewer', 'function': 'function reviewer'}
 
 
 def acceptance_lines(t):
@@ -107,11 +138,22 @@ def build_prompt(t, repo, start, check, outcome, check_commands=()):
                         allowed=allowed_list(check_commands or [check]))
 
 
-def review_prompt(t, repo, sha, base_ref, check, outcome, check_commands=()):
-    return REVIEW.format(id=t['id'], title=t['title'], repo=repo, sha=sha, base_ref=base_ref,
-                         body=t['body'] or '(no body)', acceptance=acceptance_lines(t),
-                         check=check or 'the repo\'s tests', risk=t['risk'], outcome=outcome,
-                         allowed=allowed_list(check_commands or [check]))
+def review_prompt(t, repo, sha, base_ref, check, outcome, check_commands=(), role='code'):
+    fields = dict(id=t['id'], title=t['title'], repo=repo, sha=sha, base_ref=base_ref, body=t['body'] or '(no body)',
+                  acceptance=acceptance_lines(t), check=check or 'the repo\'s tests', risk=t['risk'],
+                  outcome=outcome, role_name=ROLE_NAMES[role])
+    rules = REVIEW_RULES.format(allowed=allowed_list(check_commands or [check]))
+    body = (REVIEW_CODE if role == 'code' else REVIEW_FUNCTION).format(rules=rules, **fields)
+    return REVIEW_HEAD.format(**fields) + body
+
+
+def function_findings(verdict):
+    """The failing Acceptance lines of a function review, as findings a fix pass can act on."""
+    out = [f'{x.get("line", "?")}: {x.get("evidence", "no evidence given")}'
+           for x in verdict.get('lines') or [] if not x.get('pass')]
+    if str(verdict.get('check', 'pass')).lower() != 'pass':
+        out.insert(0, 'the check command failed')
+    return out
 
 
 def allowed_tools(check_commands, run_dir):

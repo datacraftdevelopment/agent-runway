@@ -14,7 +14,9 @@ final class SetupReportTests: XCTestCase {
         XCTAssertTrue(report.skills.built)
         XCTAssertEqual(report.skills.claude, true)
         XCTAssertEqual(report.skills.codex, false)
-        XCTAssertFalse(report.skills.installed)
+        XCTAssertEqual(report.skills.installed, false)
+        XCTAssertEqual(report.engines, ["claude"])
+        XCTAssertEqual(report.tools.first { $0.name == "codex" }?.optional, true)
         XCTAssertTrue(report.repos.isEmpty)
     }
 
