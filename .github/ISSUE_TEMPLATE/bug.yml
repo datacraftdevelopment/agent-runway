@@ -1,0 +1,41 @@
+name: Bug
+description: Something in Runway didn't work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repo is public. Leave out secrets, tokens, private repo names and anyone else's code.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to see it again
+      placeholder: |
+        1. Open the app
+        2. ...
+  - type: input
+    id: version
+    attributes:
+      label: Runway version
+      description: From the app's About box, or `runway --version`.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which agent was involved
+      options: ["Claude Code", "Codex", "Both", "Neither / not sure"]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything else
+      description: Error text, a screenshot, `runway doctor` output.

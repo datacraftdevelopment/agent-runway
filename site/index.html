@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Runway</title>
+<meta name="description" content="A Mac app that runs small coding tickets with your own Claude Code and Codex, on your own Macs, and only merges what is low risk.">
+<meta property="og:title" content="Agent Runway">
+<meta property="og:description" content="Hand small coding tickets to Claude Code and Codex. They run on your own Macs, the other agent reviews, and only low-risk work merges on its own.">
+<meta property="og:image" content="/screens/board.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#1a2330; --muted:#5a6676; --line:#d5dbe3;
+  --accent:#b86e00; --accent-ink:#ffffff; --accent-soft:#fbefd9;
+  --tarmac:#1d252f; --tarmac-ink:#e9eef4; --tarmac-muted:#a8b3c1;
+  --claude:#c96442; --codex:#3b82f6; --any:#8a94a3; --ok:#2f7d4f;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171e; --surface:#1a212a; --ink:#e6ebf1; --muted:#9aa6b5; --line:#2c3642;
+  --accent:#f0a630; --accent-ink:#1a1206; --accent-soft:#3a2c14; --tarmac:#0b0f14;
+  --ok:#5fc48a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171e; --surface:#1a212a; --ink:#e6ebf1; --muted:#9aa6b5; --line:#2c3642;
+  --accent:#f0a630; --accent-ink:#1a1206; --accent-soft:#3a2c14; --tarmac:#0b0f14;
+  --ok:#5fc48a; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.6 var(--body);margin:0}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px))}
+.narrow{max-width:720px}
+h1,h2,h3{font-family:var(--display);line-height:1.05;margin:0;text-wrap:balance}
+h2{font-size:clamp(32px,5vw,46px);font-weight:800}
+h3{font-size:23px;font-weight:600;letter-spacing:.01em}
+p{margin:0}
+code{font-family:var(--mono);font-size:.86em}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:20px;color:var(--muted);max-width:52ch}
+section{padding-block:72px;border-top:1px solid var(--line)}
+.stack{display:grid;gap:18px}
+
+/* nav */
+nav{background:var(--tarmac);color:var(--tarmac-ink)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+nav .brand{display:flex;align-items:center;gap:10px;font:800 22px/1 var(--display);letter-spacing:.02em;text-decoration:none}
+nav .links{display:flex;gap:20px;font-size:15px}
+nav .links a{text-decoration:none;color:var(--tarmac-muted)}
+nav .links a:hover{color:var(--tarmac-ink)}
+
+/* hero */
+.hero{background:var(--tarmac);color:var(--tarmac-ink);padding-block:56px 0;position:relative;overflow:hidden}
+.hero h1{font-size:clamp(60px,12vw,124px);font-weight:800;letter-spacing:.01em}
+.hero h1 span{color:var(--accent)}
+.hero .tagline{font:700 clamp(24px,3.4vw,32px)/1.2 var(--display);margin-top:14px;letter-spacing:.01em}
+.hero .lede{color:var(--tarmac-muted);font-size:21px;max-width:40ch;margin-top:18px}
+.hero .ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.hero .note{margin-top:14px;font-size:14px;color:var(--tarmac-muted)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;border-radius:8px;font:700 16px/1 var(--body);text-decoration:none;border:1px solid transparent}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{border-color:rgba(255,255,255,.25);color:var(--tarmac-ink)}
+.btn.ghost:hover{border-color:rgba(255,255,255,.55)}
+.btn svg{width:18px;height:18px;flex:none}
+.shot{margin-top:52px;position:relative}
+.shot img{border-radius:12px 12px 0 0;box-shadow:0 -10px 60px rgba(0,0,0,.45);width:100%}
+.runway-line{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 48px,transparent 48px 96px);opacity:.9}
+
+/* steps */
+.steps{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));counter-reset:s}
+.steps li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;counter-increment:s}
+.steps li::before{content:counter(s,decimal-leading-zero);display:block;font:600 13px/1 var(--mono);color:var(--accent);margin-bottom:14px;letter-spacing:.1em}
+.steps p{color:var(--muted);font-size:16px;margin-top:8px}
+
+/* agent chips */
+.chip{display:inline-block;padding:1px 8px;border-radius:5px;font:600 13px/1.6 var(--mono)}
+.chip.claude{background:color-mix(in srgb,var(--claude) 18%,transparent);color:var(--claude)}
+.chip.codex{background:color-mix(in srgb,var(--codex) 18%,transparent);color:var(--codex)}
+.chip.any{background:color-mix(in srgb,var(--any) 20%,transparent);color:var(--muted)}
+
+/* features */
+.grid2{display:grid;gap:28px 40px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.feat h3{margin-bottom:6px}
+.feat p{color:var(--muted)}
+
+/* screens */
+.screens{display:grid;gap:24px;grid-template-columns:1.6fr 1fr;align-items:start}
+.screens figure{margin:0}
+.screens img{border-radius:10px;border:1px solid var(--line)}
+figcaption{font-size:14px;color:var(--muted);margin-top:10px}
+.screens .side{display:grid;gap:24px;grid-template-columns:1fr}
+@media (max-width:760px){.screens{grid-template-columns:1fr}}
+
+/* status */
+.status{display:grid;gap:12px;margin-top:8px}
+.status div{display:flex;gap:14px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.status b{font:600 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;min-width:84px;flex:none}
+.status .now b{color:var(--ok)} .status .next b{color:var(--accent)} .status .later b{color:var(--muted)}
+
+/* feedback */
+.feedback{background:var(--accent-soft);border-radius:14px;padding:32px;display:grid;gap:16px}
+.feedback pre{margin:0;background:var(--tarmac);color:var(--tarmac-ink);border-radius:8px;padding:14px 16px;overflow-x:auto;font:400 14px/1.5 var(--mono)}
+.feedback .ctas{display:flex;flex-wrap:wrap;gap:12px}
+.feedback .btn.primary{background:var(--ink);color:var(--bg)}
+.feedback .btn.ghost{border-color:var(--ink);color:var(--ink)}
+
+/* workflow */
+.flow{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.flow li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:8px;align-content:start;min-width:0}
+.flow li.auto{background:var(--tarmac);color:var(--tarmac-ink);border-color:var(--tarmac)}
+.flow li.auto p{color:var(--tarmac-muted)}
+.flow p{color:var(--muted);font-size:15px}
+.lane{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.flow code{font-size:13px;word-break:break-word}
+.more{font-weight:700;color:var(--accent);text-decoration:none}
+.more:hover{text-decoration:underline}
+/* receipt */
+.receipt{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.receipt table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
+.receipt th,.receipt td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+.receipt thead th{font:600 11px/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.receipt tr:last-child td{border-bottom:0}
+.receipt .ok{color:var(--ok);font-weight:700}
+.receipt .you{color:var(--accent);font-weight:700}
+/* faq */
+.faq{display:grid;gap:10px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.faq summary{cursor:pointer;font-weight:700}
+.faq details p{color:var(--muted);margin-top:8px}
+.faq summary:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+footer{border-top:1px solid var(--line);padding-block:32px;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}
+
+@media (max-width:560px){
+  nav .links a.hide-sm{display:none}
+  section{padding-block:56px}
+  .feedback{padding:22px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">Agent Runway</a>
+    <div class="links">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a href="/skills">Skills</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a class="hide-sm" href="#feedback">Feedback</a>
+      <a href="https://github.com/datacraftdevelopment/agent-runway">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Free · Source available · macOS · Built for one developer</p>
+    <h1>Agent <span>Runway</span></h1>
+    <p class="tagline">A ready-made software factory for one.</p>
+    <p class="lede">You don't have to build your own factory. Install Runway and keep working in Claude Code or Codex the way you do now. When part of the job can run on its own, file it as a ticket. Runway runs it on your Mac, has a fresh session review it, and only merges what is low risk.</p>
+    <div class="ctas">
+      <!-- Until the first signed release, the main button sends people to watch the repo. After it, make "Download for Mac" primary again, pointing at releases/latest/download/Runway.zip. -->
+      <a class="btn primary" href="https://github.com/datacraftdevelopment/agent-runway">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        Watch on GitHub
+      </a>
+      <a class="btn ghost" href="#how">See how it works</a>
+    </div>
+    <p class="note">Early preview. The first signed build isn't out yet: watch the repo on GitHub and you'll hear when the download is ready. macOS 14 or later.</p>
+    <div class="shot">
+      <img src="/screens/board.png" width="1280" height="800" alt="The Runway window: a board of tickets in four columns, Needs you, Up next, Running and Done, with the Macs and cloud they run on listed in the sidebar.">
+    </div>
+  </div>
+  <div class="runway-line"></div>
+</header>
+
+<main>
+<section id="how">
+  <div class="wrap stack">
+    <p class="eyebrow">How it works</p>
+    <h2>You decide what to build. Runway builds it.</h2>
+    <p class="lede">The thinking stays with you, in a normal Claude Code or Codex session. Once the work is shaped into tickets and you type go, everything after that runs without you. You only come back for a merge that isn't low risk.</p>
+    <ol class="flow">
+      <li><span class="lane">You + your agent</span><h3>Discover</h3><p>Talk the problem through. For big, foggy work, map out the decisions first.</p><code>wayfinder · grill-me</code></li>
+      <li><span class="lane">You + your agent</span><h3>Prototype</h3><p>Answer a design question with a throwaway prototype before anything real is built.</p><code>prototype</code></li>
+      <li><span class="lane">You + your agent</span><h3>Spec</h3><p>Turn the conversation into a spec: what done looks like, and how to check it.</p><code>to-spec</code></li>
+      <li><span class="lane">You type go</span><h3>Tickets</h3><p>Your agent breaks the spec into small tickets, each with its risk and acceptance checks. Nothing is filed until you say go.</p><code>file-tickets</code></li>
+      <li class="auto"><span class="lane">Runs on its own</span><h3>Build and check</h3><p>Each ticket runs on a free Mac in its own worktree. Then two fresh sessions review it: one reads the code, and one runs every acceptance check.</p><code>Runway app</code></li>
+      <li class="auto"><span class="lane">Runs on its own</span><h3>Merge</h3><p>Low-risk work that passes review and checks merges itself. Anything else waits on your board as one question.</p><code>runway</code></li>
+    </ol>
+    <p>If a ticket gets stuck, copy its take-back prompt from the board and finish it with your agent. Then give it back to Runway, mark it done, or drop it.</p>
+    <p><a class="more" href="/skills">Every skill in the workflow, and what each one does →</a></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap grid2">
+    <div class="feat"><h3>One subscription is enough</h3><p>Tickets run with the Claude Code or the Codex you already sign in to. You don't need both, any API keys, or a service in between.</p></div>
+    <div class="feat"><h3>Nothing hosted</h3><p>One SQLite file on your Mac holds every ticket and run. Specs and code stay in your git repos.</p></div>
+    <div class="feat"><h3>Nothing hidden</h3><p>The loop runs only while the app is open. No daemons, no launch agents. Close the app and dispatch pauses; runs already started finish.</p></div>
+    <div class="feat"><h3>A gate you can read</h3><p>Auto-merge needs low risk, a passing review on the exact commit, green checks, and no sensitive paths such as auth, payments, migrations or CI. A reviewer can raise risk, never lower it.</p></div>
+    <div class="feat"><h3><span class="chip claude">Claude</span> <span class="chip codex">Codex</span> <span class="chip any">Any</span></h3><p>Use whichever one you have. With both, pin a ticket to one agent or let whichever is free take it, and when one hits its usage limit the next tickets go to the other.</p></div>
+    <div class="feat"><h3>Many Macs, one board</h3><p>Each repo has a main computer, and a ticket can be pinned to the Mac where its files live. The board shows what runs where.</p></div>
+    <div class="feat"><h3>Know how hands-off it is</h3><p>A strip on the board shows how many tickets merged without you, how long they took, what they cost, and where the others stopped.</p></div>
+    <div class="feat"><h3>It learns from its stops</h3><p>When three tickets stop for the same reason in a week, Runway files a retro ticket to fix the cause. Its pull request links every failed run, and it never merges itself.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack">
+    <p class="eyebrow">The app</p>
+    <h2>One look tells you what needs you</h2>
+    <div class="screens">
+      <figure>
+        <img src="/screens/first-run.png" width="760" height="580" alt="The first-run screen: Runway installs its command and skills, your agent finishes setup, and a table shows which Macs and agents are ready." loading="lazy">
+        <figcaption>First run. Runway lays the groundwork, then your own agent finishes setup on each computer.</figcaption>
+      </figure>
+      <div class="side">
+        <figure>
+          <img src="/screens/side-panel.png" width="320" height="640" alt="The side panel: what needs you, and one card per repo with what is running on which Mac." loading="lazy" style="max-width:300px">
+          <figcaption>The side panel stays on top: what needs you, and what each repo is running right now.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap narrow stack">
+    <p class="eyebrow">A real run</p>
+    <h2>Three tickets, one practice repo</h2>
+    <p class="lede">These are the first tickets Runway ran for real, on a small practice repo. They were filed from a session, then built, reviewed and gated with nobody watching.</p>
+    <div class="receipt"><table>
+      <thead><tr><th>Ticket</th><th>Built by</th><th>Reviewed by</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>T-1 Count lines · low risk</td><td><span class="chip claude">Claude</span></td><td><span class="chip codex">Codex</span> pass</td><td><span class="ok">Merged by the gate</span>, 80 seconds from filing</td></tr>
+        <tr><td>T-2 Count words · not low</td><td><span class="chip codex">Codex</span></td><td><span class="chip claude">Claude</span> pass</td><td><span class="you">Waits for you:</span> "Merge PR #2?"</td></tr>
+        <tr><td>T-3 Count characters · low risk</td><td><span class="chip codex">Codex</span></td><td><span class="chip claude">Claude</span> fail, then pass</td><td><span class="ok">Merged by the gate</span> after one retry</td></tr>
+      </tbody>
+    </table></div>
+    <p>One merged with nobody touching it. One merged after a retry, once a Runway bug it hit was fixed. The third waited because it was marked not low risk when it was shaped, which is the point.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap narrow stack">
+    <p class="eyebrow">Questions</p>
+    <h2>What people ask first</h2>
+    <div class="faq">
+      <details><summary>What does it cost?</summary><p>Nothing extra. Runway is free, and tickets run on the subscription you already have: Claude Code or Codex, even an entry-level plan. There are no API keys and nothing is billed per run.</p></details>
+      <details><summary>Do I need both Claude Code and Codex?</summary><p>No. Runway works with just one. Every ticket gets two fresh-session reviews, one of the code and one of the acceptance checks, and with one agent both run on it. If you have both, the code review goes to the other agent, which catches a bit more.</p></details>
+      <details><summary>Does my code leave my Macs?</summary><p>Runway itself sends nothing anywhere. Tickets and runs live in one SQLite file on your Mac. Your code goes where it already goes: to GitHub, and to Claude Code and Codex as they work on it.</p></details>
+      <details><summary>What stops it merging something bad?</summary><p>A gate written in code, not a prompt. A ticket merges on its own only when it was marked low risk while it was shaped, both fresh reviews (code and acceptance checks) passed on the exact commit, the checks are green, and it touches no sensitive paths such as auth, payments, migrations or CI. A reviewer can raise the risk but never lower it. Everything else waits for you.</p></details>
+      <details><summary>Is this for teams?</summary><p>No. Runway is for one developer working across their own repos and Macs. There's no Slack bot, no shared cloud and no seats. If you want a hosted factory for a whole engineering team, cloud products such as Warp Factories are built for that.</p></details>
+      <details><summary>Do I have to design my own workflow?</summary><p>No. Runway comes with one: discover, prototype, spec, tickets, then hands-off build, review and merge. Install it and use it as it is. It's built around the open skills Matt Pocock publishes, so you're not inventing a process. If you already work another way, <code>file-tickets</code> can file tickets from any session.</p></details>
+      <details><summary>What if I hit my usage limit?</summary><p>Runway rests that agent until the limit resets, and the ticket goes back in the queue without using up its fix attempt. If you have both agents, the next tickets go to the other one in the meantime.</p></details>
+    </div>
+  </div>
+</section>
+
+<section id="status">
+  <div class="wrap narrow stack">
+    <p class="eyebrow">Where it stands</p>
+    <h2>Early, and honest about it</h2>
+    <p class="lede">Runway is a working preview built in the open. Expect rough edges and say so when you hit one.</p>
+    <div class="status">
+      <div class="now"><b>Works</b><span>Filing, running, two fresh reviews, the merge gate, hands-off stats and take back, with Claude Code, Codex or both on one Mac.</span></div>
+      <div class="next"><b>Building</b><span>The Runway skills (written, now in testing), more Macs over SSH, cloud runs, and a signed download.</span></div>
+      <div class="later"><b>Later</b><span>Linux and other agents. Tell us which you need.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="feedback">
+  <div class="wrap narrow">
+    <div class="feedback">
+      <p class="eyebrow">Feedback</p>
+      <h2>Found a bug? Want something?</h2>
+      <p>Open an issue on GitHub. Once the Runway skills are installed, you can also ask your agent: it drafts the issue with your version and macOS, shows it to you, and files it only when you say so.</p>
+      <pre>/runway:feedback the board froze after I closed the lid</pre>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/datacraftdevelopment/agent-runway/issues/new/choose">Open an issue</a>
+        <a class="btn ghost" href="https://github.com/datacraftdevelopment/agent-runway/issues">See open issues</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Agent Runway is free to use. Its source is available under the <a href="https://polyformproject.org/licenses/shield/1.0.0">PolyForm Shield 1.0.0</a> licence: use it, change it, share it, just don't build a competing product from it.</span>
+    <span><a href="https://github.com/datacraftdevelopment/agent-runway">GitHub</a> · <a href="https://github.com/datacraftdevelopment/agent-runway/blob/main/LICENSE">Licence</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
