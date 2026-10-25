@@ -63,7 +63,10 @@ struct TicketCard: View {
                     Chip(text: "retro", foreground: Color(hex: 0xD5B3FF), background: Color(hex: 0x2D2140))
                 }
                 if ticket.taken == true {
-                    Chip(text: "taken back", foreground: Palette.needsYouText, background: Palette.needsYouFill)
+                    Chip(text: ticket.takenLong ? "taken back · \(Int((ticket.takenHours ?? 0) / 24))d" : "taken back",
+                         foreground: Palette.needsYouText, background: Palette.needsYouFill)
+                        .help(ticket.takenLong ? "Taken back more than a day ago: give it back, mark it done, or drop it"
+                              : "Taken back")
                 }
             }
         }
@@ -125,6 +128,12 @@ private struct Inspector: View {
         }
         .font(.system(size: 12))
         if ticket.column == .needsYou, ticket.taken != true, let question = ticket.question { needsYou(ticket, question) }
+        if ticket.takenLong {
+            Text("Taken back \(Int((ticket.takenHours ?? 0) / 24)) day(s) ago and still open. Finish it with the "
+                 + "take-back skill: give it back, mark it done, or drop it.")
+                .font(.system(size: 12)).foregroundStyle(Palette.textMuted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         if let summary = ticket.summary {
             Text(summary).font(.system(size: 12)).foregroundStyle(Palette.textSoft).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)

@@ -63,7 +63,7 @@ struct FirstRunView: View {
                 Button("Add it to Terminal…") { model.installCommand() }.buttonStyle(PlainBoxButtonStyle(small: true))
             }
             if setup.skills.installed == true {
-                line(true, "Runway skills", detail: "file-tickets, runway, setup")
+                line(true, "Runway skills", detail: "file-tickets, runway, setup, take-back")
             } else {
                 line(false, "Runway skills", detail: setup.skills.note, warn: true)
                 if setup.skills.built {

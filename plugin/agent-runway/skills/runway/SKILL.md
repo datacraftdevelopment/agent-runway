@@ -55,5 +55,6 @@ runway take T-22 --prompt   # only the prompt, nothing else
 runway give T-22         # after the person's commits: pushes them and queues it again; both reviews run on them
 ```
 
-Taking back never resumes or relaunches the old session. The prompt it prints is for a new session (this one, if the
-person wants): it points at the worktree, the branch and the run records.
+Taking back never resumes or relaunches the old session. To finish a taken-back ticket, use the take-back skill: it
+ends every ticket with `runway give`, `runway done` (on the person's go) or `runway drop`, never leaving it taken
+back.

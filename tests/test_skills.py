@@ -37,7 +37,7 @@ class PluginTreeTest(unittest.TestCase):
             self.assertIn(f'name: {skill.name}\n', front)
             self.assertIn('description: ', front)
             names.append(skill.name)
-        self.assertEqual(names, ['file-tickets', 'runway', 'setup'])
+        self.assertEqual(names, ['file-tickets', 'runway', 'setup', 'take-back'])
 
     def test_skills_never_chain_commands_in_their_examples(self):
         """A session with an allow-list refuses chained commands, so no bash example chains one."""

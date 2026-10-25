@@ -60,7 +60,8 @@ def last_build(con, tid):
 
 
 def prompt(con, tid):
-    """What the person pastes into a new Claude Code or Codex session to take over the ticket."""
+    """What the person pastes into a new Claude Code or Codex session to take over the ticket: the take-back skill
+    first, then a compact fallback for a session without the plugin."""
     t = db.ticket(con, tid)
     branch = t['branch'] or f'rw/{tid}'
     q = json.loads(t['question'] or '{}')
@@ -76,13 +77,13 @@ def prompt(con, tid):
                      f'(transcript.jsonl, outcome.json, reviews/). Read them first to see what it tried.')
     else:
         last_line = 'It has not run yet.'
-    return (f'Take over Runway ticket {tid} in {t["repo"]}: {t["title"]}.\n'
-            f'First run: runway take {tid} (stops its worker, prints the worktree, branch {branch}).\n'
-            f'What failed: {failed}.\n'
-            f'{last_line}\n'
-            f'The ticket, its Acceptance lines and every run: runway show {tid}\n'
-            f'Fix it in the worktree, run the check, commit.\n'
-            f'When done: runway give {tid} (review runs again on your commit).')
+    return (f'Use the runway take-back skill on ticket {tid} in {t["repo"]}.\n'
+            f'\n'
+            f'Without the plugin: {tid} is "{t["title"]}", on branch {branch}. Run runway take {tid} (prints the '
+            f'worktree), then runway show {tid}. What failed: {failed}. {last_line} Fix it in the worktree, run the '
+            f'check, commit, then end it with exactly one of: runway give {tid} (Runway reviews it again), '
+            f'runway done {tid} --note "..." (only on the person\'s go: merges it), or '
+            f'runway drop {tid} --reason "..." (closes the PR). Never leave it taken back.')
 
 
 def take(con, tid, runner=None):
@@ -150,3 +151,72 @@ def give(con, tid, runner=None):
     db.event(con, 'answer', f'{tid} given back at {head[:7]}; it builds again from that commit', repo=t['repo'],
              ticket=tid)
     return head
+
+
+def push_mine(con, t, runner):
+    """The person's commits in the take-back worktree, pushed to the branch. Refuses uncommitted work."""
+    wt = t['take_dir']
+    if not wt or not Path(wt).exists():
+        return None
+    if git('status', '--porcelain', cwd=wt).stdout.strip():
+        raise db.RunwayError(f'{short_home(wt)} has uncommitted changes; commit them (or stash them) first')
+    runner.push(wt, t['branch'] or f'rw/{t["id"]}')
+    return runner.head(wt)
+
+
+def remove_worktrees(con, t, runner):
+    repo = db.repo(con, t['repo'])
+    for d in [t['take_dir']] + [r['dir'] for r in con.execute('SELECT dir FROM runs WHERE ticket=? AND dir IS NOT NULL',
+                                                              (t['id'],))]:
+        if d and Path(d).exists():
+            runner.remove(repo, d)
+
+
+def done(con, tid, note=None, github=None, runner=None):
+    """The person's go, from the session that took it over: push their commits, merge the PR if it isn't merged, and
+    record it like runway go. Safe to run again."""
+    from .github import GitHub
+    runner, gh = runner or LocalRunner(), github or GitHub()
+    t = db.ticket(con, tid)
+    if t['state'] == 'done':
+        return f'{tid} is already done'
+    if t['state'] not in OPEN_STATES:
+        raise db.RunwayError(f'{tid} is {t["state"]}')
+    if not t['pr']:
+        raise db.RunwayError(f'{tid} has no PR to merge yet: runway give {tid} lets Runway open one, or drop it')
+    repo = db.repo(con, t['repo'])
+    head = push_mine(con, t, runner)
+    pr = gh.pr(repo['path'], t['pr'])
+    if pr['state'] != 'MERGED':
+        gh.merge(repo['path'], t['pr'], head or pr['headRefOid'])
+    con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'go', ?, ?)", (tid, note, db.now()))
+    remove_worktrees(con, t, runner)
+    db.update_ticket(con, tid, state='done', stage=None, question=None, take_dir=None, merged_at=db.now(),
+                     merged_by='you', note='You finished it in your own session and merged it.'
+                     + (f' Note: {note}' if note else ''))
+    db.event(con, 'merged', f'{tid} PR #{t["pr"]}, merged by you after taking it back', repo=t['repo'], ticket=tid)
+    return f'{tid}: merged PR #{t["pr"]} and marked done'
+
+
+def drop(con, tid, reason=None, github=None, runner=None):
+    """Close the PR, remove the worktrees, and move the ticket to Done as dropped. Safe to run again."""
+    from .github import GitHub
+    runner, gh = runner or LocalRunner(), github or GitHub()
+    t = db.ticket(con, tid)
+    if t['state'] == 'dropped':
+        return f'{tid} is already dropped'
+    if t['state'] == 'done':
+        raise db.RunwayError(f'{tid} is done (merged); there is nothing to drop')
+    for r in con.execute('SELECT * FROM runs WHERE ticket=? AND ended_at IS NULL', (tid,)).fetchall():
+        runner.stop(r['tmux'])
+        con.execute("UPDATE runs SET ended_at=?, outcome='dropped' WHERE id=?", (db.now(), r['id']))
+    if t['pr']:
+        repo = db.repo(con, t['repo'])
+        if gh.pr(repo['path'], t['pr'])['state'] == 'OPEN':
+            gh.close(repo['path'], t['pr'], f'Dropped in Runway: {reason}' if reason else 'Dropped in Runway.')
+    con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'no', ?, ?)", (tid, reason, db.now()))
+    remove_worktrees(con, t, runner)
+    db.update_ticket(con, tid, state='dropped', stage='dropped', question=None, take_dir=None,
+                     note='Dropped by you.' + (f' Reason: {reason}' if reason else ''))
+    db.event(con, 'answer', f'{tid}: dropped by you' + (f' ({reason})' if reason else ''), repo=t['repo'], ticket=tid)
+    return f'{tid}: dropped' + (f', PR #{t["pr"]} closed' if t['pr'] else '')

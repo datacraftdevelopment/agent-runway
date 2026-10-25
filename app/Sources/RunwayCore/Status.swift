@@ -160,6 +160,11 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var functionReview: String?
     /// Taken back by the person: waits in Needs you until given back.
     public var taken: Bool?
+    /// Hours since it was taken back; the board nudges after a day.
+    public var takenHours: Double?
+
+    /// Taken back more than a day ago: a quiet nudge that it is still waiting to be given back, done or dropped.
+    public var takenLong: Bool { taken == true && (takenHours ?? 0) >= 24 }
     /// "work", or "retro" for a ticket Runway filed itself after repeated stops.
     public var kind: String?
     /// For a retro: the failing runs behind it.

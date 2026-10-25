@@ -163,6 +163,16 @@ def cmd_retro(con, a):
         print(f'{repo}: filed {tid}, a retro for "{reason.replace("_", " ")}" (not low risk; it never merges itself)')
 
 
+def cmd_done(con, a):
+    from . import take
+    print(take.done(con, a.ticket, a.note))
+
+
+def cmd_drop(con, a):
+    from . import take
+    print(take.drop(con, a.ticket, a.reason))
+
+
 # ---- stats ---------------------------------------------------------------------------------------------------
 
 def cmd_stats(con, a):
@@ -382,6 +392,14 @@ def parser():
     x.add_argument('--repo')
     x.add_argument('--reason', help='a stop reason, e.g. check_failed_twice (default: the most frequent)')
     x.set_defaults(fn=cmd_retro)
+    x = sub.add_parser('done', help="finish a ticket yourself: merge its PR (only on the person's go)")
+    x.add_argument('ticket')
+    x.add_argument('--note')
+    x.set_defaults(fn=cmd_done)
+    x = sub.add_parser('drop', help='drop a ticket: close its PR, remove its worktrees')
+    x.add_argument('ticket')
+    x.add_argument('--reason')
+    x.set_defaults(fn=cmd_drop)
     x = sub.add_parser('stats', help='how hands-off it is: merges that needed nothing from you, cycle time, cost')
     x.add_argument('--json', action='store_true', help='what the board strip reads')
     x.add_argument('--repo')

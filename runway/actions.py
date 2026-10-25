@@ -56,9 +56,7 @@ def answer(con, tid, verdict, note=None, github=None):
         if verdict == 'go':
             head = take.give(con, tid)
             return f'{tid}: given back at {head[:7]}'
-        db.update_ticket(con, tid, state='dropped', stage='dropped', question=None, note='You dropped it.')
-        db.event(con, 'answer', f'{tid}: dropped by you', repo=t['repo'], ticket=tid)
-        return f'{tid}: dropped'
+        return take.drop(con, tid, note, github=github)
     # failed (and anything unknown)
     if verdict == 'go':
         requeue(con, tid, note and f'The person says, retrying: {note}')

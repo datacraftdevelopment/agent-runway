@@ -32,8 +32,19 @@ class NoTmuxRunner(LocalRunner):
 
 
 class FakeGitHub:
+    def __init__(self, state='OPEN'):
+        self.state, self.merged, self.closed = state, [], []
+
     def pr(self, path, number):
-        return {'state': 'OPEN', 'headRefOid': 'x', 'files': []}
+        return {'state': self.state, 'headRefOid': 'x', 'files': []}
+
+    def merge(self, path, number, head, method='merge'):
+        self.merged.append((number, head))
+        self.state = 'MERGED'
+
+    def close(self, path, number, comment=None):
+        self.closed.append((number, comment))
+        self.state = 'CLOSED'
 
     def checks(self, path, number):
         return []
@@ -91,13 +102,16 @@ class TakeBackTest(unittest.TestCase):
         tid = self.tid
         prompt_only = take.prompt(self.con, tid)
         self.assertEqual(db.ticket(self.con, tid)['state'], 'needs_you')        # --prompt changes nothing
-        self.assertIn(f'Take over Runway ticket {tid} in app: Count words.', prompt_only)
-        self.assertIn(f'branch rw/{tid}', prompt_only)
+        self.assertEqual(prompt_only.splitlines()[0], f'Use the runway take-back skill on ticket {tid} in app.')
+        self.assertIn(f'on branch rw/{tid}', prompt_only)
+        self.assertIn(f'runway done {tid} --note', prompt_only)
+        self.assertIn(f'runway drop {tid} --reason', prompt_only)
+        self.assertIn('Never leave it taken back.', prompt_only)
         self.assertIn('code review: Claude Code: pass; function review: Codex: fail', prompt_only)
         self.assertIn('Last run: Codex, session thread-1, stopped at reviews.', prompt_only)
         self.assertIn(f'runs/{tid}/1/ (transcript.jsonl, outcome.json, reviews/)', prompt_only)
         self.assertIn(f'runway show {tid}', prompt_only)
-        self.assertIn(f'When done: runway give {tid}', prompt_only)
+        self.assertIn(f'runway give {tid} (Runway reviews it again)', prompt_only)
 
         wt, branch = take.take(self.con, tid, runner=self.runner)
         self.assertEqual(branch, f'rw/{tid}')
@@ -151,6 +165,47 @@ class TakeBackTest(unittest.TestCase):
         self.assertIn('1. build by codex: done, stopped at reviews', out)
         self.assertIn('outcome.json', out)
         self.assertIn('session: thread-1', out)
+
+    def test_done_pushes_merges_and_records_the_go_once(self):
+        tid = self.tid
+        wt, branch = take.take(self.con, tid, runner=self.runner)
+        mine = self.commit(wt, 'words.py', 'def count(t):\n    return len(t.split())\n', 'finished', branch=branch)
+        gh = FakeGitHub()
+        self.assertIn('merged PR #7', take.done(self.con, tid, 'looks right', github=gh, runner=self.runner))
+        self.assertEqual(gh.merged, [(7, mine)])                       # merged at the person's own head
+        t = db.ticket(self.con, tid)
+        self.assertEqual((t['state'], t['merged_by'], t['take_dir']), ('done', 'you', None))
+        self.assertFalse(Path(wt).exists())
+        self.assertEqual(self.con.execute("SELECT answer, note FROM answers").fetchall()[0][:], ('go', 'looks right'))
+        self.assertIn('already done', take.done(self.con, tid, github=gh, runner=self.runner))
+        self.assertEqual(len(gh.merged), 1)
+        self.assertNotIn(tid, stats.window(self.con, 7)['hands_off_tickets'])
+
+    def test_done_refuses_uncommitted_work(self):
+        wt, _ = take.take(self.con, self.tid, runner=self.runner)
+        (Path(wt) / 'words.py').write_text('half done\n')
+        with self.assertRaisesRegex(db.RunwayError, 'uncommitted'):
+            take.done(self.con, self.tid, github=FakeGitHub(), runner=self.runner)
+
+    def test_drop_closes_the_pr_and_removes_worktrees_once(self):
+        tid = self.tid
+        wt, _ = take.take(self.con, tid, runner=self.runner)
+        gh = FakeGitHub()
+        self.assertIn('PR #7 closed', take.drop(self.con, tid, 'not needed', github=gh, runner=self.runner))
+        self.assertEqual(gh.closed, [(7, 'Dropped in Runway: not needed')])
+        self.assertFalse(Path(wt).exists())
+        t = db.ticket(self.con, tid)
+        self.assertEqual((t['state'], t['take_dir']), ('dropped', None))
+        self.assertIn('already dropped', take.drop(self.con, tid, github=gh, runner=self.runner))
+        self.assertEqual(len(gh.closed), 1)
+
+    def test_board_knows_how_long_it_has_been_taken(self):
+        from runway import status
+        take.take(self.con, self.tid, runner=self.runner)
+        self.con.execute("UPDATE stops SET at=? WHERE reason='taken_back'", (db.now() - 30 * 3600,))
+        t = next(x for x in status.snapshot(self.con)['tickets'] if x['id'] == self.tid)
+        self.assertTrue(t['taken'])
+        self.assertGreaterEqual(t['taken_hours'], 30)
 
     def test_a_done_ticket_cannot_be_taken(self):
         db.update_ticket(self.con, self.tid, state='done')

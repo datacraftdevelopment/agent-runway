@@ -35,5 +35,9 @@ class GitHub:
         gh(['pr', 'ready', str(number)], repo_path)
         gh(['pr', 'merge', str(number), f'--{method}', '--match-head-commit', head], repo_path)
 
+    def close(self, repo_path, number, comment=None):
+        args = ['pr', 'close', str(number)] + (['--comment', comment] if comment else [])
+        gh(args, repo_path)
+
     def comment(self, repo_path, number, body):
         gh(['pr', 'comment', str(number), '--body', body], repo_path)
