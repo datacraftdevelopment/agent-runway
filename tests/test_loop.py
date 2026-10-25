@@ -369,5 +369,61 @@ class NoEngine(LoopTest):
             self.file()
 
 
+
+class FakeRemote(FakeRunner):
+    """Another Mac: a FakeRunner that also records when the loop collects a run folder from it."""
+
+    def __init__(self, home, host):
+        super().__init__(home)
+        self.host, self.collected = host, []
+
+    def collect(self, run_dir):
+        self.collected.append(run_dir)
+
+
+class SSHMacs(LoopTest):
+    def setUp(self):
+        super().setUp()
+        self.remotes = {}
+        self.loop.ssh = lambda host: self.remotes.setdefault(host, FakeRemote(self.tmp.name, host))
+        self.con.execute("INSERT INTO runners(name, kind, host, slots) VALUES ('Mini', 'ssh_mac', 'mini.example', 1)")
+        self.con.execute("INSERT INTO runners(name, kind, slots) VALUES ('No Host', 'ssh_mac', 1)")
+
+    def test_a_ticket_pinned_to_an_ssh_mac_runs_there_end_to_end(self):
+        tid = self.file(runs_on='Mini')
+        self.loop.tick()
+        remote = self.remotes['mini.example']
+        build = self.live_run(tid)
+        self.assertEqual((build['runner'], len(remote.started), self.runner.started), ('Mini', 1, []))
+        (db.run_dir(self.con, build) / 'outcome.json').write_text(json.dumps({'status': 'done', 'summary': 'ok'}))
+        remote.live.discard(build['tmux'])
+        self.loop.tick()
+        self.assertEqual(remote.collected, [db.run_dir(self.con, build)])   # brought back before it's read
+        self.assertEqual(remote.pushed, [f'rw/{tid}'])                       # committed and pushed over there
+        self.assertEqual((self.state(tid), self.runner.pushed), ('reviewing', []))
+
+    def test_a_running_remote_run_is_left_alone_and_one_slot_means_one_run(self):
+        a, b = self.file(runs_on='Mini'), self.file(runs_on='Mini')
+        self.loop.tick()
+        self.loop.tick()
+        self.assertEqual((self.state(a), self.state(b)), ('building', 'queued'))
+        self.assertEqual(self.remotes['mini.example'].collected, [])
+
+    def test_this_mac_still_runs_on_this_mac_and_a_mac_without_a_host_gets_nothing(self):
+        self.assertNotIn('No Host', self.loop.free_slots())
+        self.assertIn('Mini', self.loop.free_slots())
+        tid = self.file(runs_on='This Mac')
+        self.loop.tick()
+        self.assertEqual((len(self.runner.started), self.remotes), (1, {}))
+
+    def test_cleanup_removes_each_worktree_on_the_mac_that_has_it(self):
+        tid = self.file(runs_on='Mini')
+        self.loop.tick()
+        run = self.live_run(tid)
+        self.loop.cleanup(db.ticket(self.con, tid))
+        self.assertEqual(self.remotes['mini.example'].removed, [run['dir']])
+        self.assertEqual(self.runner.removed, [])
+
+
 if __name__ == '__main__':
     unittest.main()

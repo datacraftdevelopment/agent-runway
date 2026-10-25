@@ -111,6 +111,8 @@ class SSHRunnerTest(unittest.TestCase):
         self.assertTrue(self.runner.alive('rw-T1-1'))
         self.runner.stop('rw-T1-1')
         self.assertFalse(self.runner.alive('rw-T1-1'))
+        fresh = SSHRunner('second-mac', ssh=str(self.bin / 'ssh'), tmux=str(self.bin / 'tmux'))  # a restarted loop
+        fresh.collect(run_dir)
         self.assertEqual(json.loads((run_dir / 'outcome.json').read_text()), {'status': 'done'})
         self.assertEqual((run_dir / 'exit').read_text().strip(), '0')
         self.assertIn(str(run_dir), (run_dir / 'prompt.md').read_text())      # this Mac's prompt is left as it was

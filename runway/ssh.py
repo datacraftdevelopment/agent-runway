@@ -1,8 +1,8 @@
 """Another Mac as a runner, over plain ssh: the same worktree + tmux + outcome file as this Mac, run there.
 
 The loop keeps every run's folder on this Mac (it reads the log, exit code and outcome from it), so the runner
-mirrors it: `start` sends the folder over before the agent starts, and `alive` brings it back once the session has
-ended. Paths under this Mac's ~/.runway are rewritten to the other Mac's in the shell line and the prompt.
+mirrors it: `start` sends the folder over before the agent starts, and the loop calls `collect` to bring it back once
+the session has ended. Neither keeps anything in memory, so a restarted loop still collects runs started before. Paths under this Mac's ~/.runway are rewritten to the other Mac's in the shell line and the prompt.
 
 On the other Mac, Runway keeps its own clone of each repo (~/.runway/repos/<name>, cloned from this Mac's origin
 URL) and its worktrees (~/.runway/worktrees/<repo>/<ticket>-<run>/). Pushes go from there, so that Mac needs push
@@ -35,7 +35,6 @@ class SSHRunner:
         self.ssh = [ssh, *options]
         self.tmux = tmux
         self._root = None
-        self.runs = {}         # tmux session name -> (this Mac's run folder, the other Mac's run folder)
 
     # ---- talking to the other Mac --------------------------------------------------------------------------------
 
@@ -111,11 +110,10 @@ class SSHRunner:
 
     def start(self, name, workdir, line):
         local = run_folder(line)
-        remote = self.there(str(local)) if local else None
         if local:
+            remote = self.there(str(local))
             self.must(f'mkdir -p {q(remote)} && tar -C {q(remote)} -xf -', 'sending the run folder',
                       input=self.pack(local), text=False)
-            self.runs[name] = (local, remote)
         res = self.sh(f'{self.tmux} new-session -d -s {q(name)} -c {q(workdir)} bash -lc {q(self.there(line))}')
         if res.returncode != 0:
             raise db.RunwayError(f'tmux on {self.host} could not start {name}: {res.stderr.strip()}')
@@ -124,14 +122,10 @@ class SSHRunner:
         res = self.sh(f'{self.tmux} has-session -t {q("=" + name)}')
         if res.returncode == UNREACHABLE:
             return True        # can't tell: keep waiting, and the loop's hour limit still applies
-        if res.returncode == 0:
-            return True
-        self.fetch(name)
-        return False
+        return res.returncode == 0
 
     def stop(self, name):
         self.sh(f'{self.tmux} kill-session -t {q("=" + name)}')
-        self.fetch(name)
 
     def check(self, workdir, cmd, timeout=900):
         if not cmd:
@@ -182,19 +176,17 @@ class SSHRunner:
                 tar.addfile(info, io.BytesIO(data))
         return buf.getvalue()
 
-    def fetch(self, name):
-        """Bring a finished run's folder back to this Mac, so the loop reads its log, exit code and outcome."""
-        if name not in self.runs:
-            return
-        local, remote = self.runs[name]
-        res = self.sh(f'tar -C {q(remote)} -cf - .', text=False)
+    def collect(self, run_dir):
+        """Bring a finished run's folder back to this Mac, so the loop reads its log, exit code and outcome. The
+        prompt stays as this Mac wrote it. Quietly does nothing when the folder can't be read there."""
+        local = Path(run_dir)
+        res = self.sh(f'tar -C {q(self.there(str(local)))} -cf - .', text=False)
         if res.returncode != 0:
             return
         with tarfile.open(fileobj=io.BytesIO(res.stdout)) as tar:
             for m in tar.getmembers():
                 if m.isfile() and '/' not in m.name.removeprefix('./') and m.name.removeprefix('./') not in TEXT_FILES:
-                    (Path(local) / m.name.removeprefix('./')).write_bytes(tar.extractfile(m).read())
-        self.runs.pop(name, None)
+                    (local / m.name.removeprefix('./')).write_bytes(tar.extractfile(m).read())
 
 
 def run_folder(line):

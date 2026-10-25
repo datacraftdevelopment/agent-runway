@@ -87,6 +87,8 @@ Sparkle (updates), Ringside, rounds and Linear-era code. SwiftTerm stays out for
   imports cloud tickets, picks ready tickets, respects runs-on and slots, starts runs, reads outcomes.
 - [x] 4.2 This Mac runner: worktree + tmux + `claude -p` / `codex exec`, outcome file. Check: one practice ticket.
 - [ ] 4.3 SSH Mac runner: the same over `ssh`, using S2's finding. Check: one ticket on the second Mac.
+  Built (`runway/ssh.py`, the loop picks the runner per run from the runners table), tested on stubs only; the
+  one real ticket waits on S2 and the second Mac's address. Take back still makes its worktree on this Mac.
 - [ ] 4.4 Cloud runner: using S3's finding. Check: one ticket in the cloud.
 - [x] 4.5 Review by the other agent, then the gate (from PR #3's `gate.py`): low risk + review pass on head + checks
   green + no sensitive path, else needs-you.

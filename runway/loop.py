@@ -21,6 +21,7 @@ from pathlib import Path
 from . import db, gate, limits, retro, worker
 from .github import GitHub
 from .runner import LocalRunner
+from .ssh import SSHRunner
 
 MAX_RUN = 60 * 60          # a run still going after an hour is stopped and counts as failed
 FIX_PASSES = 1             # a failed build or review gets one fix pass before it asks the person
@@ -29,11 +30,24 @@ NAMES = {'claude': 'Claude Code', 'codex': 'Codex'}
 
 
 class Loop:
-    def __init__(self, con, runner=None, github=None, log=print):
+    def __init__(self, con, runner=None, github=None, log=print, ssh=SSHRunner):
         self.con = con
-        self.runner = runner or LocalRunner()
+        self.runner = runner or LocalRunner()   # This Mac; also reads runway.json from the local clones
         self.github = github or GitHub()
         self.log = log
+        self.ssh = ssh                          # host -> a runner for that Mac (tests pass a fake)
+        self.remotes = {}
+
+    def runner_for(self, name):
+        """The runner a run started on (or will start on), from its row in the runners table."""
+        row = self.con.execute('SELECT * FROM runners WHERE name=?', (name,)).fetchone() if name else None
+        if not row or row['kind'] != 'ssh_mac':
+            return self.runner
+        if not row['host']:
+            raise db.RunwayError(f'{name} has no host to reach it over ssh')
+        if row['host'] not in self.remotes:
+            self.remotes[row['host']] = self.ssh(row['host'])
+        return self.remotes[row['host']]
 
     # ---- the tick ----------------------------------------------------------------------------------------------
 
@@ -51,12 +65,15 @@ class Loop:
 
     def settle(self, run):
         overdue = db.now() - run['started_at'] > MAX_RUN
-        if self.runner.alive(run['tmux']) and not overdue:
+        runner = self.runner_for(run['runner'])
+        if runner.alive(run['tmux']) and not overdue:
             return
         if overdue:
-            self.runner.stop(run['tmux'])
+            runner.stop(run['tmux'])
         t = db.ticket(self.con, run['ticket'])
         run_dir = db.run_dir(self.con, run)
+        if hasattr(runner, 'collect'):
+            runner.collect(run_dir)             # a run on another Mac: bring its folder back first
         log_text = read(run_dir / 'log')
         if run['agent'] == 'codex' and not run['session_id']:
             self.con.execute('UPDATE runs SET session_id=? WHERE id=?', (worker.codex_session(log_text), run['id']))
@@ -93,23 +110,24 @@ class Loop:
             why = summary or f'the worker ended without an outcome (exit {read(run_dir / "exit").strip() or "?"})'
             return self.failed(t, why)
         self.stage(run, 'commit')
-        sha = self.runner.commit(run['dir'], f'{t["id"]}: {t["title"]}')
+        runner = self.runner_for(run['runner'])
+        sha = runner.commit(run['dir'], f'{t["id"]}: {t["title"]}')
         if not sha and t['taken']:
             # Taken back and given back: the person's commits are the work; carry on with them.
-            sha = self.runner.head(run['dir'])
+            sha = runner.head(run['dir'])
         if not sha:
             self.end(run, 'failed')
             return self.failed(t, 'the worker said done but changed nothing')
         db.update_ticket(self.con, t['id'], state='checking', stage='check', sha=sha)
         self.stage(run, 'check')
         cfg = self.runner.config(repo)
-        ok, output = self.runner.check(run['dir'], check_command(repo, cfg))
+        ok, output = runner.check(run['dir'], check_command(repo, cfg))
         if not ok:
             self.end(run, 'failed')
             return self.failed(t, f'the check failed after the build: {output[-600:]}', reason='check')
         branch = t['branch'] or f'rw/{t["id"]}'
         self.stage(run, 'push')
-        self.runner.push(run['dir'], branch)
+        runner.push(run['dir'], branch)
         self.end(run, 'done', sha=sha)
         pr = t['pr']
         if not pr:
@@ -186,7 +204,7 @@ class Loop:
     def stop_reviews(self, t, but=None):
         for r in self.con.execute("SELECT * FROM runs WHERE ticket=? AND kind='review' AND ended_at IS NULL AND id != ?",
                                   (t['id'], but or -1)).fetchall():
-            self.runner.stop(r['tmux'])
+            self.runner_for(r['runner']).stop(r['tmux'])
             self.end(r, 'cancelled')
 
     def end(self, run, outcome, sha=None):
@@ -256,8 +274,8 @@ class Loop:
 
     def cleanup(self, t):
         repo = db.repo(self.con, t['repo'])
-        for r in self.con.execute('SELECT dir FROM runs WHERE ticket=? AND dir IS NOT NULL', (t['id'],)):
-            self.runner.remove(repo, r['dir'])
+        for r in self.con.execute('SELECT dir, runner FROM runs WHERE ticket=? AND dir IS NOT NULL', (t['id'],)):
+            self.runner_for(r['runner']).remove(repo, r['dir'])
 
     # ---- 3. starting work --------------------------------------------------------------------------------------
 
@@ -308,9 +326,9 @@ class Loop:
     def free_slots(self):
         used = {r['runner']: r['n'] for r in self.con.execute(
             'SELECT runner, COUNT(*) n FROM runs WHERE ended_at IS NULL GROUP BY runner')}
-        # Only This Mac runs tickets so far; SSH Macs and cloud come with their runners.
+        # This Mac and SSH Macs run tickets; cloud comes with its runner.
         return {r['name']: r['slots'] - used.get(r['name'], 0) for r in self.con.execute(
-            "SELECT * FROM runners WHERE kind='this_mac' AND state='online' "
+            "SELECT * FROM runners WHERE (kind='this_mac' OR (kind='ssh_mac' AND host IS NOT NULL)) AND state='online' "
             "AND (paused_until IS NULL OR paused_until < ?)", (db.now(),))}
 
     def blocked(self, t):
@@ -350,6 +368,7 @@ class Loop:
 
     def start(self, t, runner_name, agent, role=None):
         repo = db.repo(self.con, t['repo'])
+        runner = self.runner_for(runner_name)
         kind = 'review' if t['state'] == 'reviewing' else 'build'
         cur = self.con.execute('INSERT INTO runs(ticket, kind, role, agent, runner, started_at) '
                                'VALUES (?, ?, ?, ?, ?, ?)',
@@ -369,20 +388,20 @@ class Loop:
                 # A fix pass carries on from the pushed branch; a first build starts from the base.
                 # A fix pass, or a ticket given back after a take back, carries on from the pushed branch (and the
                 # person's commits on it); a first build starts from the base.
-                carry_on = (t['fix_passes'] or t['taken']) and self.runner.has_ref(repo, f'origin/{branch}')
+                carry_on = (t['fix_passes'] or t['taken']) and runner.has_ref(repo, f'origin/{branch}')
                 start_ref = f'origin/{branch}' if carry_on else f'origin/{t["base"]}'
                 # Earlier runs' worktrees still hold the ticket's branch, and git won't reset a branch checked out
                 # elsewhere, so a fix pass clears them first.
-                for old in self.con.execute('SELECT dir FROM runs WHERE ticket=? AND id != ? AND dir IS NOT NULL '
+                for old in self.con.execute('SELECT dir, runner FROM runs WHERE ticket=? AND id != ? AND dir IS NOT NULL '
                                             'AND ended_at IS NOT NULL', (t['id'], run_id)).fetchall():
-                    self.runner.remove(repo, old['dir'])
-                wt = self.runner.worktree(repo, t['id'], run_id, start_ref, branch=branch)
+                    self.runner_for(old['runner']).remove(repo, old['dir'])
+                wt = runner.worktree(repo, t['id'], run_id, start_ref, branch=branch)
                 # The base commit, for head-to-head re-runs from the same starting point.
                 self.con.execute('UPDATE runs SET base_sha=? WHERE id=?',
-                                 (self.runner.rev(repo, f'origin/{t["base"]}'), run_id))
+                                 (runner.rev(repo, f'origin/{t["base"]}'), run_id))
                 prompt = worker.build_prompt(t, repo['name'], start_ref, check, run_dir / 'outcome.json', commands)
             else:
-                wt = self.runner.worktree(repo, t['id'], run_id, t['sha'])
+                wt = runner.worktree(repo, t['id'], run_id, t['sha'])
                 prompt = worker.review_prompt(t, repo['name'], t['sha'], f'origin/{t["base"]}', check,
                                               run_dir / 'review.json', commands, role=role or 'code')
         except db.RunwayError:
@@ -392,7 +411,7 @@ class Loop:
         session = worker.new_session_id() if agent == 'claude' else None
         name = f'rw-{t["id"]}-{run_id}'
         line = worker.command(agent, run_dir / 'prompt.md', run_dir, wt, commands, session_id=session)
-        self.runner.start(name, wt, line)
+        runner.start(name, wt, line)
         self.con.execute('UPDATE runs SET dir=?, tmux=?, session_id=?, sha=?, branch=? WHERE id=?',
                          (str(wt), name, session, t['sha'] if kind == 'review' else None,
                           branch if kind == 'build' else None, run_id))
