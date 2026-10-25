@@ -94,6 +94,7 @@ def report(con, check_signins=True):
         'command': {'path': str(own_command()), 'link': str(link), 'linked': is_our_link(link),
                     'link_dir_on_path': link_dir_on_path(link.parent)},
         'database': str(db.db_path()),
+        'database_exists': db.db_path().exists(),
         'tools': tools,
         'signins': signins,
         'engines': engines,

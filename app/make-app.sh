@@ -103,6 +103,9 @@ cp "$BIN_DIR/Runway" "$APP/Contents/MacOS/Runway"
 cp Tests/RunwayCoreTests/Fixtures/sample-status.json "$APP/Contents/Resources/sample-status.json"
 # The licence (with its Required Notice line) travels with every copy of the app.
 cp "$REPO/LICENSE" "$APP/Contents/Resources/LICENSE"
+# Release notes, one file per version: What's New reads them, and the GitHub release (Sparkle's notes link) shows the
+# same file.
+[ -d release-notes ] && cp -R release-notes "$APP/Contents/Resources/release-notes"
 
 # Sparkle's framework rides in Contents/Frameworks; the binary finds it through an rpath.
 cp -R "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/"
@@ -221,7 +224,8 @@ APPCAST
     git -C "$REPO" tag "$TAG" "$SOURCE" && git -C "$REPO" push origin "refs/tags/$TAG" || die "could not tag $SOURCE as $TAG"
   fi
   NOTES="Runway $VERSION (build $BUILD, source $SOURCE)."
-  [ -f "release-notes/$VERSION.md" ] && NOTES="$(cat "release-notes/$VERSION.md")"
+  # The same file What's New shows, without its front matter (big: true).
+  [ -f "release-notes/$VERSION.md" ] && NOTES="$(awk 'NR==1 && /^---$/ {fm=1; next} fm && /^---$/ {fm=0; next} !fm' "release-notes/$VERSION.md")"
   gh release create "$TAG" "$ZIP" "$REL_DIR/appcast.xml" -R "$GH_REPO" --verify-tag \
     --title "Runway $VERSION" --notes "$NOTES" || die "gh release create failed"
   echo "Published $TAG: https://github.com/$GH_REPO/releases/tag/$TAG"

@@ -25,7 +25,7 @@ final class AppModel {
     /// The last thing a button did (or the error it got), shown in the toolbar.
     private(set) var lastAction: String?
 
-    private let cli: RunwayCLI?
+    let cli: RunwayCLI?
     private var loop: Process?
     private var polling: Task<Void, Never>?
     private let logger = Logger(subsystem: "dev.datacraft.runway-agent", category: "actions")
@@ -38,7 +38,26 @@ final class AppModel {
         cli = env["RUNWAY_STATUS_FILE"] == nil ? RunwayCLI.find() : nil
         if let cli {
             source = .live
-            if env["RUNWAY_NO_LOOP"] == nil { startLoop(cli) }
+            // First launch ever: nothing runs until the walkthrough's "Set it up" has made ~/.runway (startLive).
+            firstLaunch = !FileManager.default.fileExists(atPath: Self.databasePath)
+            if firstLaunch {
+                if RenderMode.folder != nil { Task { [weak self] in if let self { await RenderMode.renderAndQuit(self) } } }
+            } else {
+                startLive(cli)
+            }
+        } else {
+            loadSample()
+            if RenderMode.folder != nil {
+                Task { [weak self] in if let self { await RenderMode.renderAndQuit(self) } }
+            }
+        }
+    }
+
+    /// The loop and the status polling, once Runway's database exists.
+    func startLive(_ cli: RunwayCLI) {
+        guard polling == nil else { return }
+        if ProcessInfo.processInfo.environment["RUNWAY_NO_LOOP"] == nil { startLoop(cli) }
+        do {
             polling = Task { [weak self] in
                 var tick = 0
                 while !Task.isCancelled {
@@ -48,11 +67,6 @@ final class AppModel {
                     if let self, RenderMode.folder != nil { return await RenderMode.renderAndQuit(self) }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                 }
-            }
-        } else {
-            loadSample()
-            if RenderMode.folder != nil {
-                Task { [weak self] in if let self { await RenderMode.renderAndQuit(self) } }
             }
         }
     }
@@ -139,15 +153,26 @@ final class AppModel {
     // MARK: First run
 
     /// The last `runway doctor --json`, and whether a check is running.
-    private(set) var setup: SetupReport?
-    private(set) var checking = false
+    var setup: SetupReport?
+    var checking = false
     /// A folder the person picked as their first repo, with what Runway guessed about it.
     var pendingRepo: RepoSuggestion?
     var pendingCheck = ""
-    private(set) var setupMessage: String?
+    var setupMessage: String?
 
-    /// True when the app should open on the setup screen: live, and no repo watched yet.
-    var needsSetup: Bool { source == .live && (status?.repos.isEmpty ?? true) }
+    // The walkthrough (AppModel+Guide.swift).
+    /// Runway had never been set up on this Mac when the app started: no ~/.runway database.
+    private(set) var firstLaunch = false
+    var guideStep: SetupGuide.Step = .welcome
+    /// "Set it up": the items running now, done this session, and any that failed with what they said.
+    var installing: SetupGuide.Item.Kind?
+    var installed: Set<SetupGuide.Item.Kind> = []
+    var installErrors: [SetupGuide.Item.Kind: String] = [:]
+    /// The prompt last copied from the Next step, so the button can say so.
+    var copiedPrompt = false
+
+    // What's New (AppModel+Guide.swift).
+    var whatsNew: [ReleaseNote] = []
 
     func runDoctor() {
         guard let cli else { return setupMessage = "Sample data: no runway command to check with" }

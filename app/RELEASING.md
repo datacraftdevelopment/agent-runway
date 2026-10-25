@@ -16,8 +16,10 @@ Only app releases are published on this repo, because "latest" must always be th
 
 ## Cutting a release
 
-1. Bump `app/VERSION` on a branch (e.g. `0.1.0` to `0.2.0`) and, if you like, write `app/release-notes/<VERSION>.md`
-   (shown in Sparkle's update window and on the release page). Merge to `main`.
+1. Bump `app/VERSION` on a branch (e.g. `0.1.0` to `0.2.0`) and write `app/release-notes/<VERSION>.md`: a few plain
+   `- ` lines. The same file is the release page (and so Sparkle's update window) and the app's What's New screen. For
+   a major release, start it with front matter `---` / `big: true` / `---` and add `### ` sections: What's New shows
+   each as a step in a fuller recap (the front matter is stripped from the release page). Merge to `main`.
 2. Publish, one of:
    - **GitHub Actions:** Actions > release > Run workflow, on `main`. Needs the secrets below.
    - **This Mac:** on a clean `main`, `RUNWAY_SIGN_IDENTITY="Developer ID Application: …" RUNWAY_NOTARY_PROFILE=runway-notary bash app/make-app.sh --release`.
