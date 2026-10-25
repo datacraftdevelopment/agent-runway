@@ -163,8 +163,8 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
   <div class="wrap">
     <p class="eyebrow">Free · Source available · macOS · Built for one developer</p>
     <h1>Agent <span>Runway</span></h1>
-    <p class="tagline">A software factory for one.</p>
-    <p class="lede">Keep working with Claude Code and Codex the way you do now. When part of the job can run on its own, file it as a ticket. Runway runs it on your own Macs, has the other agent review it, and only merges what is low risk.</p>
+    <p class="tagline">A ready-made software factory for one.</p>
+    <p class="lede">You don't have to build your own factory. Install Runway and keep working in Claude Code or Codex the way you do now. When part of the job can run on its own, file it as a ticket. Runway runs it on your Mac, has a fresh session review it, and only merges what is low risk.</p>
     <div class="ctas">
       <!-- Until the first signed release, the main button sends people to watch the repo. After it, make "Download for Mac" primary again, pointing at releases/latest/download/Runway.zip. -->
       <a class="btn primary" href="https://github.com/datacraftdevelopment/agent-runway">
@@ -192,7 +192,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <li><span class="lane">You + your agent</span><h3>Prototype</h3><p>Answer a design question with a throwaway prototype before anything real is built.</p><code>prototype</code></li>
       <li><span class="lane">You + your agent</span><h3>Spec</h3><p>Turn the conversation into a spec: what done looks like, and how to check it.</p><code>to-spec</code></li>
       <li><span class="lane">You type go</span><h3>Tickets</h3><p>Your agent breaks the spec into small tickets, each with its risk and acceptance checks. Nothing is filed until you say go.</p><code>file-tickets</code></li>
-      <li class="auto"><span class="lane">Runs on its own</span><h3>Build and check</h3><p>Each ticket runs on a free Mac in its own worktree. Claude's work is reviewed by Codex, and Codex's by Claude.</p><code>Runway app</code></li>
+      <li class="auto"><span class="lane">Runs on its own</span><h3>Build and check</h3><p>Each ticket runs on a free Mac in its own worktree. A fresh session reviews it. If you have both Claude Code and Codex, each one reviews the other's work.</p><code>Runway app</code></li>
       <li class="auto"><span class="lane">Runs on its own</span><h3>Merge</h3><p>Low-risk work that passes review and checks merges itself. Anything else waits on your board as one question.</p><code>runway</code></li>
     </ol>
     <p><a class="more" href="/skills">Every skill in the workflow, and what each one does →</a></p>
@@ -201,11 +201,11 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 
 <section>
   <div class="wrap grid2">
-    <div class="feat"><h3>Your own subscriptions</h3><p>Tickets run with the Claude Code and Codex you already sign in to. No API keys to buy, no service in between.</p></div>
+    <div class="feat"><h3>One subscription is enough</h3><p>Tickets run with the Claude Code or the Codex you already sign in to. You don't need both, any API keys, or a service in between.</p></div>
     <div class="feat"><h3>Nothing hosted</h3><p>One SQLite file on your Mac holds every ticket and run. Specs and code stay in your git repos.</p></div>
     <div class="feat"><h3>Nothing hidden</h3><p>The loop runs only while the app is open. No daemons, no launch agents. Close the app and dispatch pauses; runs already started finish.</p></div>
     <div class="feat"><h3>A gate you can read</h3><p>Auto-merge needs low risk, a passing review on the exact commit, green checks, and no sensitive paths such as auth, payments, migrations or CI. A reviewer can raise risk, never lower it.</p></div>
-    <div class="feat"><h3><span class="chip claude">Claude</span> <span class="chip codex">Codex</span> <span class="chip any">Any</span></h3><p>Pin a ticket to one agent or let whichever is free take it. When one hits its usage limit, the next tickets go to the other until it resets.</p></div>
+    <div class="feat"><h3><span class="chip claude">Claude</span> <span class="chip codex">Codex</span> <span class="chip any">Any</span></h3><p>Use whichever one you have. With both, pin a ticket to one agent or let whichever is free take it, and when one hits its usage limit the next tickets go to the other.</p></div>
     <div class="feat"><h3>Many Macs, one board</h3><p>Each repo has a main computer, and a ticket can be pinned to the Mac where its files live. The board shows what runs where.</p></div>
   </div>
 </section>
@@ -251,12 +251,13 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <p class="eyebrow">Questions</p>
     <h2>What people ask first</h2>
     <div class="faq">
-      <details><summary>What does it cost?</summary><p>Nothing. Runway is free, and tickets run on the Claude Code and Codex subscriptions you already pay for. There are no API keys and nothing is billed per run.</p></details>
+      <details><summary>What does it cost?</summary><p>Nothing extra. Runway is free, and tickets run on the subscription you already have: Claude Code or Codex, even an entry-level plan. There are no API keys and nothing is billed per run.</p></details>
+      <details><summary>Do I need both Claude Code and Codex?</summary><p>No. Runway works with just one. A fresh session of that same agent reviews each ticket before the gate. If you do have both, they review each other's work, which catches a bit more.</p></details>
       <details><summary>Does my code leave my Macs?</summary><p>Runway itself sends nothing anywhere. Tickets and runs live in one SQLite file on your Mac. Your code goes where it already goes: to GitHub, and to Claude Code and Codex as they work on it.</p></details>
       <details><summary>What stops it merging something bad?</summary><p>A gate written in code, not a prompt. A ticket merges on its own only when it was marked low risk while it was shaped, the other agent passed it on the exact commit, the checks are green, and it touches no sensitive paths such as auth, payments, migrations or CI. A reviewer can raise the risk but never lower it. Everything else waits for you.</p></details>
       <details><summary>Is this for teams?</summary><p>No. Runway is for one developer working across their own repos and Macs. There's no Slack bot, no shared cloud and no seats. If you want a hosted factory for a whole engineering team, cloud products such as Warp Factories are built for that.</p></details>
-      <details><summary>Do I have to use these exact skills?</summary><p>No. Runway only needs tickets, and <code>file-tickets</code> can file them from any session. The discovery and spec skills are the way of working it was built around, and the open skills Matt Pocock publishes fit it well.</p></details>
-      <details><summary>What if Claude or Codex hits its usage limit?</summary><p>That agent rests until its limit resets, and the next tickets go to the other one. The ticket that hit the limit goes back in the queue without using up its fix attempt.</p></details>
+      <details><summary>Do I have to design my own workflow?</summary><p>No. Runway comes with one: discover, prototype, spec, tickets, then hands-off build, review and merge. Install it and use it as it is. It's built around the open skills Matt Pocock publishes, so you're not inventing a process. If you already work another way, <code>file-tickets</code> can file tickets from any session.</p></details>
+      <details><summary>What if I hit my usage limit?</summary><p>Runway rests that agent until the limit resets, and the ticket goes back in the queue without using up its fix attempt. If you have both agents, the next tickets go to the other one in the meantime.</p></details>
     </div>
   </div>
 </section>

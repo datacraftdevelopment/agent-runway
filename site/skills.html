@@ -188,7 +188,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow stack">
-    <p>There are two sets. The <b>shaping skills</b> are Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>, MIT). Runway was built around how they work, and you install them yourself. The <b>Agent Runway skills</b> come with the app, are installed on first run, and work in both Claude Code and Codex.</p>
+    <p>You don't have to design a workflow: this is the one Runway comes with. The skills come in two sets. The <b>shaping skills</b> are Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>, MIT). Runway was built around how they work, and you install them yourself. The <b>Agent Runway skills</b> come with the app, are installed on first run, and work in both Claude Code and Codex.</p>
 
     <div class="stage">
       <div><span class="who">You + your agent</span><h3>1 · Discover</h3></div>
@@ -226,7 +226,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <div class="stage auto">
       <div><span class="who">Runs on its own</span><h3>5 · Build, check, review</h3></div>
       <div>
-        <p>The Runway app does this part, in plain code rather than an agent. Each ticket gets a fresh git worktree on a free Mac. The agent builds it, the repo's own check command runs, and a draft pull request opens. Then the other agent reviews it on that exact commit: Codex reviews Claude's work, and Claude reviews Codex's. A failed review gets one fix pass. If a usage limit hits, the next tickets go to the other agent.</p>
+        <p>The Runway app does this part, in plain code rather than an agent. Each ticket gets a fresh git worktree on a free Mac. The agent builds it, the repo's own check command runs, and a draft pull request opens. Then a fresh session reviews it on that exact commit. With one agent, that's a new session of the same agent. With both, Codex reviews Claude's work and Claude reviews Codex's. A failed review gets one fix pass. If a usage limit hits, that agent rests until it resets, and with both installed the other agent takes over.</p>
       </div>
     </div>
 
