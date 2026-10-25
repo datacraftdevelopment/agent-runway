@@ -155,7 +155,9 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var pr: String?
     /// The PR's web address, when the repo is on GitHub.
     public var prUrl: String?
+    /// The code review's verdict (two fresh sessions review each build: code and function).
     public var review: String?
+    public var functionReview: String?
     public var question: Question?
     /// Where it was filed from: "Claude Code on this Mac".
     public var filedFrom: String
@@ -168,7 +170,7 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
 
     public init(id: String, repo: String, title: String, column: Column, agent: AgentChoice, risk: Risk,
                 runsOn: String? = nil, pinned: Bool = false, stage: Stage? = nil, pr: String? = nil,
-                prUrl: String? = nil, review: String? = nil, question: Question? = nil, filedFrom: String, filedAt: Date,
+                prUrl: String? = nil, review: String? = nil, functionReview: String? = nil, question: Question? = nil, filedFrom: String, filedAt: Date,
                 waitsOn: [String] = [], elapsed: Int? = nil, summary: String? = nil) {
         self.id = id
         self.repo = repo
@@ -182,6 +184,7 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
         self.pr = pr
         self.prUrl = prUrl
         self.review = review
+        self.functionReview = functionReview
         self.question = question
         self.filedFrom = filedFrom
         self.filedAt = filedAt
@@ -225,7 +228,7 @@ public struct ActivityLine: Codable, Equatable, Identifiable, Sendable {
 
 /// One row of the first-run table: what setup has found on a runner.
 public struct SetupRow: Codable, Equatable, Identifiable, Sendable {
-    public enum Check: String, Codable, Sendable { case yes, checking, signIn = "sign_in", no }
+    public enum Check: String, Codable, Sendable { case yes, checking, signIn = "sign_in", no, optional }
 
     public var runner: String
     public var reachable: Check

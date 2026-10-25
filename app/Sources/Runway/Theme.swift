@@ -166,6 +166,7 @@ extension SetupRow.Check {
         case .checking: return "checking"
         case .signIn: return "sign in"
         case .no: return "no"
+        case .optional: return "optional"
         }
     }
 
@@ -174,6 +175,7 @@ extension SetupRow.Check {
         case .yes: return Color(hex: 0x7EE59A)
         case .checking: return Color(hex: 0x8CC4FF)
         case .signIn, .no: return Color(hex: 0xFFC46B)
+        case .optional: return Palette.textMuted
         }
     }
 }
