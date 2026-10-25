@@ -136,34 +136,6 @@ final class AppModel {
         lastAction = what
     }
 
-    /// Opens Terminal on the ticket's session: `tmux attach` while it runs, else `claude --resume` / `codex resume`.
-    func openSession(_ ticket: String) {
-        guard let cli else { return act("Sample data: no session to open") }
-        Task {
-            let result = await cli.run(["session", ticket, "--json"])
-            guard result.status == 0,
-                  let info = try? JSONSerialization.jsonObject(with: Data(result.output.utf8)) as? [String: Any],
-                  let dir = info["dir"] as? String else {
-                lastAction = result.error.isEmpty ? "No session for \(ticket)" : result.error
-                return
-            }
-            guard let command = info["command"] as? String else {
-                lastAction = "\(ticket)'s run left no session to resume"
-                return
-            }
-            let script = FileManager.default.temporaryDirectory.appendingPathComponent("runway-\(ticket).command")
-            let body = "#!/bin/zsh -l\ncd \(RunwayCLI.quote(dir)) && \(command)\n"
-            do {
-                try body.write(to: script, atomically: true, encoding: .utf8)
-                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
-                NSWorkspace.shared.open(script)
-                lastAction = "Opened \(command)"
-            } catch {
-                lastAction = "Couldn't open the session: \(error.localizedDescription)"
-            }
-        }
-    }
-
     // MARK: First run
 
     /// The last `runway doctor --json`, and whether a check is running.
@@ -282,6 +254,29 @@ final class AppModel {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         setupMessage = "Copied: \(text)"
+    }
+
+    /// Take-back prompts copied this session, by ticket, shown in the inspector.
+    private(set) var takePrompts: [String: String] = [:]
+
+    /// `runway take` (stops the worker, keeps the branch, marks it taken back; harmless twice), then the prompt from
+    /// `runway take --prompt` onto the clipboard. Nothing is launched or resumed.
+    func takeBack(_ ticket: String) {
+        guard let cli else { return act("Sample data: nothing to take back") }
+        Task {
+            let took = await cli.run(["take", ticket])
+            guard took.status == 0 else {
+                lastAction = took.error.trimmingCharacters(in: .whitespacesAndNewlines)
+                return
+            }
+            let prompt = await cli.run(["take", ticket, "--prompt"])
+            let text = prompt.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            takePrompts[ticket] = text
+            lastAction = "\(ticket) taken back; prompt copied"
+            await refresh()
+        }
     }
 
     func openPR(_ ticket: Ticket) {

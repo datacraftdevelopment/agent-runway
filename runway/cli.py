@@ -104,6 +104,32 @@ def cmd_status(con, a):
         print(f'{ag["kind"]}: ' + (f'resting until {ag["resting_until"]}' if ag['resting_until'] else 'available'))
 
 
+# ---- take back -----------------------------------------------------------------------------------------------
+
+def cmd_show(con, a):
+    from . import take
+    print(take.show(con, a.ticket))
+
+
+def cmd_take(con, a):
+    from . import take
+    if a.prompt:
+        print(take.prompt(con, a.ticket))       # nothing else: the app copies this
+        return
+    wt, branch = take.take(con, a.ticket)
+    print(f'{a.ticket} is taken back. Its worker is stopped; Runway leaves it alone until you give it back.')
+    print(f'worktree: {wt}')
+    print(f'branch:   {branch}')
+    print()
+    print(take.prompt(con, a.ticket))
+
+
+def cmd_give(con, a):
+    from . import take
+    head = take.give(con, a.ticket)
+    print(f'{a.ticket} is given back at {head[:7]}: it builds again from that commit, then both reviews run on it.')
+
+
 # ---- stats ---------------------------------------------------------------------------------------------------
 
 def cmd_stats(con, a):
@@ -164,25 +190,6 @@ def cmd_stop(con, a):
 def cmd_runs_on(con, a):
     from . import actions
     print(actions.runs_on(con, a.target, a.where))
-
-
-def cmd_session(con, a):
-    """Where a ticket's last run lives and the line that reopens it (the app's Open session)."""
-    db.ticket(con, a.ticket)
-    run = con.execute('SELECT * FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (a.ticket,)).fetchone()
-    if not run:
-        raise db.RunwayError(f'{a.ticket} has not run yet')
-    if run['ended_at'] is None and run['tmux']:
-        line = f'tmux attach -t {run["tmux"]}'
-    elif run['agent'] == 'claude' and run['session_id']:
-        line = f'claude --resume {run["session_id"]}'
-    elif run['agent'] == 'codex' and run['session_id']:
-        line = f'codex resume {run["session_id"]}'
-    else:
-        line = None
-    info = {'ticket': a.ticket, 'run': run['id'], 'kind': run['kind'], 'agent': run['agent'], 'runner': run['runner'],
-            'dir': run['dir'], 'live': run['ended_at'] is None, 'command': line}
-    out(info) if a.json else print(f'cd {run["dir"]} && {line}' if line else f'{run["dir"]} (no session to resume)')
 
 
 # ---- the loop and setup checks -----------------------------------------------------------------------------------
@@ -306,10 +313,6 @@ def parser():
     x.add_argument('target')
     x.add_argument('where')
     x.set_defaults(fn=cmd_runs_on)
-    x = sub.add_parser('session', help="where a ticket's last run is and how to reopen it")
-    x.add_argument('ticket')
-    x.add_argument('--json', action='store_true')
-    x.set_defaults(fn=cmd_session)
 
     x = sub.add_parser('loop', help='run the loop (the app starts this; one at a time)')
     x.add_argument('--every', type=int, default=15, help='seconds between ticks')
@@ -327,6 +330,16 @@ def parser():
     x.add_argument('--to', help='another folder for the link')
     x.set_defaults(fn=cmd_install_command)
 
+    x = sub.add_parser('show', help='a ticket, its Acceptance lines and every run with where its record is')
+    x.add_argument('ticket')
+    x.set_defaults(fn=cmd_show)
+    x = sub.add_parser('take', help='take a ticket back: stop its worker, keep its branch, print a prompt')
+    x.add_argument('ticket')
+    x.add_argument('--prompt', action='store_true', help='print only the prompt, change nothing')
+    x.set_defaults(fn=cmd_take)
+    x = sub.add_parser('give', help='give a taken-back ticket back: push your commits, queue it again')
+    x.add_argument('ticket')
+    x.set_defaults(fn=cmd_give)
     x = sub.add_parser('stats', help='how hands-off it is: merges that needed nothing from you, cycle time, cost')
     x.add_argument('--json', action='store_true', help='what the board strip reads')
     x.add_argument('--repo')

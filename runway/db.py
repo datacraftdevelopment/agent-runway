@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 MIGRATIONS = {
     1: """
@@ -140,6 +140,14 @@ MIGRATIONS = {
         detail TEXT
     );
     """,
+    # Take back (Joe, 2026-10-25): every run keeps enough for a new session to read what it did: its folder
+    # (~/.runway/runs/<ticket>/<n>/), branch, the last stage it reached and a link to its transcript.
+    5: """
+    ALTER TABLE runs ADD COLUMN run_dir TEXT;
+    ALTER TABLE runs ADD COLUMN branch TEXT;
+    ALTER TABLE runs ADD COLUMN stage TEXT;
+    ALTER TABLE runs ADD COLUMN transcript TEXT;
+    """,
 }
 
 # Ticket states and the board column and stage each shows as.
@@ -150,6 +158,7 @@ STATES = {
     'reviewing': ('running', 'review'),
     'merging': ('running', 'merge'),
     'needs_you': ('needs_you', None),
+    'taken': ('needs_you', None),       # taken back by the person: waits in Needs you until given back
     'done': ('done', None),
     'dropped': ('done', None),
 }
@@ -189,8 +198,26 @@ def migrate(con):
                           + f"\nINSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{v}');\nCOMMIT;")
     if version == 0:
         seed(con)
-    elif version < 4 <= SCHEMA_VERSION:
-        backfill_v4(con)
+    else:
+        if version < 4 <= SCHEMA_VERSION:
+            backfill_v4(con)
+        if version < 5 <= SCHEMA_VERSION:
+            backfill_v5(con)
+
+
+def backfill_v5(con):
+    """Runs from before version 5: the last stage they reached, from their outcome, and their transcript linked into
+    their folder, so take back's prompt and runway show can point at them."""
+    from . import worker
+    stage = {'done': 'reviews', 'pass': 'review done', 'fail': 'review done', 'failed': 'failed',
+             'limited': 'usage limit', 'needs_you': 'asked a question'}
+    for r in con.execute('SELECT * FROM runs WHERE run_dir IS NULL').fetchall():
+        folder = home() / 'runs' / str(r['id'])
+        transcript = None
+        if folder.exists():
+            transcript = worker.link_transcript(r['agent'], r['session_id'], folder)
+        con.execute('UPDATE runs SET stage=COALESCE(stage, ?), transcript=COALESCE(transcript, ?) WHERE id=?',
+                    (stage.get(r['outcome'] or '', r['outcome'] or r['kind']), transcript, r['id']))
 
 
 def backfill_v4(con):
@@ -251,6 +278,15 @@ def set_meta(con, key, value):
 def event(con, kind, text, repo=None, ticket=None):
     con.execute('INSERT INTO events(at, kind, repo, ticket, text) VALUES (?, ?, ?, ?, ?)',
                 (now(), kind, repo, ticket, text))
+
+
+def run_dir(con, run):
+    """A run's folder: ~/.runway/runs/<ticket>/<n>/ (runs from before version 5: ~/.runway/runs/<id>/)."""
+    if isinstance(run, int):
+        run = con.execute('SELECT * FROM runs WHERE id=?', (run,)).fetchone()
+    path = Path(run['run_dir']) if run['run_dir'] else home() / 'runs' / str(run['id'])
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def next_ticket_id(con):

@@ -158,6 +158,10 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     /// The code review's verdict (two fresh sessions review each build: code and function).
     public var review: String?
     public var functionReview: String?
+    /// Taken back by the person: waits in Needs you until given back.
+    public var taken: Bool?
+    /// "work", or "retro" for a ticket Runway filed itself after repeated stops.
+    public var kind: String?
     public var question: Question?
     /// Where it was filed from: "Claude Code on this Mac".
     public var filedFrom: String

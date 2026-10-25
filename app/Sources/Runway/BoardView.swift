@@ -59,6 +59,12 @@ struct TicketCard: View {
             HStack(spacing: 4) {
                 AgentChip(agent: ticket.agent)
                 RiskChip(risk: ticket.risk)
+                if ticket.kind == "retro" {
+                    Chip(text: "retro", foreground: Color(hex: 0xD5B3FF), background: Color(hex: 0x2D2140))
+                }
+                if ticket.taken == true {
+                    Chip(text: "taken back", foreground: Palette.needsYouText, background: Palette.needsYouFill)
+                }
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
@@ -118,16 +124,47 @@ private struct Inspector: View {
             if !ticket.waitsOn.isEmpty { row("Waits on", ticket.waitsOn.joined(separator: ", ")) }
         }
         .font(.system(size: 12))
-        if ticket.column == .needsYou, let question = ticket.question { needsYou(ticket, question) }
+        if ticket.column == .needsYou, ticket.taken != true, let question = ticket.question { needsYou(ticket, question) }
         if let summary = ticket.summary {
             Text(summary).font(.system(size: 12)).foregroundStyle(Palette.textSoft).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
         Spacer()
-        Button { model.openSession(ticket.id) } label: {
-            Text("Open session").frame(maxWidth: .infinity)
+        if let prompt = model.takePrompts[ticket.id] { takePrompt(prompt) }
+        if ticket.column != .done {
+            HStack(spacing: 8) {
+                Button { model.takeBack(ticket.id) } label: {
+                    Text(ticket.taken == true ? "Copy prompt again" : "Take back · copy prompt").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(TakeBackButtonStyle())
+                .help("Stops its worker, keeps its branch and copies a prompt for any Claude Code or Codex session")
+                Button { model.run(["give", ticket.id]) } label: {
+                    Text("Give back").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PlainBoxButtonStyle())
+                .disabled(ticket.taken != true)
+                .help("Pushes your commits and queues it again; both reviews run on your commit")
+            }
         }
-        .buttonStyle(PlainBoxButtonStyle())
+    }
+
+    private func takePrompt(_ prompt: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                SectionHeading(text: "Take-back prompt", color: Palette.needsYouText)
+                Spacer()
+                Text("✓ Copied. Paste it into Claude Code or Codex.").font(.system(size: 11))
+                    .foregroundStyle(Palette.runningPillText)
+            }
+            ScrollView {
+                Text(prompt).font(.system(size: 10.5, design: .monospaced)).foregroundStyle(Color(hex: 0xE5E5EA))
+                    .lineSpacing(2).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 180)
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(Palette.code, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.border))
+        }
     }
 
     private func needsYou(_ ticket: Ticket, _ question: Ticket.Question) -> some View {

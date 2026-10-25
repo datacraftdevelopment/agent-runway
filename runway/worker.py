@@ -211,6 +211,34 @@ def usage(agent, log_text):
     return (tin or None), (tout or None), None
 
 
+def transcript_path(agent, session):
+    """Where the engine keeps the session's transcript (Claude Code: <config>/projects/*/<id>.jsonl; Codex:
+    <home>/sessions/**/rollout-*-<thread>.jsonl), or None when it can't be found."""
+    import os
+    from pathlib import Path
+    if not session:
+        return None
+    if agent == 'claude':
+        root = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude') / 'projects'
+        hits = list(root.glob(f'*/{session}.jsonl')) if root.exists() else []
+    else:
+        root = Path(os.environ.get('CODEX_HOME') or Path.home() / '.codex') / 'sessions'
+        hits = list(root.glob(f'**/*{session}*.jsonl')) if root.exists() else []
+    return hits[0] if hits else None
+
+
+def link_transcript(agent, session, run_dir):
+    """A transcript.jsonl link in the run's folder, so a new session can read what this one did."""
+    src = transcript_path(agent, session)
+    if not src:
+        return None
+    link = run_dir / 'transcript.jsonl'
+    if link.is_symlink() or link.exists():
+        link.unlink()
+    link.symlink_to(src)
+    return str(src)
+
+
 def new_session_id():
     return str(uuid.uuid4())
 

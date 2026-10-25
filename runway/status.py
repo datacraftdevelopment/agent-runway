@@ -45,6 +45,7 @@ def ticket_json(con, t, run, slugs=None):
         'id': t['id'], 'repo': t['repo'], 'title': t['title'], 'column': column, 'stage': stage,
         'agent': t['agent'], 'risk': t['risk'], 'runs_on': runs_on, 'pinned': bool(t['pinned']),
         'pr': pr_label(t), 'review': t['review'], 'function_review': t['function_review'],
+        'taken': t['state'] == 'taken', 'kind': t['kind'],
         'pr_url': f'https://github.com/{slugs[t["repo"]]}/pull/{t["pr"]}' if t['pr'] and (slugs or {}).get(t['repo'])
         else None, 'question': question if column == 'needs_you' else None,
         'filed_from': t['filed_from'], 'filed_at': iso(t['filed_at']), 'waits_on': open_blockers,
