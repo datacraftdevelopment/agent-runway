@@ -8,7 +8,7 @@ technical to hand to a newcomer ("a super terminal"). No Orca, no Herdr.
 
 People keep working in Claude Code or Codex exactly as they do now. When part of the work can run on its own, the
 agent in that session proposes tickets, the person says go, and the tickets are filed. Runway picks them up, runs each
-one headless on a free runner (this Mac, another Mac over SSH, or the cloud), has the other agent review it, and the result comes
+one headless on a free runner (this Mac, another Mac over SSH, or the cloud), reviews it in two fresh sessions, and the result comes
 back as a pull request: merged on its own when it is low risk, otherwise waiting for the person. A small Mac app shows
 what's up next, what's running, what needs you and what's done, in the look of Runway v1's app.
 
@@ -45,14 +45,27 @@ what's up next, what's running, what needs you and what's done, in the look of R
 - **Workers run headless.** `claude -p` or `codex exec` with JSON output, in a fresh git worktree, inside tmux so a
   dropped SSH connection or a closed app doesn't kill the run. Each run writes one outcome file
   (`done`, `blocked`, `needs-you` with one question, `failed`) that the loop reads back.
-- **Review by the other agent,** pinned to the exact commit, against the ticket's Acceptance lines. It can raise risk,
-  never lower it. With only one agent signed in, the best a review can say is needs-you, so nothing auto-merges on a
-  model reviewing itself.
-- **Merge gate as code:** auto-merge only when risk is `low`, the review passed on the head commit, checks are green,
-  and no changed path is sensitive (auth, payments, migrations, CI, the repo's `runway.json`). Everything else is a
-  needs-you card with the PR link.
-- **Usage-limit failover** (Joe, 2026-10-23, kept from PR #3): when one agent's limit error stops a run, the ticket goes
-  back to the queue without spending its fix pass and `any` tickets go to the other agent until the reset.
+- **One engine is enough** (ruling, Joe, 2026-10-25). Runway works fully with only Claude Code or only Codex,
+  including a ~$20 plan; never assume both. Setup is green with one engine signed in, and the other shows as optional.
+  A ticket's agent `any` means any signed-in engine, and a ticket naming an engine this Mac doesn't have is refused at
+  filing. The app shows only the engines that exist. This replaces the earlier rule that a one-model review caps at
+  needs-you.
+- **Review is two fresh sessions** (ruling, Joe, 2026-10-25), each with its own prompt and none of the builder's
+  context, pinned to the exact head commit:
+  - the **code review**: correctness, bugs, risk, sensitive paths, tests worth having;
+  - the **function review**: checks out the head commit, runs the check command and walks each Acceptance line,
+    pass or fail per line with evidence.
+  Both must pass on the same head commit for the gate; either can fail it, and either can raise the risk (never lower
+  it). With one engine both run on it, and their passes count. With two, the code review prefers the other engine from
+  the builder and the function review runs on either; cross-model review is preferred, not required. Both verdicts are
+  stored per run and shown in the inspector (Code review, Function review).
+- **Merge gate as code:** auto-merge only when risk is `low`, both reviews passed on the head commit, checks are
+  green, and no changed path is sensitive (auth, payments, migrations, CI, the repo's `runway.json`). Everything else
+  is a needs-you card with the PR link.
+- **Usage limits** (Joe, 2026-10-23, kept from PR #3; one-engine case, 2026-10-25): when an engine's limit error stops
+  a run, the ticket goes back to the queue without spending its fix pass, and the board shows that engine resting until
+  the reset. With two engines, `any` tickets go to the other one until then; with one, the ticket simply waits (it
+  doesn't fail, and no failover is attempted).
 - **The loop is a plain script, not an agent,** and it runs only while the app is open, as the app's child process.
   No LaunchAgent, no daemon, nothing hidden. Closing the app pauses dispatch; runs already started finish in tmux and
   are picked up when the app opens again.
@@ -71,7 +84,7 @@ what's up next, what's running, what needs you and what's done, in the look of R
 | `runway` CLI | Python, stdlib only. `file`, `loop`, `status --json`, `pause`/`resume`, `go`/`no`, `doctor`. State in `~/.runway/runway.db` (SQLite, stdlib `sqlite3`); `import` pulls cloud-filed tickets from `runway/tickets`. | `loop.py`, `gate.py`, `tickets.py` from PR #3 with Orca swapped for ssh/tmux; `store.py` (SQLite) from PR #2 |
 | `file-tickets` skill | For Claude Code and Codex. Proposes the batch, files on go with `runway file` (or the `runway/tickets` branch from a cloud session). | PR #2/#3 skill text, trimmed |
 | `work-ticket` skill | What a headless worker follows: build in the worktree, open a draft PR, write the outcome file. | PR #2 |
-| `review-ticket` skill | The other agent's review and verdict. | PR #2 |
+| `review-ticket` skill | Superseded: the code and function review prompts live in the CLI (`runway/worker.py`). | PR #2 |
 | `runway` skill | From any session: what's running, what needs me, pause, resume, go/no. | v1's `runway` skill idea |
 | `setup` skill | Run by the person's agent: sign-ins, add this computer (or `join` another Mac, or connect cloud), pick repos. | PR #2's setup outline |
 | The app | SwiftUI: menu bar + side panel + one window. | Runway v1's SwiftUI app (archived `runway` repo) |
