@@ -64,6 +64,9 @@ final class SetupGuideTests: XCTestCase {
         XCTAssertEqual(both.last?.title, "The Agent Runway skills in Claude Code and Codex")
         XCTAssertTrue(both.last?.done ?? false)
         XCTAssertTrue(both.first?.done ?? false)        // an older runway (no database_exists) counts it as there
+        let offPath = SetupGuide.items(try report { $0.command.linked = true; $0.command.linkDirOnPath = false })
+        XCTAssertTrue(offPath[1].done)
+        XCTAssertTrue(offPath[1].detail.contains("isn't on your PATH"))
     }
 
     func testFirstPromptNamesTheRepoAndTheSkill() {

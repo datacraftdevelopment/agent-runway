@@ -57,8 +57,11 @@ public enum SetupGuide {
                  detail: "~/.runway: your tickets, runs and their logs. Nothing of Runway's goes into your repos.",
                  done: report.databaseExists != false, skipped: false),
             Item(kind: .command, title: "The runway command in Terminal",
-                 detail: "One link in ~/.local/bin to the command inside this app, so your agent can file tickets. "
-                    + "It never replaces a file that's already there.",
+                 detail: report.command.linked && !report.command.linkDirOnPath
+                    ? "Linked, but ~/.local/bin isn't on your PATH yet. Add this line to ~/.zprofile: "
+                        + "export PATH=\"$HOME/.local/bin:$PATH\""
+                    : "One link in ~/.local/bin to the command inside this app, so your agent can file tickets. "
+                        + "It never replaces a file that's already there.",
                  done: report.command.linked, skipped: false),
             Item(kind: .skills, title: "The Agent Runway skills in \(into)",
                  detail: "Added with \(into == "Codex" ? "Codex's" : "each agent's") own plugin command. "
