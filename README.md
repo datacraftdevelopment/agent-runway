@@ -1,30 +1,95 @@
 # Agent Runway
 
-One board that dispatches coding tickets to agents on many machines and cloud sessions. Concept: `docs/concept.md`.
+**A ready-made software factory for one.** Keep working in Claude Code or Codex the way you do now. When part of the
+job can run on its own, file it as a ticket. Runway runs it on your Mac, has a fresh session review it, and only
+merges what is low risk.
 
-Website: `site/` (static, hosted on Vercel at agentrunway.app). Bugs and ideas: [open an issue](https://github.com/datacraftdevelopment/agent-runway/issues/new/choose).
+Website: **[agentrunway.app](https://agentrunway.app)** · Free · Source available · macOS 14 or later
 
-Project-management scaffold for this project. Light by design: only the
-day-one folders exist; everything else is created on first use (the taxonomy
-lives in `CLAUDE.md`).
+![The Runway board: tickets in Needs you, Up next, Running and Done, with the Macs they run on in the sidebar](docs/shipped/screens/board.png)
 
-## Working the project
+> **Early preview.** Runway runs real tickets today. The first signed download isn't out yet: watch this repo
+> (Watch → Custom → Releases) to hear when it is, or build it from source below.
 
-1. `_pm/skeleton.md` holds the outcome, journey and non-negotiables, written at
-   scaffold time; keep it current as scope moves.
-2. Open each session with `whats-next`; close it with `stepping-away`.
-3. New work: `brainstorming` writes a design doc in `docs/specs/` with its
-   Acceptance checks; `writing-plans` turns it into a plan in `docs/plans/`;
-   one session runs the plan; `finishing-a-development-branch` wraps it up;
-   `ship-acceptance` proves it against production.
-4. Decisions that need their own record go to `docs/adr/`. Loose ideas go to
-   `docs/inbox.md`.
+## How it works
 
-Stamped by the pm-sp plugin's `/pm-sp:scaffold` (`datacraftdevelopment/dc-dev-plugins`).
-The workflow of record is that plugin's `WORKFLOW.md`.
+You decide what to build, and Runway builds it.
+
+1. **Discover, prototype, spec.** You and your agent talk the work through in a normal session, try a throwaway
+   prototype if a design question needs one, and write a spec that says what done looks like and how to check it.
+2. **Tickets.** Your agent breaks the spec into small tickets, each with its risk and acceptance checks. Nothing is
+   filed until you type go (`file-tickets` skill).
+3. **Build and check.** Each ticket runs headless in its own git worktree, inside tmux, so closing the app doesn't kill
+   it. Then two fresh sessions review it: one reads the code, the other runs every acceptance check.
+4. **Merge.** Low-risk work that passes review and checks merges itself. Anything else waits on your board as one
+   question with its pull request. A stuck ticket can be taken back into a normal session and handed back.
+
+The full workflow and every skill in it: [agentrunway.app/skills](https://agentrunway.app/skills).
+
+## What it is, and isn't
+
+- **One subscription is enough.** Tickets run with the Claude Code or the Codex you already sign in to. No API keys,
+  no service in between. With both, the code review goes to the other agent, and when one hits its usage limit the
+  next tickets go to the other.
+- **Nothing hosted.** One SQLite file on your Mac (`~/.runway/runway.db`) holds every ticket and run. Specs and code
+  stay in your git repos.
+- **Nothing hidden.** The loop runs only while the app is open, as its child. No daemons, no launch agents.
+- **A gate written in code.** Auto-merge needs low risk (set when the work was shaped), a passing review on the exact
+  commit, green checks, and no sensitive paths (auth, payments, migrations, CI, `runway.json`). A reviewer can raise
+  risk, never lower it.
+- **Mac only, one Mac for now.** Other Macs over SSH are next; cloud runs after that.
+
+## Install
+
+**The app (recommended, once released):** download `Runway.zip` from
+[Releases](https://github.com/datacraftdevelopment/agent-runway/releases/latest), move Runway to Applications and open
+it. Its first-run screen checks your tools and sign-ins, installs the `runway` command and adds the Agent Runway skills
+to Claude Code and Codex.
+
+**From source** (needs the Xcode Command Line Tools, Python 3, git, tmux, `gh`, and Claude Code or Codex):
+
+```bash
+git clone https://github.com/datacraftdevelopment/agent-runway
+cd agent-runway/app
+bash make-app.sh --open      # builds build/Runway.app and opens it
+```
+
+Then, in Claude Code or Codex, run the `setup` skill (or follow the app's first run) to check sign-ins and add a first
+repo with its test command.
+
+## The skills
+
+The plugin in [`plugin/agent-runway`](plugin/agent-runway) works in both Claude Code and Codex. The app installs it.
+
+| Skill | What it does |
+| --- | --- |
+| `file-tickets` | Proposes a short batch of tickets from your session and files them on your go. |
+| `runway` | What's running, what needs you, pause and resume, go or no on a waiting ticket. |
+| `setup` | Checks this Mac's tools and sign-ins, walks you through each fix, adds a first repo. |
+| `take-back` | Brings a stuck ticket into your session to finish, then hands it back or closes it. |
+
+## Repository
+
+| Path | What's there |
+| --- | --- |
+| `app/` | The SwiftUI menu bar app (`swift build && swift test`; releasing: `app/RELEASING.md`) |
+| `runway/`, `bin/runway` | The `runway` command: every rule lives here, stdlib Python (`python3 -m unittest`) |
+| `plugin/` | The Agent Runway skills for Claude Code and Codex |
+| `site/` | The website, deployed to agentrunway.app from `main` |
+| `docs/` | Designs (`docs/specs/`), plans, quirks |
+
+## Feedback and contributing
+
+Bugs and ideas: [open an issue](https://github.com/datacraftdevelopment/agent-runway/issues/new/choose). This repo is
+public, so leave out secrets, private repo names and anyone else's code.
+
+Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). The first one asks you to accept the
+[Contributor Licence Agreement](CLA.md) with a single comment.
 
 ## Licence
 
-Source available under the [PolyForm Shield License 1.0.0](LICENSE): free to use, change and share for any purpose except providing a product that competes with Agent Runway. Third-party code vendored into this repo keeps its own licence, recorded beside it.
+Source available under the [PolyForm Shield License 1.0.0](LICENSE): free to use, change and share for any purpose
+except providing a product that competes with Agent Runway. Third-party code vendored into this repo keeps its own
+licence, recorded beside it.
 
-Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests need the [Contributor Licence Agreement](CLA.md), which a check asks for once.
+Made by DataCraft Development.
