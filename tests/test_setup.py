@@ -166,6 +166,27 @@ class DoctorOneEngineTest(unittest.TestCase):
         self.assertIn('Runway needs Claude Code or Codex (either one)', plain.stdout)
 
 
+class FirstRunInitTest(unittest.TestCase):
+    """Before "Set it up", doctor checks without making ~/.runway; runway init makes it."""
+
+    def test_doctor_looks_and_init_makes_the_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / 'runway'
+            env = {**os.environ, 'RUNWAY_HOME': str(home), 'SHELL': '/bin/sh'}
+            cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
+            run = lambda *args: subprocess.run(['/usr/bin/python3', str(cli), *args], env=env, capture_output=True,
+                                               text=True, timeout=120)
+            rep = json.loads(run('doctor', '--json').stdout)
+            self.assertFalse(rep['database_exists'])
+            self.assertFalse(home.exists())
+            res = run('init')
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn(str(home / 'runway.db'), res.stdout)
+            self.assertTrue((home / 'runway.db').exists())
+            self.assertTrue(json.loads(run('doctor', '--json').stdout)['database_exists'])
+            self.assertEqual(run('init').returncode, 0)
+
+
 class RepoAddTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

@@ -60,7 +60,14 @@ struct MenuBarContent: View {
             item(id: "pause") { model.run(["pause", "--for", "1h"]) } label: { Text("Pause everything for 1 hour") }
             item(id: "panel") { open("runway-panel") } label: { Text("Open side panel") }
             item(id: "window") { open("runway") } label: { Text("Open Runway") }
-            item(id: "setup") { open("runway-setup") } label: { Text("Set up Runway…") }
+            item(id: "setup") {
+                model.guideStep = model.setup.map { SetupGuide.start($0, firstLaunch: false) } ?? .check
+                open("runway-setup")
+            } label: { Text("Set up Runway…") }
+            item(id: "whatsnew") {
+                model.showAllNotes()
+                open("runway-whatsnew")
+            } label: { Text("What's New…") }
             divider
             if let note = AppUpdater.shared.state.menuNote {
                 Text("Runway \(AppUpdater.shared.version) · \(note)")

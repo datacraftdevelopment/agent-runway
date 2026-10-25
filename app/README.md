@@ -27,11 +27,19 @@ labelled "Sample data". Launch switches for trying screens and taking screenshot
 
 | Variable | Effect |
 | --- | --- |
-| `RUNWAY_OPEN=panel,menu,setup` | Also open the side panel, the menu's content in a window, the first-run screen |
+| `RUNWAY_OPEN=panel,menu,setup,whatsnew` | Also open the side panel, the menu's content in a window, the setup walkthrough, What's New |
 | `RUNWAY_TAB=activity` | Open the main window on Activity |
 | `RUNWAY_SELECT=T-14` | Select that ticket in the inspector |
 | `RUNWAY_NO_LOOP=1` | Don't start the loop |
-| `RUNWAY_RENDER=<folder>` | Render each screen offscreen to PNGs and quit |
+| `RUNWAY_RENDER=<folder>` | Render each screen offscreen to PNGs and quit (each walkthrough step, What's New) |
+| `RUNWAY_RENDER_SETUP=1` | With `RUNWAY_RENDER`: press "Set it up" for real, then render the result |
+| `RUNWAY_VERSION=0.1.1` | Stand in for the app's version (What's New) |
+| `RUNWAY_DEFAULTS_SUITE=<name>` | Keep a trial run's settings (the last version seen) out of the real app's |
+
+First launch (no `~/.runway/runway.db`) opens the setup walkthrough and starts nothing until "Set it up" has run
+(`runway init`, `install-command`, `install-skills`). Every later launch runs `runway doctor` again and reopens the
+walkthrough only if something is missing, else shows What's New when this version is newer than the last one seen.
+Notes are `release-notes/<version>.md` (see `RELEASING.md`).
 
 ```bash
 RUNWAY_OPEN=panel build/Runway.app/Contents/MacOS/Runway
