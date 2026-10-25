@@ -57,7 +57,7 @@ struct MenuBarContent: View {
             } else {
                 Text(model.loadError ?? "Loading…").foregroundStyle(Palette.textMuted).padding(8)
             }
-            item(id: "pause") { model.act("pause everything --for 1h") } label: { Text("Pause everything for 1 hour") }
+            item(id: "pause") { model.run(["pause", "--for", "1h"]) } label: { Text("Pause everything for 1 hour") }
             item(id: "panel") { open("runway-panel") } label: { Text("Open side panel") }
             item(id: "window") { open("runway") } label: { Text("Open Runway") }
             item(id: "setup") { open("runway-setup") } label: { Text("Set up Runway…") }

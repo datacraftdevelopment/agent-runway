@@ -153,6 +153,8 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     /// Only for running tickets.
     public var stage: Stage?
     public var pr: String?
+    /// The PR's web address, when the repo is on GitHub.
+    public var prUrl: String?
     public var review: String?
     public var question: Question?
     /// Where it was filed from: "Claude Code on this Mac".
@@ -166,7 +168,7 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
 
     public init(id: String, repo: String, title: String, column: Column, agent: AgentChoice, risk: Risk,
                 runsOn: String? = nil, pinned: Bool = false, stage: Stage? = nil, pr: String? = nil,
-                review: String? = nil, question: Question? = nil, filedFrom: String, filedAt: Date,
+                prUrl: String? = nil, review: String? = nil, question: Question? = nil, filedFrom: String, filedAt: Date,
                 waitsOn: [String] = [], elapsed: Int? = nil, summary: String? = nil) {
         self.id = id
         self.repo = repo
@@ -178,6 +180,7 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
         self.pinned = pinned
         self.stage = stage
         self.pr = pr
+        self.prUrl = prUrl
         self.review = review
         self.question = question
         self.filedFrom = filedFrom
@@ -195,7 +198,15 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
 }
 
 public struct ActivityLine: Codable, Equatable, Identifiable, Sendable {
-    public enum Kind: String, Codable, Sendable { case filed, start, review, merged, needsYou = "needs_you", limit, failed }
+    public enum Kind: String, Codable, Sendable {
+        case filed, start, review, merged, needsYou = "needs_you", limit, failed, setup, answer, other
+
+        /// A kind this build doesn't know shows as `other`, so one new event never blanks the whole status.
+        public init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Kind(rawValue: raw) ?? .other
+        }
+    }
 
     public var at: Date
     public var kind: Kind

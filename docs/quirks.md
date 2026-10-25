@@ -4,6 +4,30 @@ Non-obvious gotchas worth remembering. Check before re-inventing fixes.
 
 > Format: short heading, one or two sentences. Date-stamped. Add new entries at the top. The point is fast scanning, not exhaustive documentation.
 
+## Claude's allow-list refuses chained commands (2026-10-24)
+
+With `--permission-mode dontAsk --allowedTools 'Bash(python3 -m unittest -q:*)' 'Bash(git diff:*)'`, a reviewer that
+ran `git diff … && python3 -m unittest -q; echo EXIT=$?` was refused as one command and gave up instead of retrying
+them separately. Each pattern alone works (`:*` and ` *` forms both match). The worker prompts now list the allowed
+commands and say to run each on its own; the next review ran with no refusals.
+
+## A fix pass can't reuse the ticket's branch while an old worktree holds it (2026-10-24)
+
+`git worktree add -B rw/T-3 …` fails with "cannot force update the branch used by worktree" while the earlier
+build's worktree still has it checked out, even with `--force`. The loop removes the ticket's finished runs'
+worktrees before a fix pass.
+
+## Screenshots need an unlocked screen (2026-10-24)
+
+`screencapture -l <window>` and `-R` fail with "could not create image" while the Mac is locked
+(`ioreg -n Root -d1 | grep IOConsoleLocked`). `RUNWAY_RENDER=<folder>` renders the app's screens offscreen instead,
+but `ImageRenderer` leaves ScrollView contents and text fields blank.
+
+## Codex 0.164 has no --full-auto (2026-10-24)
+
+`codex exec -s workspace-write` is the sandbox flag; `--add-dir` makes another folder writable (the run folder for
+the outcome file). `--json` prints events, the first carrying the session's `thread_id` for `codex resume`.
+
 ## S3: Codex Cloud needs an environment first (2026-10-23)
 
 `codex cloud exec --env <ENV_ID> [--branch <b>] "prompt"` submits a task without the TUI; `codex cloud list --json`,

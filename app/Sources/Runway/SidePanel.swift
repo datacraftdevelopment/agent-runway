@@ -114,11 +114,11 @@ struct SidePanel: View {
     @ViewBuilder private func startStop(_ repo: Repo) -> some View {
         switch repo.state {
         case .running, .needsYou:
-            Button("Stop") { model.act("stop \(repo.name)") }.buttonStyle(PlainBoxButtonStyle(fill: Palette.window, small: true))
+            Button("Stop") { model.run(["stop", repo.name]) }.buttonStyle(PlainBoxButtonStyle(fill: Palette.window, small: true))
         case .paused:
-            Button("Resume") { model.act("resume \(repo.name)") }.buttonStyle(PrimaryButtonStyle(small: true))
+            Button("Resume") { model.run(["resume", repo.name]) }.buttonStyle(PrimaryButtonStyle(small: true))
         case .idle, .off:
-            Button("Start") { model.act("start \(repo.name)") }.buttonStyle(PrimaryButtonStyle(small: true))
+            Button("Start") { model.run(["start", repo.name]) }.buttonStyle(PrimaryButtonStyle(small: true))
         }
     }
 

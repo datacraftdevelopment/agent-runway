@@ -52,14 +52,14 @@ Sparkle (updates), Ringside, rounds and Linear-era code. SwiftTerm stays out for
 
 ## Phase 2: the database and the `runway` command
 
-- [ ] 2.1 `runway/` Python package, stdlib only, `bin/runway`. SQLite schema at `~/.runway/runway.db`: repos,
+- [x] 2.1 `runway/` Python package, stdlib only, `bin/runway`. SQLite schema at `~/.runway/runway.db`: repos,
   runners, agents, tickets, blockers, runs (attempts), reviews, answers, events. Migrations by version number.
   Reuse `store.py` from PR #2 where it fits. Check: unit tests on a temp database.
-- [ ] 2.2 `runway file` (from stdin JSON or a Markdown file; validates risk reasons, blockers, runs-on) and
+- [x] 2.2 `runway file` (from stdin JSON or a Markdown file; validates risk reasons, blockers, runs-on) and
   `runway import` (reads `runway/tickets` branch files from cloud sessions, idempotent). Check: tests.
-- [ ] 2.3 `runway status --json` in the shape the app's fixture already uses (the fixture becomes a test).
-- [ ] 2.4 `runway go|no <ticket> [--note]`, `pause|resume [repo|runner] [--for 1h]`, `runs-on <repo|ticket> <runner|any|main>`.
-- [ ] 2.5 The app reads `runway status --json` (polls every few seconds) and its buttons call these commands.
+- [x] 2.3 `runway status --json` in the shape the app's fixture already uses (the fixture becomes a test).
+- [x] 2.4 `runway go|no <ticket> [--note]`, `pause|resume [repo|runner] [--for 1h]`, `runs-on <repo|ticket> <runner|any|main>`.
+- [x] 2.5 The app reads `runway status --json` (polls every few seconds) and its buttons call these commands.
   Check: file a ticket in a terminal, see it appear in the app.
 
 ## Phase 3: the skills (Claude Code and Codex)
@@ -76,14 +76,14 @@ Sparkle (updates), Ringside, rounds and Linear-era code. SwiftTerm stays out for
 
 ## Phase 4: the loop across runners
 
-- [ ] 4.1 `runway loop` (started by the app as a child process; stops dispatching when the app quits): each tick
+- [x] 4.1 `runway loop` (started by the app as a child process; stops dispatching when the app quits): each tick
   imports cloud tickets, picks ready tickets, respects runs-on and slots, starts runs, reads outcomes.
-- [ ] 4.2 This Mac runner: worktree + tmux + `claude -p` / `codex exec`, outcome file. Check: one practice ticket.
+- [x] 4.2 This Mac runner: worktree + tmux + `claude -p` / `codex exec`, outcome file. Check: one practice ticket.
 - [ ] 4.3 SSH Mac runner: the same over `ssh`, using S2's finding. Check: one ticket on the second Mac.
 - [ ] 4.4 Cloud runner: using S3's finding. Check: one ticket in the cloud.
-- [ ] 4.5 Review by the other agent, then the gate (from PR #3's `gate.py`): low risk + review pass on head + checks
+- [x] 4.5 Review by the other agent, then the gate (from PR #3's `gate.py`): low risk + review pass on head + checks
   green + no sensitive path, else needs-you.
-- [ ] 4.6 Usage-limit failover (from PR #3's limits): requeue without spending the fix pass; agent rests until reset.
+- [x] 4.6 Usage-limit failover (from PR #3's limits): requeue without spending the fix pass; agent rests until reset.
 - [ ] 4.7 Run the design's Acceptance A1 to A5 on a practice repo across this Mac, a second Mac and cloud; record the
   result with `ship-acceptance`.
 

@@ -1,44 +1,89 @@
+import AppKit
 import Foundation
 import Observation
 import os
 import RunwayCore
 
-/// The app's state: the latest status snapshot and what the person has selected. Buttons call `act`, which for now
-/// only logs; in Phase 2 each one runs a `runway` command and the next status read shows the result.
+/// The app's state: the latest status snapshot and what the person has selected. It holds no rules: it reads
+/// `runway status --json` every few seconds and every button runs a `runway` command, then reads the status again.
+/// With no `runway` command found (or `RUNWAY_STATUS_FILE` set) it shows a status file instead, read-only.
 @MainActor
 @Observable
 final class AppModel {
     enum Tab: Hashable { case board, activity }
+    enum Source: Equatable { case live, sample }
 
     private(set) var status: Status?
     private(set) var loadError: String?
+    private(set) var source: Source = .sample
     var selectedRepo: String?
     var selectedTicket: String?
     var tab: Tab = .board
-    /// The last action a no-op button logged, shown in the status bar line so a click visibly does something.
+    /// The last thing a button did (or the error it got), shown in the toolbar.
     private(set) var lastAction: String?
 
+    private let cli: RunwayCLI?
+    private var loop: Process?
+    private var polling: Task<Void, Never>?
     private let logger = Logger(subsystem: "dev.datacraft.runway-agent", category: "actions")
 
     init() {
+        let env = ProcessInfo.processInfo.environment
         // RUNWAY_TAB=activity and RUNWAY_SELECT=<ticket> open the window in a given state, for screenshots.
-        if ProcessInfo.processInfo.environment["RUNWAY_TAB"] == "activity" { tab = .activity }
-        load()
+        if env["RUNWAY_TAB"] == "activity" { tab = .activity }
+        cli = env["RUNWAY_STATUS_FILE"] == nil ? RunwayCLI.find() : nil
+        if let cli {
+            source = .live
+            if env["RUNWAY_NO_LOOP"] == nil { startLoop(cli) }
+            polling = Task { [weak self] in
+                while !Task.isCancelled {
+                    await self?.refresh()
+                    if let self, RenderMode.folder != nil { return RenderMode.renderAndQuit(self) }
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                }
+            }
+        } else {
+            loadSample()
+            if RenderMode.folder != nil {
+                Task { [weak self] in if let self { RenderMode.renderAndQuit(self) } }
+            }
+        }
     }
 
-    func load() {
-        guard let url = Self.statusURL() else {
-            loadError = "No status file found (set RUNWAY_STATUS_FILE)"
+    // MARK: Reading
+
+    func refresh() async {
+        guard let cli else { return }
+        let result = await cli.run(["status", "--json"])
+        guard result.status == 0 else {
+            loadError = "runway status failed: \(result.error.trimmingCharacters(in: .whitespacesAndNewlines))"
             return
         }
         do {
-            let status = try Status.decode(Data(contentsOf: url))
-            self.status = status
-            loadError = nil
-            if selectedRepo == nil { selectedRepo = status.repos.first?.name }
-            if selectedTicket == nil { selectedTicket = Self.defaultTicket(status, repo: selectedRepo) }
+            apply(try Status.decode(Data(result.output.utf8)))
+        } catch {
+            loadError = "Couldn't read runway status: \(error.localizedDescription)"
+        }
+    }
+
+    private func loadSample() {
+        guard let url = Self.sampleURL() else {
+            loadError = "No runway command and no status file found"
+            return
+        }
+        do {
+            apply(try Status.decode(Data(contentsOf: url)))
         } catch {
             loadError = "Couldn't read \(url.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
+
+    private func apply(_ status: Status) {
+        if status != self.status { self.status = status }
+        loadError = nil
+        if selectedRepo == nil || status.repo(named: selectedRepo ?? "") == nil { selectedRepo = status.repos.first?.name }
+        if selectedTicket == nil || !status.tickets.contains(where: { $0.id == selectedTicket }) {
+            selectedTicket = Self.defaultTicket(status, repo: selectedRepo)
         }
     }
 
@@ -54,11 +99,78 @@ final class AppModel {
         if let status, ticket?.repo != repo { selectedTicket = Self.defaultTicket(status, repo: repo) }
     }
 
+    // MARK: Acting
+
+    /// Runs `runway <args>`, shows what it said, and reads the status again.
+    func run(_ args: [String]) {
+        logger.info("runway \(args.joined(separator: " "), privacy: .public)")
+        guard let cli else {
+            lastAction = "Sample data: would run runway \(args.joined(separator: " "))"
+            return
+        }
+        lastAction = "runway \(args.joined(separator: " "))…"
+        Task {
+            let result = await cli.run(args)
+            let said = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+            lastAction = said.isEmpty ? "runway \(args.first ?? "") done" : String(said.prefix(200))
+            await refresh()
+        }
+    }
+
+    /// A button that has nothing to run yet: say so rather than do nothing.
     func act(_ what: String) {
         logger.info("\(what, privacy: .public)")
-        print("runway action: \(what)")
         lastAction = what
     }
+
+    /// Opens Terminal on the ticket's session: `tmux attach` while it runs, else `claude --resume` / `codex resume`.
+    func openSession(_ ticket: String) {
+        guard let cli else { return act("Sample data: no session to open") }
+        Task {
+            let result = await cli.run(["session", ticket, "--json"])
+            guard result.status == 0,
+                  let info = try? JSONSerialization.jsonObject(with: Data(result.output.utf8)) as? [String: Any],
+                  let dir = info["dir"] as? String else {
+                lastAction = result.error.isEmpty ? "No session for \(ticket)" : result.error
+                return
+            }
+            guard let command = info["command"] as? String else {
+                lastAction = "\(ticket)'s run left no session to resume"
+                return
+            }
+            let script = FileManager.default.temporaryDirectory.appendingPathComponent("runway-\(ticket).command")
+            let body = "#!/bin/zsh -l\ncd \(RunwayCLI.quote(dir)) && \(command)\n"
+            do {
+                try body.write(to: script, atomically: true, encoding: .utf8)
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+                NSWorkspace.shared.open(script)
+                lastAction = "Opened \(command)"
+            } catch {
+                lastAction = "Couldn't open the session: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func openPR(_ ticket: Ticket) {
+        guard let url = ticket.prUrl.flatMap(URL.init(string:)) else { return act("No PR link for \(ticket.id)") }
+        NSWorkspace.shared.open(url)
+    }
+
+    // MARK: The loop
+
+    private func startLoop(_ cli: RunwayCLI) {
+        let log = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".runway/loop.log")
+        try? FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
+        loop = cli.startLoop(log: log)
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
+                                               queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.loop?.terminate() }
+        }
+    }
+
+    var loopRunning: Bool { loop?.isRunning ?? false }
+
+    // MARK: Helpers
 
     /// The first needs-you ticket, else T-19 as in the mock, else the first ticket in the repo.
     private static func defaultTicket(_ status: Status, repo: String?) -> String? {
@@ -67,11 +179,11 @@ final class AppModel {
         if let pick = ProcessInfo.processInfo.environment["RUNWAY_SELECT"], tickets.contains(where: { $0.id == pick }) {
             return pick
         }
-        return tickets.first { $0.id == "T-19" }?.id ?? tickets.first?.id
+        return tickets.first { $0.column == .needsYou }?.id ?? tickets.first { $0.id == "T-19" }?.id ?? tickets.first?.id
     }
 
-    /// `RUNWAY_STATUS_FILE`, else the copy inside Runway.app, else the test fixture when run from the package.
-    static func statusURL() -> URL? {
+    /// `RUNWAY_STATUS_FILE`, else the sample inside Runway.app, else the test fixture when run from the package.
+    static func sampleURL() -> URL? {
         let fm = FileManager.default
         if let path = ProcessInfo.processInfo.environment["RUNWAY_STATUS_FILE"], fm.fileExists(atPath: path) {
             return URL(fileURLWithPath: path)
