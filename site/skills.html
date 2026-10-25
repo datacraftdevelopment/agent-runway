@@ -226,7 +226,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <div class="stage auto">
       <div><span class="who">Runs on its own</span><h3>5 · Build, check, review</h3></div>
       <div>
-        <p>The Runway app does this part, in plain code rather than an agent. Each ticket gets a fresh git worktree on a free Mac. The agent builds it, the repo's own check command runs, and a draft pull request opens. Then a fresh session reviews it on that exact commit. With one agent, that's a new session of the same agent. With both, Codex reviews Claude's work and Claude reviews Codex's. A failed review gets one fix pass. If a usage limit hits, that agent rests until it resets, and with both installed the other agent takes over.</p>
+        <p>The Runway app does this part, in plain code rather than an agent. Each ticket gets a fresh git worktree on a free Mac. The agent builds it, the repo's own check command runs, and a draft pull request opens. Then two fresh sessions review it on that exact commit, with none of the builder's context. The code review looks for bugs, risk and sensitive paths, and can raise the risk. The function review runs the check and walks every acceptance line, pass or fail. With one agent, both run on it. With both agents, the code review goes to the one that didn't build it. A failed review gets one fix pass. If a usage limit hits, the ticket waits in Up next until the limit resets, or goes to the other agent if you have both.</p>
       </div>
     </div>
 
@@ -234,7 +234,22 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <div><span class="who">Runs on its own · you when it asks</span><h3>6 · Merge or ask</h3></div>
       <div>
         <p>Low-risk tickets that pass review and checks, and touch no sensitive paths, merge on their own. Anything else becomes one question on your board, such as "Merge PR #2?", answered with a click or from a session.</p>
-        <div class="skill"><header><code>runway</code><span class="src">Agent Runway</span></header><p>Ask your agent what Runway is doing and what needs you, then say go, no, pause or resume. It acts only on your own words for that ticket, and it gives you the line to reopen any run's session.</p></div>
+        <div class="skill"><header><code>runway</code><span class="src">Agent Runway</span></header><p>Ask your agent what Runway is doing and what needs you, then say go, no, pause or resume. It acts only on your own words for that ticket. For a stuck ticket, it points you to take-back.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">You, when a ticket is stuck</span><h3>Take back</h3></div>
+      <div>
+        <p>When a ticket stops on a failed review or check, finish it yourself instead of starting over. On the board, <b>Take back · copy prompt</b> copies one line. Paste it into Claude Code or Codex.</p>
+        <div class="skill"><header><code>take-back</code><span class="src">Agent Runway</span></header><p>It claims the ticket and stops its worker, keeping the branch and worktree. Then it reads the last run: what the worker said, both reviews' findings and the session itself. It tells you in a few lines what was tried and why it stopped, and you fix it together in the worktree. It always ends with one of three, and only with your OK. <b>Give back</b> sends it to Runway for fresh reviews, so a low-risk ticket can still merge itself. <b>Done</b> merges it on your typed go. <b>Drop</b> closes it. A ticket is never left taken back.</p></div>
+      </div>
+    </div>
+
+    <div class="stage auto">
+      <div><span class="who">Runs on its own</span><h3>Getting better</h3></div>
+      <div>
+        <p>The board shows how hands-off Runway really is: how many tickets merged without you, cycle time, cost per ticket, and where the rest stopped. When three tickets in a repo stop for the same reason within a week, Runway files a retro ticket to fix the cause. Its pull request links every run behind it, and a retro never merges on its own. With both agents, <code>runway bench</code> re-runs finished tickets on each one, so you can see which does better on your work.</p>
       </div>
     </div>
 
