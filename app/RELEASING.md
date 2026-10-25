@@ -1,6 +1,7 @@
 # Releasing the Runway app
 
-A release is a Developer ID-signed, notarized `Runway.zip` plus an `appcast.xml`, published as the GitHub release
+A release is a Developer ID-signed, notarized `Runway.dmg` (for first installs), `Runway.zip` (for updates) and an
+`appcast.xml`, published as the GitHub release
 `v<VERSION>` on this repo. Every installed Runway checks the feed once a day (and on "Check for Updates…" in the
 menu), and Sparkle installs the new version after checking two things: the zip's EdDSA signature against the public
 key built into the app, and the new app's Developer ID. The `runway` command rides inside the app, so an update brings
@@ -8,7 +9,8 @@ the matching command with it.
 
 | What | Where |
 | --- | --- |
-| Download (website link, always the newest) | `https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/Runway.zip` |
+| Download (website link, always the newest) | `https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/Runway.dmg` |
+| Update download (Sparkle) | `https://github.com/datacraftdevelopment/agent-runway/releases/download/v<VERSION>/Runway.zip` |
 | Update feed (built into the app) | `https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/appcast.xml` |
 | One version | `https://github.com/datacraftdevelopment/agent-runway/releases/tag/v<VERSION>` |
 
@@ -26,7 +28,7 @@ Both run the same `make-app.sh --release`, which refuses on a dirty tree, off `m
 or when the tests fail. `--release --dry-run` does everything except notarize and publish, needs no secrets, and runs
 in CI on every PR.
 
-`--release --no-publish` signs, notarizes and staples `build/release/Runway.zip` from any branch, with no tag and no
+`--release --no-publish` signs, notarizes and staples `build/release/Runway.dmg` and `Runway.zip` from any branch, with no tag and no
 release: the build to download onto a clean Mac and try as a new user would. It needs the same identity and notary
 settings as a real release.
 
@@ -69,3 +71,11 @@ Nothing below ever goes into the repo. The only key that is committed is Sparkle
 `bash make-app.sh` stays ad-hoc signed, for this Mac only. With `sparkle-public-key` committed, a local build checks
 the feed too, and Sparkle will offer to replace it with the newest release. Run local builds with
 `RUNWAY_STATUS_FILE` set (sample data), or just decline, if you don't want that.
+
+## Install and updates
+
+The DMG shows Runway beside an Applications shortcut to drag it onto. Opened from anywhere else (Downloads, the
+disk image itself), Runway offers to move itself into Applications and reopen, because Sparkle can't update a copy
+that macOS has translocated or that sits on a read-only disk image. `RUNWAY_NO_MOVE=1` skips the offer; developer
+builds in `build/` never ask. The icon is `icon/AppIcon.png` (1024 px, cut to the macOS tile shape from the artwork in `icon/AppIcon-source.png`);
+`make-app.sh` turns it into `AppIcon.icns`.

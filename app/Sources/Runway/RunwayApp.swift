@@ -61,6 +61,8 @@ private struct LaunchOpener: View {
         Color.clear.frame(width: 0, height: 0).task {
             guard !Self.done else { return }
             Self.done = true
+            // Run from Downloads or the disk image: offer the move first, since updates only work from Applications.
+            MoveToApplications.offerIfNeeded()
             let wanted = (ProcessInfo.processInfo.environment["RUNWAY_OPEN"] ?? "").split(separator: ",")
             for id in wanted { openWindow(id: "runway-\(id)") }
             // First run: until a repo is watched, the setup screen opens on top of the main window.

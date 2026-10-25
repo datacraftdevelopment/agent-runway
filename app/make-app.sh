@@ -36,7 +36,8 @@ VERSION="$(tr -d '[:space:]' < VERSION)"
 TAG="v$VERSION"
 REL_DIR="build/release"
 # Releases, their downloads and the update feed live on this (public) repo. The website links
-# https://github.com/$GH_REPO/releases/latest/download/Runway.zip, so the asset name never changes.
+# https://github.com/$GH_REPO/releases/latest/download/Runway.dmg, so the asset names never change. Runway.zip
+# is what Sparkle downloads for updates.
 GH_REPO="${RUNWAY_RELEASE_REPO:-datacraftdevelopment/agent-runway}"
 FEED_URL="https://github.com/$GH_REPO/releases/latest/download/appcast.xml"
 
@@ -104,6 +105,19 @@ cp Tests/RunwayCoreTests/Fixtures/sample-status.json "$APP/Contents/Resources/sa
 # The licence (with its Required Notice line) travels with every copy of the app.
 cp "$REPO/LICENSE" "$APP/Contents/Resources/LICENSE"
 
+# The app icon, made from icon/AppIcon.png (1024 px) with the system's sips and iconutil.
+ICON_KEY=""
+if [ -f icon/AppIcon.png ]; then
+  ICONSET="build/AppIcon.iconset"; rm -rf "$ICONSET"; mkdir -p "$ICONSET"
+  for size in 16 32 128 256 512; do
+    sips -z "$size" "$size" icon/AppIcon.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+    sips -z "$((size * 2))" "$((size * 2))" icon/AppIcon.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  iconutil -c icns -o "$APP/Contents/Resources/AppIcon.icns" "$ICONSET"
+  rm -rf "$ICONSET"
+  ICON_KEY="  <key>CFBundleIconFile</key><string>AppIcon</string>"
+fi
+
 # Sparkle's framework rides in Contents/Frameworks; the binary finds it through an rpath.
 cp -R "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Runway" 2>/dev/null || true
@@ -133,6 +147,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+$ICON_KEY
   <key>NSHumanReadableCopyright</key><string>Copyright 2026 DataCraft Development. Agent Runway, https://agentrunway.app</string>
 $SPARKLE_KEYS
 </dict>
@@ -163,7 +178,7 @@ if [ "$RELEASE" = 1 ]; then
   if [ "$DRY" = 1 ]; then
     echo "== dry run: skipping notarize and staple"
   else
-    echo "== notarize (a few minutes)"
+    echo "== notarize the app (a few minutes)"
     ditto -c -k --keepParent "$APP" "$REL_DIR/notarize.zip"
     if [ -n "${RUNWAY_NOTARY_PROFILE:-}" ]; then
       NOTARY=(--keychain-profile "$RUNWAY_NOTARY_PROFILE")
@@ -176,6 +191,23 @@ if [ "$RELEASE" = 1 ]; then
     spctl --assess --type execute "$APP" || die "Gatekeeper rejects the notarized app"
   fi
   ditto -c -k --keepParent "$APP" "$ZIP"
+
+  # The disk image people download: Runway.app beside an Applications shortcut, to drag one onto the other.
+  # Sparkle keeps updating from the zip; the DMG is for first installs.
+  DMG="$REL_DIR/Runway.dmg"
+  STAGE="$REL_DIR/dmg"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+  ditto "$APP" "$STAGE/Runway.app"
+  ln -s /Applications "$STAGE/Applications"
+  hdiutil create -volname "Agent Runway" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null \
+    || die "hdiutil create failed"
+  rm -rf "$STAGE"
+  codesign --force "$TS" --sign "$RUNWAY_SIGN_IDENTITY" "$DMG" || die "codesign failed on $DMG"
+  if [ "$DRY" = 0 ]; then
+    echo "== notarize the disk image (a few minutes)"
+    xcrun notarytool submit "$DMG" "${NOTARY[@]}" --wait || die "notarization of the disk image failed"
+    xcrun stapler staple "$DMG" || die "stapling the disk image failed"
+    spctl --assess --type open --context context:primary-signature "$DMG" || die "Gatekeeper rejects the disk image"
+  fi
 
   SIGN_UPDATE="${SPARKLE_SIGN_UPDATE:-$(find .build/artifacts -name sign_update -type f -perm -u+x 2>/dev/null | head -n 1)}"
   { [ -n "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; } || die "Sparkle's sign_update not found (set SPARKLE_SIGN_UPDATE, or run swift build so the package's artifacts exist)"
@@ -208,11 +240,11 @@ if [ "$RELEASE" = 1 ]; then
 </rss>
 APPCAST
   if [ "$DRY" = 1 ]; then
-    echo "Dry run done: $(pwd)/$ZIP and $(pwd)/$REL_DIR/appcast.xml (not notarized, not published)"
+    echo "Dry run done: $(pwd)/$DMG, $(pwd)/$ZIP and $(pwd)/$REL_DIR/appcast.xml (not notarized, not published)"
     exit 0
   fi
   if [ "$NOPUB" = 1 ]; then
-    echo "Built $(pwd)/$ZIP: signed, notarized and stapled (not tagged, not published)"
+    echo "Built $(pwd)/$DMG and $(pwd)/$ZIP: signed, notarized and stapled (not tagged, not published)"
     exit 0
   fi
   echo "== publish $TAG"
@@ -222,7 +254,7 @@ APPCAST
   fi
   NOTES="Runway $VERSION (build $BUILD, source $SOURCE)."
   [ -f "release-notes/$VERSION.md" ] && NOTES="$(cat "release-notes/$VERSION.md")"
-  gh release create "$TAG" "$ZIP" "$REL_DIR/appcast.xml" -R "$GH_REPO" --verify-tag \
+  gh release create "$TAG" "$DMG" "$ZIP" "$REL_DIR/appcast.xml" -R "$GH_REPO" --verify-tag \
     --title "Runway $VERSION" --notes "$NOTES" || die "gh release create failed"
   echo "Published $TAG: https://github.com/$GH_REPO/releases/tag/$TAG"
   exit 0

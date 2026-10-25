@@ -2,14 +2,14 @@ import AppKit
 import SwiftUI
 import RunwayCore
 
-/// The menu bar icon: an airplane, plus the needs-you count when something is waiting.
+/// The menu bar icon: a paper plane like the app icon, filled with the needs-you count beside it when something is waiting.
 struct MenuBarLabel: View {
     let model: AppModel
 
     var body: some View {
         let count = model.status?.needsYou.count ?? 0
         HStack(spacing: 3) {
-            Image(systemName: count > 0 ? "airplane.departure" : "airplane")
+            Image(systemName: count > 0 ? "paperplane.fill" : "paperplane")
             if count > 0 { Text("\(count)") }
         }
     }
