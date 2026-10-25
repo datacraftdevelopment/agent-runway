@@ -30,7 +30,7 @@ struct SetupGuideView: View {
         }
         .font(.system(size: 13))
         .foregroundStyle(Palette.text)
-        .padding(.horizontal, 30).padding(.top, 34).padding(.bottom, 24)
+        .padding(.horizontal, 30).padding(.top, 42).padding(.bottom, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Palette.window)
         .ignoresSafeArea()
