@@ -28,6 +28,9 @@ jobs:
           codesign --verify --deep --strict build/Runway.app
           test -d build/Runway.app/Contents/Frameworks/Sparkle.framework
           test -s build/Runway.app/Contents/Resources/LICENSE
+          test -s build/Runway.app/Contents/Resources/AppIcon.icns
+          test -s build/release/Runway.dmg
+          hdiutil verify build/release/Runway.dmg
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' build/Runway.app/Contents/Info.plist
           grep -q '<enclosure url="https://github.com/datacraftdevelopment/agent-runway/releases/download/v' build/release/appcast.xml
           ls -l build/release
