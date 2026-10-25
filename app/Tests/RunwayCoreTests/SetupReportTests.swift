@@ -29,3 +29,17 @@ final class SetupReportTests: XCTestCase {
         XCTAssertNil(bare.check)
     }
 }
+
+final class TakenBackTests: XCTestCase {
+    func testNudgeAfterADay() throws {
+        func ticket(_ hours: Double?, taken: Bool) throws -> Ticket {
+            let json = #"{"id":"T-1","repo":"r","title":"t","column":"needs_you","agent":"any","risk":"low","pinned":false,"#
+                + #""filed_from":"x","filed_at":"2026-10-23T19:16:00Z","waits_on":[],"taken":\#(taken),"#
+                + #""taken_hours":\#(hours.map { String($0) } ?? "null")}"#
+            return try StatusCoding.decoder.decode(Ticket.self, from: Data(json.utf8))
+        }
+        XCTAssertFalse(try ticket(3, taken: true).takenLong)
+        XCTAssertTrue(try ticket(30, taken: true).takenLong)
+        XCTAssertFalse(try ticket(nil, taken: false).takenLong)
+    }
+}

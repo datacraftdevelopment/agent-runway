@@ -47,6 +47,9 @@ def evaluate(ticket, pr, checks, config, fresh=False):
     hits = sensitive_hits([f['path'] for f in pr.get('files', [])], patterns)
     if hits:
         reasons.append('it changes sensitive paths: ' + ', '.join(hits[:6]))
+    keys = ticket.keys() if hasattr(ticket, 'keys') else ticket
+    if 'kind' in keys and ticket['kind'] == 'retro':
+        reasons.append('it is a retro, which never merges on its own')
     if config.get('auto_merge') is False:
         reasons.append("the repo's runway.json turns auto-merge off")
     pending = [c['name'] for c in checks if c.get('state') in PENDING]

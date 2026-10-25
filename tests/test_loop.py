@@ -34,6 +34,9 @@ class FakeRunner:
     def has_ref(self, repo, ref):
         return True
 
+    def rev(self, repo, ref):
+        return 'base0000000000000000000000000000000000000'
+
     def start(self, name, workdir, line):
         self.live.add(name)
         self.started.append((name, line))
@@ -53,6 +56,9 @@ class FakeRunner:
     def push(self, workdir, branch):
         self.pushed.append(branch)
 
+    def head(self, workdir):
+        return 'a1b2c3d4e5f6a7b8c9d0'
+
     def remove(self, repo, workdir):
         self.removed.append(workdir)
 
@@ -67,7 +73,9 @@ class FakeGitHub:
         self.merged = []
 
     def create_pr(self, path, base, branch, title, body):
+        self.bodies = getattr(self, 'bodies', {})
         n = len(self.prs) + 1
+        self.bodies[n] = body
         self.prs[n] = {'number': n, 'state': 'OPEN', 'headRefOid': 'a1b2c3d4e5f6a7b8c9d0', 'files': [{'path': 'tally/x.py'}]}
         return n
 
@@ -116,7 +124,7 @@ class LoopTest(unittest.TestCase):
 
     def finish(self, tid, filename, payload, log='', role=None):
         run = self.live_run(tid, role)
-        d = self.runner.run_dir(run['id'])
+        d = db.run_dir(self.con, run)
         if payload is not None:
             (d / filename).write_text(json.dumps(payload))
         (d / 'log').write_text(log)
@@ -171,8 +179,8 @@ class TwoEngines(LoopTest):
         self.assertEqual((t['state'], t['review']), ('done', 'Codex: pass'))
         self.assertTrue(t['function_review'].endswith(': pass'))
         self.assertEqual(self.gh.merged, [1])
-        prompts = [(self.runner.run_dir(r['id']) / 'prompt.md').read_text()
-                   for r in self.con.execute("SELECT id FROM runs WHERE kind='review' ORDER BY role")]
+        prompts = [(db.run_dir(self.con, r) / 'prompt.md').read_text()
+                   for r in self.con.execute("SELECT * FROM runs WHERE kind='review' ORDER BY role")]
         self.assertIn('code reviewer, in a fresh session', prompts[0])
         self.assertIn('Walk each Acceptance line', prompts[1])
 

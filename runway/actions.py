@@ -18,7 +18,7 @@ from .github import GitHub
 
 def answer(con, tid, verdict, note=None, github=None):
     t = db.ticket(con, tid)
-    if t['state'] != 'needs_you':
+    if t['state'] not in ('needs_you', 'taken'):
         raise db.RunwayError(f'{tid} is not waiting for you (it is {t["state"]})')
     q = json.loads(t['question'] or '{}')
     kind = q.get('kind', 'failed')
@@ -31,8 +31,8 @@ def answer(con, tid, verdict, note=None, github=None):
             gh = github or GitHub()
             pr = gh.pr(r['path'], t['pr'])
             gh.merge(r['path'], t['pr'], pr['headRefOid'])
-            db.update_ticket(con, tid, state='done', stage=None, question=None, note=f'You merged it at '
-                             f'{time.strftime("%H:%M")}.')
+            db.update_ticket(con, tid, state='done', stage=None, question=None, merged_at=db.now(), merged_by='you',
+                             note=f'You merged it at {time.strftime("%H:%M")}.')
             db.event(con, 'merged', f'{tid} PR #{t["pr"]}, merged by you', repo=t['repo'], ticket=tid)
             return f'{tid}: merged PR #{t["pr"]}'
         if note:
@@ -51,6 +51,12 @@ def answer(con, tid, verdict, note=None, github=None):
         requeue(con, tid, f'You asked: {text}\nThe person answered: {reply}')
         db.event(con, 'answer', f'{tid}: answered ({said})', repo=t['repo'], ticket=tid)
         return f'{tid}: answered, back to Up next'
+    if kind == 'taken':
+        from . import take
+        if verdict == 'go':
+            head = take.give(con, tid)
+            return f'{tid}: given back at {head[:7]}'
+        return take.drop(con, tid, note, github=github)
     # failed (and anything unknown)
     if verdict == 'go':
         requeue(con, tid, note and f'The person says, retrying: {note}')

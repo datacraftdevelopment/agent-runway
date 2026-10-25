@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import db, gate, limits, worker
+from . import db, gate, limits, retro, worker
 from .github import GitHub
 from .runner import LocalRunner
 
@@ -42,6 +42,8 @@ class Loop:
             self.settle(run)
         for t in self.con.execute("SELECT * FROM tickets WHERE state='merging' ORDER BY filed_at").fetchall():
             self.try_gate(t)
+        for tid in retro.check(self.con, self.runner.config):
+            self.log(f'filed retro {tid}')
         self.dispatch()
         db.set_meta(self.con, 'loop_at', db.now())
 
@@ -54,7 +56,7 @@ class Loop:
         if overdue:
             self.runner.stop(run['tmux'])
         t = db.ticket(self.con, run['ticket'])
-        run_dir = self.runner.run_dir(run['id'])
+        run_dir = db.run_dir(self.con, run)
         log_text = read(run_dir / 'log')
         if run['agent'] == 'codex' and not run['session_id']:
             self.con.execute('UPDATE runs SET session_id=? WHERE id=?', (worker.codex_session(log_text), run['id']))
@@ -90,26 +92,35 @@ class Loop:
             self.end(run, 'failed')
             why = summary or f'the worker ended without an outcome (exit {read(run_dir / "exit").strip() or "?"})'
             return self.failed(t, why)
+        self.stage(run, 'commit')
         sha = self.runner.commit(run['dir'], f'{t["id"]}: {t["title"]}')
+        if not sha and t['taken']:
+            # Taken back and given back: the person's commits are the work; carry on with them.
+            sha = self.runner.head(run['dir'])
         if not sha:
             self.end(run, 'failed')
             return self.failed(t, 'the worker said done but changed nothing')
         db.update_ticket(self.con, t['id'], state='checking', stage='check', sha=sha)
+        self.stage(run, 'check')
         cfg = self.runner.config(repo)
         ok, output = self.runner.check(run['dir'], check_command(repo, cfg))
         if not ok:
             self.end(run, 'failed')
             return self.failed(t, f'the check failed after the build: {output[-600:]}', reason='check')
         branch = t['branch'] or f'rw/{t["id"]}'
+        self.stage(run, 'push')
         self.runner.push(run['dir'], branch)
         self.end(run, 'done', sha=sha)
         pr = t['pr']
         if not pr:
             body = (f'Runway ticket {t["id"]}, built by {NAMES[run["agent"]]} on {run["runner"]}.\n\n'
                     f'{t["body"]}\n\n## Acceptance\n\n{worker.acceptance_lines(t)}\n\n## Worker summary\n\n{summary}')
+            if t['kind'] == 'retro':
+                body += '\n\n' + retro.runs_behind_section(json.loads(t['retro_runs'] or '[]'))
             pr = self.github.create_pr(repo['path'], t['base'], branch, f'{t["id"]}: {t["title"]}', body)
         db.update_ticket(self.con, t['id'], state='reviewing', stage='review', sha=sha, branch=branch, pr=pr,
                          review=None, function_review=None, note=None)
+        self.stage(run, 'reviews')
         db.event(self.con, 'start', f'{t["id"]} built by {NAMES[run["agent"]]}, check passed; PR #{pr}',
                  repo=t['repo'], ticket=t['id'])
 
@@ -141,6 +152,7 @@ class Loop:
         self.end(run, v, sha=run['sha'])
         db.event(self.con, 'review', f'{t["id"]} {label.lower()} by {name}: {v} on {run["sha"][:7]}'
                  + (' (risk raised)' if raised else ''), repo=t['repo'], ticket=t['id'])
+        self.keep_review(t, role, verdict, text)
         fields = {'review' if role == 'code' else 'function_review': text}
         if raised:
             fields['risk'] = 'not_low'
@@ -156,6 +168,15 @@ class Loop:
             db.update_ticket(self.con, t['id'], state='merging', stage='merge')
             return self.try_gate(db.ticket(self.con, t['id']))
 
+    def keep_review(self, t, role, verdict, text):
+        """Both verdicts, with their notes, beside the build they judged: <build run>/reviews/<role>.json."""
+        build = self.con.execute("SELECT * FROM runs WHERE ticket=? AND kind='build' AND sha=? ORDER BY id DESC "
+                                 "LIMIT 1", (t['id'], t['sha'])).fetchone()
+        if build:
+            folder = db.run_dir(self.con, build) / 'reviews'
+            folder.mkdir(exist_ok=True)
+            (folder / f'{role}.json').write_text(json.dumps(dict(verdict, recorded=text), indent=2))
+
     def passed(self, t, role):
         """Whether this role's latest review of the ticket's current head commit passed."""
         row = self.con.execute("SELECT outcome FROM runs WHERE ticket=? AND kind='review' AND role=? AND sha=? "
@@ -169,8 +190,16 @@ class Loop:
             self.end(r, 'cancelled')
 
     def end(self, run, outcome, sha=None):
-        self.con.execute('UPDATE runs SET ended_at=?, outcome=?, sha=COALESCE(?, sha) WHERE id=?',
-                         (db.now(), outcome, sha, run['id']))
+        run_dir = db.run_dir(self.con, run)
+        tin, tout, cost = worker.usage(run['agent'], read(run_dir / 'log'))
+        session = run['session_id'] or (worker.codex_session(read(run_dir / 'log')) if run['agent'] == 'codex' else None)
+        transcript = worker.link_transcript(run['agent'], session, run_dir)
+        self.con.execute('UPDATE runs SET ended_at=?, outcome=?, sha=COALESCE(?, sha), tokens_in=?, tokens_out=?, '
+                         'cost_usd=?, session_id=COALESCE(session_id, ?), transcript=? WHERE id=?',
+                         (db.now(), outcome, sha, tin, tout, cost, session, transcript, run['id']))
+
+    def stage(self, run, stage):
+        self.con.execute('UPDATE runs SET stage=? WHERE id=?', (stage, run['id']))
 
     def failed(self, t, why, reason='build'):
         """A fix pass if one is left, else the person. `reason` is why it stopped, for the stats."""
@@ -186,6 +215,9 @@ class Loop:
                  reason=f'{reason}_failed_twice')
 
     def ask(self, t, kind, text, short, go_label, no_label, log, reason=None):
+        last = self.con.execute('SELECT id FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (t['id'],)).fetchone()
+        self.con.execute('INSERT INTO stops(ticket, repo, at, reason, run, detail) VALUES (?, ?, ?, ?, ?, ?)',
+                         (t['id'], t['repo'], db.now(), reason or kind, last['id'] if last else None, text[:4000]))
         db.update_ticket(self.con, t['id'], state='needs_you', stage=None,
                          question={'kind': kind, 'text': text, 'short': short, 'reason': reason or kind,
                                    'go_label': go_label, 'no_label': no_label})
@@ -205,13 +237,14 @@ class Loop:
         if verdict == 'wait':
             return
         if verdict == 'merged':
-            db.update_ticket(self.con, t['id'], state='done', stage=None, note='Merged outside Runway.')
+            db.update_ticket(self.con, t['id'], state='done', stage=None, note='Merged outside Runway.',
+                             merged_at=db.now(), merged_by='outside')
             return self.cleanup(t)
         if verdict == 'merge':
             self.github.merge(repo['path'], t['pr'], pr['headRefOid'], self.runner.config(repo).get('merge_method',
                                                                                                       'merge'))
-            db.update_ticket(self.con, t['id'], state='done', stage=None,
-                             note='Merged on its own: low risk, review passed, checks green.')
+            db.update_ticket(self.con, t['id'], state='done', stage=None, merged_at=db.now(), merged_by='gate',
+                             note='Merged on its own: low risk, both reviews passed, checks green.')
             db.event(self.con, 'merged', f'{t["id"]} PR #{t["pr"]} (low risk, checks green)', repo=t['repo'],
                      ticket=t['id'])
             self.log(f'merged {t["id"]} (PR #{t["pr"]})')
@@ -322,7 +355,11 @@ class Loop:
                                'VALUES (?, ?, ?, ?, ?, ?)',
                                (t['id'], kind, role if kind == 'review' else None, agent, runner_name, db.now()))
         run_id = cur.lastrowid
-        run_dir = self.runner.run_dir(run_id)
+        n = self.con.execute('SELECT COUNT(*) FROM runs WHERE ticket=?', (t['id'],)).fetchone()[0]
+        run_dir = db.home() / 'runs' / t['id'] / str(n)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        self.con.execute('UPDATE runs SET run_dir=?, stage=? WHERE id=?',
+                         (str(run_dir), 'build' if kind == 'build' else f'{role or "code"} review', run_id))
         cfg = self.runner.config(repo)
         check = check_command(repo, cfg)
         commands = [check] + list(cfg.get('worker_commands', []))
@@ -330,14 +367,19 @@ class Loop:
         try:
             if kind == 'build':
                 # A fix pass carries on from the pushed branch; a first build starts from the base.
-                start_ref = f'origin/{branch}' if t['fix_passes'] and self.runner.has_ref(repo, f'origin/{branch}') \
-                    else f'origin/{t["base"]}'
+                # A fix pass, or a ticket given back after a take back, carries on from the pushed branch (and the
+                # person's commits on it); a first build starts from the base.
+                carry_on = (t['fix_passes'] or t['taken']) and self.runner.has_ref(repo, f'origin/{branch}')
+                start_ref = f'origin/{branch}' if carry_on else f'origin/{t["base"]}'
                 # Earlier runs' worktrees still hold the ticket's branch, and git won't reset a branch checked out
                 # elsewhere, so a fix pass clears them first.
                 for old in self.con.execute('SELECT dir FROM runs WHERE ticket=? AND id != ? AND dir IS NOT NULL '
                                             'AND ended_at IS NOT NULL', (t['id'], run_id)).fetchall():
                     self.runner.remove(repo, old['dir'])
                 wt = self.runner.worktree(repo, t['id'], run_id, start_ref, branch=branch)
+                # The base commit, for head-to-head re-runs from the same starting point.
+                self.con.execute('UPDATE runs SET base_sha=? WHERE id=?',
+                                 (self.runner.rev(repo, f'origin/{t["base"]}'), run_id))
                 prompt = worker.build_prompt(t, repo['name'], start_ref, check, run_dir / 'outcome.json', commands)
             else:
                 wt = self.runner.worktree(repo, t['id'], run_id, t['sha'])
@@ -351,8 +393,9 @@ class Loop:
         name = f'rw-{t["id"]}-{run_id}'
         line = worker.command(agent, run_dir / 'prompt.md', run_dir, wt, commands, session_id=session)
         self.runner.start(name, wt, line)
-        self.con.execute('UPDATE runs SET dir=?, tmux=?, session_id=?, sha=? WHERE id=?',
-                         (str(wt), name, session, t['sha'] if kind == 'review' else None, run_id))
+        self.con.execute('UPDATE runs SET dir=?, tmux=?, session_id=?, sha=?, branch=? WHERE id=?',
+                         (str(wt), name, session, t['sha'] if kind == 'review' else None,
+                          branch if kind == 'build' else None, run_id))
         if kind == 'build':
             db.update_ticket(self.con, t['id'], state='building', stage='build', branch=branch)
         where = 'in the cloud' if runner_name == 'Cloud' else f'on {runner_name}'

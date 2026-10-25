@@ -285,6 +285,16 @@ struct PlainBoxButtonStyle: ButtonStyle {
     }
 }
 
+/// The mock's amber Take back button.
+struct TakeBackButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.needsYouText)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Palette.needsYouFill.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(hex: 0xB07A2A)))
+    }
+}
+
 /// The mock's filled blue button.
 struct PrimaryButtonStyle: ButtonStyle {
     var small = false

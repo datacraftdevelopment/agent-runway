@@ -38,7 +38,23 @@ runway runs-on T-19 "Mac mini"         # pin a ticket to one runner; runway runs
 
 Then say what Runway printed.
 
-## Watching one run
+## Looking into one ticket
 
-`runway session T-15` prints the line that reopens it: `tmux attach` while it runs, `claude --resume` or
-`codex resume` after. Give the person the line; don't attach from here.
+```bash
+runway show T-15         # the ticket, its Acceptance lines and every run, with where each run's record is
+```
+
+Each run keeps its record in `~/.runway/runs/<ticket>/<n>/`: `outcome.json`, `transcript.jsonl` (the session's
+transcript), `reviews/` (both verdicts with notes) and the log. Read those to see what a run did.
+
+## Taking a ticket back, only when the person asks
+
+```bash
+runway take T-22         # stops its worker, keeps its branch and worktree, marks it taken back, prints a prompt
+runway take T-22 --prompt   # only the prompt, nothing else
+runway give T-22         # after the person's commits: pushes them and queues it again; both reviews run on them
+```
+
+Taking back never resumes or relaunches the old session. To finish a taken-back ticket, use the take-back skill: it
+ends every ticket with `runway give`, `runway done` (on the person's go) or `runway drop`, never leaving it taken
+back.

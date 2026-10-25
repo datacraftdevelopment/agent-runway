@@ -104,6 +104,100 @@ def cmd_status(con, a):
         print(f'{ag["kind"]}: ' + (f'resting until {ag["resting_until"]}' if ag['resting_until'] else 'available'))
 
 
+# ---- take back -----------------------------------------------------------------------------------------------
+
+def cmd_show(con, a):
+    from . import take
+    print(take.show(con, a.ticket))
+
+
+def cmd_take(con, a):
+    from . import take
+    if a.prompt:
+        print(take.prompt(con, a.ticket))       # nothing else: the app copies this
+        return
+    wt, branch = take.take(con, a.ticket)
+    print(f'{a.ticket} is taken back. Its worker is stopped; Runway leaves it alone until you give it back.')
+    print(f'worktree: {wt}')
+    print(f'branch:   {branch}')
+    print()
+    print(take.prompt(con, a.ticket))
+
+
+def cmd_give(con, a):
+    from . import take
+    head = take.give(con, a.ticket)
+    print(f'{a.ticket} is given back at {head[:7]}: it builds again from that commit, then both reviews run on it.')
+
+
+def cmd_bench(con, a):
+    from . import bench
+    results = bench.run(con, a.tickets, agents=a.agents.split(','), log=lambda m: print(m, flush=True))
+    if a.json:
+        out(results)
+        return
+    print()
+    for r in results:
+        cost = f'${r["cost_usd"]:.2f}' if r['cost_usd'] is not None else f'{r["tokens"] or 0} tokens'
+        print(f'{r["ticket"]:6} {r["agent"]:7} {r["result"]:5} {r["minutes"]:5} min  {cost}'
+              + (f'  ({r["why"]})' if r['why'] else ''))
+    print('Nothing was pushed; each run\'s record is in ~/.runway/bench/<ticket>/.')
+
+
+def cmd_retro(con, a):
+    """File a retro by hand: for the given reason, or the most frequent one in the last 7 days."""
+    from . import retro
+    repos = [a.repo] if a.repo else [r['name'] for r in con.execute('SELECT name FROM repos ORDER BY name')]
+    since = db.now() - retro.WINDOW_DAYS * 86400
+    for repo in repos:
+        reason = a.reason
+        if not reason:
+            row = con.execute("SELECT reason, COUNT(DISTINCT ticket) n FROM stops WHERE repo=? AND at >= ? AND reason "
+                              "NOT IN ('not_low_risk', 'taken_back') GROUP BY reason ORDER BY n DESC LIMIT 1",
+                              (repo, since)).fetchone()
+            if not row:
+                print(f'{repo}: nothing stopped in the last {retro.WINDOW_DAYS} days')
+                continue
+            reason = row['reason']
+        tid = retro.file(con, repo, reason, by_hand=True)
+        print(f'{repo}: filed {tid}, a retro for "{reason.replace("_", " ")}" (not low risk; it never merges itself)')
+
+
+def cmd_done(con, a):
+    from . import take
+    print(take.done(con, a.ticket, a.note))
+
+
+def cmd_drop(con, a):
+    from . import take
+    print(take.drop(con, a.ticket, a.reason))
+
+
+# ---- stats ---------------------------------------------------------------------------------------------------
+
+def cmd_stats(con, a):
+    from . import stats
+    snap = stats.snapshot(con, repo=a.repo, days=a.days)
+    if a.json:
+        out(snap)
+        return
+    scope = snap['by_repo'][0] if a.repo else snap['all']
+    for w in scope['windows']:
+        d = w['days']
+        rate = f'{w["hands_off_rate"]:.0%}' if w['hands_off_rate'] is not None else 'n/a'
+        c = w['cycle_minutes']
+        print(f'last {d} days: {w["hands_off"]} of {w["merged"]} merged hands-off ({rate}); '
+              f'cycle {c["hands_off"]} min hands-off, {c["rest"]} min the rest')
+        cost = w['cost_per_ticket']
+        for v in cost['by_agent']:
+            usd = f'${v["median_usd"]}' if v['median_usd'] is not None else 'no dollar cost reported'
+            print(f'  {v["agent"]}: {usd}, {v["median_tokens"]} tokens per ticket (median, {v["tickets"]} tickets)')
+        if w['stopped']:
+            print('  stopped: ' + ', '.join(f'{s["label"]} {s["count"]}' for s in w['stopped']))
+    for t in scope['waiting']:
+        print(f'waiting for you: {t["id"]} {t["title"]} ({t["label"]})')
+
+
 # ---- the person's decisions --------------------------------------------------------------------------------------
 
 def cmd_go(con, a):
@@ -139,25 +233,6 @@ def cmd_stop(con, a):
 def cmd_runs_on(con, a):
     from . import actions
     print(actions.runs_on(con, a.target, a.where))
-
-
-def cmd_session(con, a):
-    """Where a ticket's last run lives and the line that reopens it (the app's Open session)."""
-    db.ticket(con, a.ticket)
-    run = con.execute('SELECT * FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (a.ticket,)).fetchone()
-    if not run:
-        raise db.RunwayError(f'{a.ticket} has not run yet')
-    if run['ended_at'] is None and run['tmux']:
-        line = f'tmux attach -t {run["tmux"]}'
-    elif run['agent'] == 'claude' and run['session_id']:
-        line = f'claude --resume {run["session_id"]}'
-    elif run['agent'] == 'codex' and run['session_id']:
-        line = f'codex resume {run["session_id"]}'
-    else:
-        line = None
-    info = {'ticket': a.ticket, 'run': run['id'], 'kind': run['kind'], 'agent': run['agent'], 'runner': run['runner'],
-            'dir': run['dir'], 'live': run['ended_at'] is None, 'command': line}
-    out(info) if a.json else print(f'cd {run["dir"]} && {line}' if line else f'{run["dir"]} (no session to resume)')
 
 
 # ---- the loop and setup checks -----------------------------------------------------------------------------------
@@ -281,10 +356,6 @@ def parser():
     x.add_argument('target')
     x.add_argument('where')
     x.set_defaults(fn=cmd_runs_on)
-    x = sub.add_parser('session', help="where a ticket's last run is and how to reopen it")
-    x.add_argument('ticket')
-    x.add_argument('--json', action='store_true')
-    x.set_defaults(fn=cmd_session)
 
     x = sub.add_parser('loop', help='run the loop (the app starts this; one at a time)')
     x.add_argument('--every', type=int, default=15, help='seconds between ticks')
@@ -301,6 +372,39 @@ def parser():
     x = sub.add_parser('install-command', help='link runway into ~/.local/bin so Terminal finds it')
     x.add_argument('--to', help='another folder for the link')
     x.set_defaults(fn=cmd_install_command)
+
+    x = sub.add_parser('show', help='a ticket, its Acceptance lines and every run with where its record is')
+    x.add_argument('ticket')
+    x.set_defaults(fn=cmd_show)
+    x = sub.add_parser('take', help='take a ticket back: stop its worker, keep its branch, print a prompt')
+    x.add_argument('ticket')
+    x.add_argument('--prompt', action='store_true', help='print only the prompt, change nothing')
+    x.set_defaults(fn=cmd_take)
+    x = sub.add_parser('give', help='give a taken-back ticket back: push your commits, queue it again')
+    x.add_argument('ticket')
+    x.set_defaults(fn=cmd_give)
+    x = sub.add_parser('bench', help='head-to-head: re-run done tickets with each engine (never pushes)')
+    x.add_argument('tickets', nargs='+')
+    x.add_argument('--agents', default='claude,codex')
+    x.add_argument('--json', action='store_true')
+    x.set_defaults(fn=cmd_bench)
+    x = sub.add_parser('retro', help='file a retro ticket now for what keeps stopping tickets')
+    x.add_argument('--repo')
+    x.add_argument('--reason', help='a stop reason, e.g. check_failed_twice (default: the most frequent)')
+    x.set_defaults(fn=cmd_retro)
+    x = sub.add_parser('done', help="finish a ticket yourself: merge its PR (only on the person's go)")
+    x.add_argument('ticket')
+    x.add_argument('--note')
+    x.set_defaults(fn=cmd_done)
+    x = sub.add_parser('drop', help='drop a ticket: close its PR, remove its worktrees')
+    x.add_argument('ticket')
+    x.add_argument('--reason')
+    x.set_defaults(fn=cmd_drop)
+    x = sub.add_parser('stats', help='how hands-off it is: merges that needed nothing from you, cycle time, cost')
+    x.add_argument('--json', action='store_true', help='what the board strip reads')
+    x.add_argument('--repo')
+    x.add_argument('--days', type=int, help='one window instead of 7 and 30')
+    x.set_defaults(fn=cmd_stats)
 
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p

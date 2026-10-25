@@ -19,8 +19,11 @@ enum RenderMode {
         }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         write(MainWindow(model: model).frame(width: 1280, height: 800), "board", folder)
+        if model.source == .live { await model.refreshStats() }
         model.tab = .activity
         write(MainWindow(model: model).frame(width: 1280, height: 800), "activity", folder)
+        model.tab = .stats
+        write(MainWindow(model: model).frame(width: 1280, height: 800), "stats", folder)
         model.tab = .board
         write(SidePanel(model: model).frame(height: 640), "side-panel", folder)
         write(MenuBarContent(model: model).fixedSize(), "menu", folder)

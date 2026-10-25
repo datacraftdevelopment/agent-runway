@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 7
 
 MIGRATIONS = {
     1: """
@@ -118,6 +118,61 @@ MIGRATIONS = {
     ALTER TABLE tickets ADD COLUMN function_review TEXT;
     UPDATE runs SET role = 'code' WHERE kind = 'review';
     """,
+    # Hands-off features (Joe, 2026-10-25): what each run cost, when and by whom a ticket merged, take backs, and
+    # every stop that needed the person, with its reason.
+    4: """
+    ALTER TABLE runs ADD COLUMN tokens_in INTEGER;
+    ALTER TABLE runs ADD COLUMN tokens_out INTEGER;
+    ALTER TABLE runs ADD COLUMN cost_usd REAL;
+    ALTER TABLE runs ADD COLUMN base_sha TEXT;
+    ALTER TABLE tickets ADD COLUMN merged_at REAL;
+    ALTER TABLE tickets ADD COLUMN merged_by TEXT;
+    ALTER TABLE tickets ADD COLUMN taken INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tickets ADD COLUMN take_dir TEXT;
+    ALTER TABLE tickets ADD COLUMN kind TEXT NOT NULL DEFAULT 'work';
+    CREATE TABLE stops (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        at REAL NOT NULL,
+        reason TEXT NOT NULL,
+        run INTEGER,
+        detail TEXT
+    );
+    """,
+    # Take back (Joe, 2026-10-25): every run keeps enough for a new session to read what it did: its folder
+    # (~/.runway/runs/<ticket>/<n>/), branch, the last stage it reached and a link to its transcript.
+    5: """
+    ALTER TABLE runs ADD COLUMN run_dir TEXT;
+    ALTER TABLE runs ADD COLUMN branch TEXT;
+    ALTER TABLE runs ADD COLUMN stage TEXT;
+    ALTER TABLE runs ADD COLUMN transcript TEXT;
+    """,
+    # Retros (Joe, 2026-10-25): why one was filed, and the runs behind it, for its PR's "Runs behind this".
+    6: """
+    ALTER TABLE tickets ADD COLUMN retro_reason TEXT;
+    ALTER TABLE tickets ADD COLUMN retro_runs TEXT;
+    """,
+    # Head-to-head (Joe, 2026-10-25): re-runs of done tickets from their base commit, one row per engine.
+    7: """
+    CREATE TABLE bench (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket TEXT NOT NULL,
+        agent TEXT NOT NULL,
+        base_sha TEXT,
+        started_at REAL NOT NULL,
+        ended_at REAL,
+        result TEXT,
+        minutes REAL,
+        tokens_in INTEGER,
+        tokens_out INTEGER,
+        cost_usd REAL,
+        detail TEXT,
+        check_output TEXT,
+        run_dir TEXT,
+        worktree TEXT
+    );
+    """,
 }
 
 # Ticket states and the board column and stage each shows as.
@@ -128,6 +183,7 @@ STATES = {
     'reviewing': ('running', 'review'),
     'merging': ('running', 'merge'),
     'needs_you': ('needs_you', None),
+    'taken': ('needs_you', None),       # taken back by the person: waits in Needs you until given back
     'done': ('done', None),
     'dropped': ('done', None),
 }
@@ -167,6 +223,57 @@ def migrate(con):
                           + f"\nINSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{v}');\nCOMMIT;")
     if version == 0:
         seed(con)
+    else:
+        if version < 4 <= SCHEMA_VERSION:
+            backfill_v4(con)
+        if version < 5 <= SCHEMA_VERSION:
+            backfill_v5(con)
+
+
+def backfill_v5(con):
+    """Runs from before version 5: the last stage they reached, from their outcome, and their transcript linked into
+    their folder, so take back's prompt and runway show can point at them."""
+    from . import worker
+    stage = {'done': 'reviews', 'pass': 'review done', 'fail': 'review done', 'failed': 'failed',
+             'limited': 'usage limit', 'needs_you': 'asked a question'}
+    for r in con.execute('SELECT * FROM runs WHERE run_dir IS NULL').fetchall():
+        folder = home() / 'runs' / str(r['id'])
+        transcript = None
+        if folder.exists():
+            transcript = worker.link_transcript(r['agent'], r['session_id'], folder)
+        con.execute('UPDATE runs SET stage=COALESCE(stage, ?), transcript=COALESCE(transcript, ?) WHERE id=?',
+                    (stage.get(r['outcome'] or '', r['outcome'] or r['kind']), transcript, r['id']))
+
+
+def backfill_v4(con):
+    """Existing databases: merges and stops from the event log, tokens and cost from each run's own log."""
+    from . import worker
+    for e in con.execute("SELECT ticket, at, text FROM events WHERE kind='merged' AND ticket IS NOT NULL ORDER BY id"):
+        con.execute('UPDATE tickets SET merged_at=?, merged_by=? WHERE id=? AND merged_at IS NULL',
+                    (e['at'], 'you' if 'merged by you' in e['text'] else 'gate', e['ticket']))
+    for e in con.execute("SELECT e.ticket, e.at, e.text, t.repo FROM events e JOIN tickets t ON t.id = e.ticket "
+                         "WHERE e.kind='needs_you' ORDER BY e.id"):
+        con.execute('INSERT INTO stops(ticket, repo, at, reason, detail) VALUES (?, ?, ?, ?, ?)',
+                    (e['ticket'], e['repo'], e['at'], reason_from_text(e['text']), e['text']))
+    for r in con.execute('SELECT id, agent FROM runs WHERE cost_usd IS NULL AND tokens_in IS NULL'):
+        log = home() / 'runs' / str(r['id']) / 'log'
+        if log.exists():
+            tin, tout, cost = worker.usage(r['agent'], log.read_text(errors='replace'))
+            con.execute('UPDATE runs SET tokens_in=?, tokens_out=?, cost_usd=? WHERE id=?', (tin, tout, cost, r['id']))
+
+
+def reason_from_text(text):
+    """An old needs-you event's reason, from its wording."""
+    t = text.lower()
+    if 'not low risk' in t:
+        return 'not_low_risk'
+    if 'sensitive paths' in t:
+        return 'sensitive_path'
+    if ' asked: ' in t:
+        return 'worker_question'
+    if 'failed twice' in t:
+        return 'failed_twice'
+    return 'other'
 
 
 def seed(con):
@@ -196,6 +303,15 @@ def set_meta(con, key, value):
 def event(con, kind, text, repo=None, ticket=None):
     con.execute('INSERT INTO events(at, kind, repo, ticket, text) VALUES (?, ?, ?, ?, ?)',
                 (now(), kind, repo, ticket, text))
+
+
+def run_dir(con, run):
+    """A run's folder: ~/.runway/runs/<ticket>/<n>/ (runs from before version 5: ~/.runway/runs/<id>/)."""
+    if isinstance(run, int):
+        run = con.execute('SELECT * FROM runs WHERE id=?', (run,)).fetchone()
+    path = Path(run['run_dir']) if run['run_dir'] else home() / 'runs' / str(run['id'])
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def next_ticket_id(con):

@@ -43,6 +43,10 @@ class LocalRunner:
             git('worktree', 'add', '--force', '--detach', str(wt), ref, cwd=path)
         return wt
 
+    def rev(self, repo, ref):
+        res = git('rev-parse', '--verify', '--quiet', ref, cwd=repo['path'], check=False)
+        return res.stdout.strip() or None
+
     def has_ref(self, repo, ref):
         return git('rev-parse', '--verify', '--quiet', ref, cwd=repo['path'], check=False).returncode == 0
 
