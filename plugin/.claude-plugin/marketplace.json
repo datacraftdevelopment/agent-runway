@@ -2,7 +2,7 @@
   "name": "agent-runway",
   "owner": {
     "name": "DataCraft Development",
-    "url": "https://agentrunway.dev"
+    "url": "https://agentrunway.app"
   },
   "description": "Agent Runway: file tickets from a normal Claude Code or Codex session; Runway runs them headless, has the other agent review them, and merges the low-risk ones.",
   "plugins": [
