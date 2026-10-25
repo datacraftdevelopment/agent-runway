@@ -59,14 +59,22 @@ repo with its test command.
 
 ## The skills
 
-The plugin in [`plugin/agent-runway`](plugin/agent-runway) works in both Claude Code and Codex. The app installs it.
+The plugin in [`plugin/agent-runway`](plugin/agent-runway) works in both Claude Code and Codex. The app installs it on
+first run, and it is the only plugin Runway needs.
 
 | Skill | What it does |
 | --- | --- |
+| `map` | Charts work too big for one session as a map of decisions, settled one at a time across sessions. |
+| `grill` | Interviews you about the plan, one question at a time, until nothing that changes the build is open. |
+| `prototype` | Builds a throwaway to settle one design question by seeing it. |
+| `spec` | Writes the spec: what it does, what it leaves out, its risk, and acceptance checks. |
 | `file-tickets` | Proposes a short batch of tickets from your session and files them on your go. |
 | `runway` | What's running, what needs you, pause and resume, go or no on a waiting ticket. |
 | `setup` | Checks this Mac's tools and sign-ins, walks you through each fix, adds a first repo. |
 | `take-back` | Brings a stuck ticket into your session to finish, then hands it back or closes it. |
+
+The shaping skills (map, grill, prototype, spec) are inspired by Matt Pocock's open
+[skills](https://github.com/mattpocock/skills); Runway's versions are written for unattended tickets.
 
 ## Repository
 

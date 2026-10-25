@@ -191,7 +191,7 @@ final class AppModel {
         guard let cli else { return }
         let alert = NSAlert()
         alert.messageText = "Add Runway's skills to Claude Code and Codex?"
-        alert.informativeText = "Runway adds its plugin, agent-runway (file-tickets, runway, setup), through each "
+        alert.informativeText = "Runway adds its plugin, agent-runway (map, grill, prototype, spec, file-tickets, runway, setup, take-back), through each "
             + "agent's own plugin commands: claude plugin install and codex plugin add, from the copy inside this app. "
             + "You can remove it the same way (claude plugin uninstall / codex plugin remove)."
         alert.addButton(withTitle: "Add the skills")
