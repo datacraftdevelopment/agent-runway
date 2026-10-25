@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import db, gate, limits, worker
+from . import db, gate, limits, retro, worker
 from .github import GitHub
 from .runner import LocalRunner
 
@@ -42,6 +42,8 @@ class Loop:
             self.settle(run)
         for t in self.con.execute("SELECT * FROM tickets WHERE state='merging' ORDER BY filed_at").fetchall():
             self.try_gate(t)
+        for tid in retro.check(self.con, self.runner.config):
+            self.log(f'filed retro {tid}')
         self.dispatch()
         db.set_meta(self.con, 'loop_at', db.now())
 
@@ -113,6 +115,8 @@ class Loop:
         if not pr:
             body = (f'Runway ticket {t["id"]}, built by {NAMES[run["agent"]]} on {run["runner"]}.\n\n'
                     f'{t["body"]}\n\n## Acceptance\n\n{worker.acceptance_lines(t)}\n\n## Worker summary\n\n{summary}')
+            if t['kind'] == 'retro':
+                body += '\n\n' + retro.runs_behind_section(json.loads(t['retro_runs'] or '[]'))
             pr = self.github.create_pr(repo['path'], t['base'], branch, f'{t["id"]}: {t["title"]}', body)
         db.update_ticket(self.con, t['id'], state='reviewing', stage='review', sha=sha, branch=branch, pr=pr,
                          review=None, function_review=None, note=None)

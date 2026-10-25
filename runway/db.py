@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 MIGRATIONS = {
     1: """
@@ -147,6 +147,11 @@ MIGRATIONS = {
     ALTER TABLE runs ADD COLUMN branch TEXT;
     ALTER TABLE runs ADD COLUMN stage TEXT;
     ALTER TABLE runs ADD COLUMN transcript TEXT;
+    """,
+    # Retros (Joe, 2026-10-25): why one was filed, and the runs behind it, for its PR's "Runs behind this".
+    6: """
+    ALTER TABLE tickets ADD COLUMN retro_reason TEXT;
+    ALTER TABLE tickets ADD COLUMN retro_runs TEXT;
     """,
 }
 

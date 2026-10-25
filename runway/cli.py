@@ -130,6 +130,25 @@ def cmd_give(con, a):
     print(f'{a.ticket} is given back at {head[:7]}: it builds again from that commit, then both reviews run on it.')
 
 
+def cmd_retro(con, a):
+    """File a retro by hand: for the given reason, or the most frequent one in the last 7 days."""
+    from . import retro
+    repos = [a.repo] if a.repo else [r['name'] for r in con.execute('SELECT name FROM repos ORDER BY name')]
+    since = db.now() - retro.WINDOW_DAYS * 86400
+    for repo in repos:
+        reason = a.reason
+        if not reason:
+            row = con.execute("SELECT reason, COUNT(DISTINCT ticket) n FROM stops WHERE repo=? AND at >= ? AND reason "
+                              "NOT IN ('not_low_risk', 'taken_back') GROUP BY reason ORDER BY n DESC LIMIT 1",
+                              (repo, since)).fetchone()
+            if not row:
+                print(f'{repo}: nothing stopped in the last {retro.WINDOW_DAYS} days')
+                continue
+            reason = row['reason']
+        tid = retro.file(con, repo, reason, by_hand=True)
+        print(f'{repo}: filed {tid}, a retro for "{reason.replace("_", " ")}" (not low risk; it never merges itself)')
+
+
 # ---- stats ---------------------------------------------------------------------------------------------------
 
 def cmd_stats(con, a):
@@ -340,6 +359,10 @@ def parser():
     x = sub.add_parser('give', help='give a taken-back ticket back: push your commits, queue it again')
     x.add_argument('ticket')
     x.set_defaults(fn=cmd_give)
+    x = sub.add_parser('retro', help='file a retro ticket now for what keeps stopping tickets')
+    x.add_argument('--repo')
+    x.add_argument('--reason', help='a stop reason, e.g. check_failed_twice (default: the most frequent)')
+    x.set_defaults(fn=cmd_retro)
     x = sub.add_parser('stats', help='how hands-off it is: merges that needed nothing from you, cycle time, cost')
     x.add_argument('--json', action='store_true', help='what the board strip reads')
     x.add_argument('--repo')

@@ -70,7 +70,9 @@ class FakeGitHub:
         self.merged = []
 
     def create_pr(self, path, base, branch, title, body):
+        self.bodies = getattr(self, 'bodies', {})
         n = len(self.prs) + 1
+        self.bodies[n] = body
         self.prs[n] = {'number': n, 'state': 'OPEN', 'headRefOid': 'a1b2c3d4e5f6a7b8c9d0', 'files': [{'path': 'tally/x.py'}]}
         return n
 

@@ -162,6 +162,15 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var taken: Bool?
     /// "work", or "retro" for a ticket Runway filed itself after repeated stops.
     public var kind: String?
+    /// For a retro: the failing runs behind it.
+    public var retroRuns: [RetroRun]?
+
+    public struct RetroRun: Codable, Equatable, Sendable {
+        public var ticket: String
+        public var title: String
+        public var prUrl: String?
+        public var record: String?
+    }
     public var question: Question?
     /// Where it was filed from: "Claude Code on this Mac".
     public var filedFrom: String

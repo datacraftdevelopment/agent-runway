@@ -130,6 +130,7 @@ private struct Inspector: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         Spacer()
+        if let runs = ticket.retroRuns, !runs.isEmpty { runsBehind(runs) }
         if let prompt = model.takePrompts[ticket.id] { takePrompt(prompt) }
         if ticket.column != .done {
             HStack(spacing: 8) {
@@ -146,6 +147,26 @@ private struct Inspector: View {
                 .help("Pushes your commits and queues it again; both reviews run on your commit")
             }
         }
+    }
+
+    /// A retro's failing runs, each linked to its PR when it has one.
+    private func runsBehind(_ runs: [Ticket.RetroRun]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            SectionHeading(text: "Runs behind this", color: Color(hex: 0xD5B3FF))
+            ForEach(runs, id: \.ticket) { run in
+                if let url = run.prUrl.flatMap(URL.init(string:)) {
+                    Link("\(run.ticket) · \(run.title)", destination: url).foregroundStyle(Palette.link)
+                } else {
+                    Text("\(run.ticket) · \(run.title)").foregroundStyle(Palette.textSoft)
+                        .help(run.record ?? "")
+                }
+            }
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex: 0x2D2140), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color(hex: 0x4B3570)))
     }
 
     private func takePrompt(_ prompt: String) -> some View {
