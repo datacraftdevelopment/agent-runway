@@ -77,5 +77,5 @@ the feed too, and Sparkle will offer to replace it with the newest release. Run 
 The DMG shows Runway beside an Applications shortcut to drag it onto. Opened from anywhere else (Downloads, the
 disk image itself), Runway offers to move itself into Applications and reopen, because Sparkle can't update a copy
 that macOS has translocated or that sits on a read-only disk image. `RUNWAY_NO_MOVE=1` skips the offer; developer
-builds in `build/` never ask. The icon is `icon/AppIcon.png` (1024 px, rendered from `icon/AppIcon.svg`);
+builds in `build/` never ask. The icon is `icon/AppIcon.png` (1024 px, cut to the macOS tile shape from the artwork in `icon/AppIcon-source.png`);
 `make-app.sh` turns it into `AppIcon.icns`.
