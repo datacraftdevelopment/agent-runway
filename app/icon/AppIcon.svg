@@ -1,13 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs><linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#5aa9ff"/><stop offset=".55" stop-color="#7d7bf2"/><stop offset="1" stop-color="#ff9a6b"/></linearGradient>
-  <linearGradient id="pg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff8a5c"/><stop offset="1" stop-color="#7f8cff"/></linearGradient></defs>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
-  <g transform="translate(512 470) rotate(-28) scale(1.55)" fill="#ffffff">
-    <path d="M-150 -14 L110 -14 C150 -14 170 -4 170 0 C170 4 150 14 110 14 L-150 14 Z"/>
-    <path d="M10 -12 L-50 -150 L-15 -150 L70 -12 Z"/>
-    <path d="M10 12 L-50 150 L-15 150 L70 12 Z"/>
-    <path d="M-120 -12 L-160 -70 L-135 -70 L-90 -12 Z"/>
-    <path d="M-120 12 L-160 70 L-135 70 L-90 12 Z"/>
-  </g>
-  <rect opacity=".6" x="250" y="745" width="524" height="40" rx="20" fill="#ffffff"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#5aa9ff"/><stop offset=".55" stop-color="#7d7bf2"/><stop offset="1" stop-color="#ff9a6b"/></linearGradient></defs><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/><g transform="translate(522 470) rotate(-24) scale(1.45)"><g fill="#fff">
+<path d="M-178 -24 L-212 -128 C-215 -137 -200 -142 -193 -135 L-112 -34 Z"/>
+<path d="M-205 -4 C-205 -26 -192 -40 -168 -40 H130 C182 -40 222 -24 236 -6 C241 2 234 12 220 14 C196 18 166 22 140 22 H-170 C-192 22 -205 12 -205 -4 Z"/>
+<path d="M-150 4 L-212 46 C-218 51 -206 58 -198 54 L-112 14 Z"/>
+<path d="M-20 0 L-96 132 C-101 141 -82 146 -73 139 L84 10 Z"/>
+<rect x="-26" y="38" width="66" height="24" rx="12"/>
+</g></g><rect opacity=".6" x="250" y="770" width="524" height="38" rx="19" fill="#fff"/></svg>
