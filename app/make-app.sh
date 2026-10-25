@@ -131,7 +131,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSHumanReadableCopyright</key><string>Copyright 2026 DataCraft Development. Agent Runway, https://agentrunway.dev</string>
+  <key>NSHumanReadableCopyright</key><string>Copyright 2026 DataCraft Development. Agent Runway, https://agentrunway.app</string>
 $SPARKLE_KEYS
 </dict>
 </plist>
