@@ -191,7 +191,7 @@ def skills_status():
     elif not present:
         note = 'Install Claude Code or Codex first; the skills go into whichever you use.'
     elif all(status[a] for a in present):
-        note = 'file-tickets, runway, setup and take-back are in ' + ' and '.join(names[a] for a in present) + '.'
+        note = 'The Agent Runway skills are in ' + ' and '.join(names[a] for a in present) + '.'
     else:
         missing = ' and '.join(names[a] for a in present if not status[a])
         note = f'Not in {missing} yet: runway install-skills adds them.'

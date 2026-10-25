@@ -37,6 +37,7 @@ img{max-width:100%;height:auto;display:block}
 a{color:inherit}
 .wrap{max-width:1040px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px))}
 .narrow{max-width:720px}
+.credit{font-size:14px;color:var(--muted);border-top:1px solid var(--line, rgba(127,127,127,.25));padding-top:20px}
 h1,h2,h3{font-family:var(--display);line-height:1.05;margin:0;text-wrap:balance}
 h2{font-size:clamp(32px,5vw,46px);font-weight:800}
 h3{font-size:23px;font-weight:600;letter-spacing:.01em}
@@ -188,14 +189,14 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow stack">
-    <p>You don't have to design a workflow: this is the one Runway comes with. The skills come in two sets. The <b>shaping skills</b> are Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>, MIT). Runway was built around how they work, and you install them yourself. The <b>Agent Runway skills</b> come with the app, are installed on first run, and work in both Claude Code and Codex.</p>
+    <p>You don't have to design a workflow: this is the one Runway comes with. Every skill on this page is part of the Agent Runway plugin. The app installs it on first run, in Claude Code and Codex alike, so there is nothing else to add.</p>
 
     <div class="stage">
       <div><span class="who">You + your agent</span><h3>1 · Discover</h3></div>
       <div>
         <p>Work out what you actually want before anything is built. This is where your judgment does the most good, so take as long as it needs.</p>
-        <div class="skill"><header><code>wayfinder</code><span class="src">Matt Pocock</span></header><p>For work too big for one session. It charts a map of the decisions that have to be made, then works through them one at a time until the way is clear.</p></div>
-        <div class="skill"><header><code>grill-me</code><span class="src">Matt Pocock</span></header><p>Your agent interviews you about the plan until every branch is settled. <code>grill-with-docs</code> does the same while it builds the project's glossary and decision records.</p></div>
+        <div class="skill"><header><code>map</code><span class="src">Agent Runway</span></header><p>For work too big for one session. It charts the decisions that have to be made, in the order they can be made, and keeps the map in your repo so any later session picks up where the last one stopped. It ends in a list of chunks, each small enough to spec.</p></div>
+        <div class="skill"><header><code>grill</code><span class="src">Agent Runway</span></header><p>Your agent interviews you about the plan, one question at a time with its recommended answer, until every branch is settled. An unattended worker can't ask what you meant, so this is where those questions get answered.</p></div>
       </div>
     </div>
 
@@ -203,7 +204,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <div><span class="who">You + your agent</span><h3>2 · Prototype</h3></div>
       <div>
         <p>When seeing beats reading, answer the question with something you can click.</p>
-        <div class="skill"><header><code>prototype</code><span class="src">Matt Pocock</span></header><p>Builds a throwaway prototype, often one HTML file or a few UI variants side by side, to settle a design question. It gets thrown away. The answer is what you keep.</p></div>
+        <div class="skill"><header><code>prototype</code><span class="src">Agent Runway</span></header><p>Builds a throwaway prototype, often one HTML file or a few UI variants side by side, to settle a design question. It gets thrown away. The answer is what you keep.</p></div>
       </div>
     </div>
 
@@ -211,7 +212,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <div><span class="who">You + your agent</span><h3>3 · Spec</h3></div>
       <div>
         <p>Write down what done looks like, in a form an unattended agent can check.</p>
-        <div class="skill"><header><code>to-spec</code><span class="src">Matt Pocock</span></header><p>Turns the conversation into a spec, without starting a new interview. The acceptance checks in it become the tickets' checks.</p></div>
+        <div class="skill"><header><code>spec</code><span class="src">Agent Runway</span></header><p>Turns the conversation into a spec in your repo, without starting a new interview: what it does, what it leaves out, its risk, and acceptance checks that say how to verify each one. Those checks become the tickets' checks.</p></div>
       </div>
     </div>
 
@@ -219,7 +220,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <div><span class="who">You type go</span><h3>4 · Tickets</h3></div>
       <div>
         <p>This is the hand-off point. After your go, nobody needs to watch.</p>
-        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It files only after you type go, and a changed batch needs a fresh go. It does the job of Matt's <code>to-tickets</code>, but it files straight into Runway.</p></div>
+        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It files only after you type go, and a changed batch needs a fresh go.</p></div>
       </div>
     </div>
 
@@ -264,6 +265,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <h3>Why the line sits where it does</h3>
       <p>Everything above step 4 is judgment: what to build, what done means, and how risky it is. Runway leaves that to you, because a wrong spec builds the wrong thing very efficiently. Everything below step 4 is careful repetition, and Runway does it without you.</p>
     </div>
+    <p class="credit">The shaping steps are inspired by Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>), the way of working Runway was built around. Runway's versions are its own, written to hand work to unattended tickets.</p>
   </div>
 </section>
 </main>
