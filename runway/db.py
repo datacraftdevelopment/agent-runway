@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 MIGRATIONS = {
     1: """
@@ -107,6 +107,10 @@ MIGRATIONS = {
         github TEXT NOT NULL DEFAULT 'checking',
         at REAL
     );
+    """,
+    # The check command first run asks for, used when the repo has no runway.json saying one.
+    2: """
+    ALTER TABLE repos ADD COLUMN check_cmd TEXT;
     """,
 }
 

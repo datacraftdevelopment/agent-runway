@@ -1,0 +1,27 @@
+{
+  "command": {
+    "link": "/Users/you/.local/bin/runway",
+    "link_dir_on_path": false,
+    "linked": false,
+    "path": "/Applications/Runway.app/Contents/Resources/cli/bin/runway"
+  },
+  "database": "/Users/you/.runway/runway.db",
+  "ready": false,
+  "repos": [],
+  "signins": [
+    { "fix": null, "label": "Claude Code", "name": "claude", "ok": true },
+    { "fix": "install codex first", "label": "Codex", "name": "codex", "ok": false },
+    { "fix": "gh auth login", "label": "GitHub", "name": "github", "ok": false }
+  ],
+  "skills": {
+    "built": false,
+    "note": "The Runway skills (file tickets from a normal Claude Code or Codex session, guided setup) are not built yet. Until they are, file tickets with: runway file"
+  },
+  "tools": [
+    { "fix": null, "name": "git", "ok": true, "path": "/usr/bin/git", "why": "worktrees and commits" },
+    { "fix": null, "name": "gh", "ok": true, "path": "/opt/homebrew/bin/gh", "why": "pull requests and merges" },
+    { "fix": null, "name": "tmux", "ok": true, "path": "/opt/homebrew/bin/tmux", "why": "keeps runs going when the app closes" },
+    { "fix": null, "name": "claude", "ok": true, "path": "/Users/you/.local/bin/claude", "why": "Claude Code, a worker and reviewer" },
+    { "fix": "npm install -g @openai/codex", "name": "codex", "ok": false, "path": null, "why": "Codex, a worker and reviewer" }
+  ]
+}

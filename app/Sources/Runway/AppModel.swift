@@ -151,6 +151,106 @@ final class AppModel {
         }
     }
 
+    // MARK: First run
+
+    /// The last `runway doctor --json`, and whether a check is running.
+    private(set) var setup: SetupReport?
+    private(set) var checking = false
+    /// A folder the person picked as their first repo, with what Runway guessed about it.
+    var pendingRepo: RepoSuggestion?
+    var pendingCheck = ""
+    private(set) var setupMessage: String?
+
+    /// True when the app should open on the setup screen: live, and no repo watched yet.
+    var needsSetup: Bool { source == .live && (status?.repos.isEmpty ?? true) }
+
+    func runDoctor() {
+        guard let cli else { return setupMessage = "Sample data: no runway command to check with" }
+        checking = true
+        Task {
+            let result = await cli.run(["doctor", "--json"])
+            checking = false
+            if let report = try? SetupReport.decode(Data(result.output.utf8)) {
+                setup = report
+                setupMessage = nil
+            } else {
+                setupMessage = "The check didn't finish: " + (result.error.isEmpty ? "no report" : result.error)
+            }
+            await refresh()
+        }
+    }
+
+    /// Asks first: the link is the one thing first run writes outside the app and ~/.runway.
+    func installCommand() {
+        guard let cli, let setup else { return }
+        let alert = NSAlert()
+        alert.messageText = "Make runway available in Terminal?"
+        alert.informativeText = "Runway adds one link, \(setup.command.link), pointing at the runway command inside "
+            + "this app. Nothing else is changed, and nothing is replaced: if a file is already there, Runway stops "
+            + "and says so."
+            + (setup.command.linkDirOnPath ? "" : "\n\nThat folder isn't on your PATH yet; Runway will show the line "
+               + "that adds it.")
+        alert.addButton(withTitle: "Add the link")
+        alert.addButton(withTitle: "Not now")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task {
+            let result = await cli.run(["install-command"])
+            setupMessage = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+            runDoctor()
+        }
+    }
+
+    /// A folder picker for the first repo; Runway then guesses its name, GitHub repo and check command.
+    func chooseRepo() {
+        guard let cli else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        panel.message = "Pick the local clone of a GitHub repo for Runway to work on."
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        chooseRepo(at: url.path)
+    }
+
+    func chooseRepo(at path: String) {
+        guard let cli else { return }
+        Task {
+            let result = await cli.run(["repo", "suggest-check", path])
+            guard let suggestion = try? RepoSuggestion.decode(Data(result.output.utf8)) else {
+                setupMessage = "Couldn't read that folder: \(result.error)"
+                return
+            }
+            pendingRepo = suggestion
+            pendingCheck = suggestion.check ?? ""
+            setupMessage = nil
+        }
+    }
+
+    func addPendingRepo() {
+        guard let cli, let repo = pendingRepo else { return }
+        var args = ["repo", "add", repo.path]
+        let check = pendingCheck.trimmingCharacters(in: .whitespaces)
+        if !check.isEmpty { args += ["--check", check] }
+        Task {
+            let result = await cli.run(args)
+            setupMessage = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+            if result.status == 0 {
+                pendingRepo = nil
+                select(repo: repo.name)
+            }
+            runDoctor()
+        }
+    }
+
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        setupMessage = "Copied: \(text)"
+    }
+
     func openPR(_ ticket: Ticket) {
         guard let url = ticket.prUrl.flatMap(URL.init(string:)) else { return act("No PR link for \(ticket.id)") }
         NSWorkspace.shared.open(url)
