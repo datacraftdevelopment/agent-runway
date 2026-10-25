@@ -6,7 +6,8 @@ One tick:
   1. finish what ended: read each finished run's outcome; commit, check, push and open the PR for a build, record the
      verdict for a review; a usage limit rests that agent and puts the ticket back without spending its fix pass.
   2. gate what passed review: merge on its own only when the gate says so, else ask the person.
-  3. start what the free slots allow: builds for ready tickets, reviews by the other agent for built ones.
+  3. start what the free slots allow: builds for ready tickets, reviews for built ones (by the other engine when
+     there is one, else by the same engine in a fresh session).
 """
 
 import fcntl
@@ -84,7 +85,7 @@ class Loop:
             text = q + (f' Recommended: {rec}' if rec else '')
             return self.ask(t, 'question', text, short=shorten(q),
                             go_label='Use recommended' if rec else 'Go', no_label='Answer differently',
-                            log=f'{t["id"]} asked: {shorten(q, 80)}')
+                            log=f'{t["id"]} asked: {shorten(q, 80)}', reason='worker_question')
         if status != 'done':
             self.end(run, 'failed')
             why = summary or f'the worker ended without an outcome (exit {read(run_dir / "exit").strip() or "?"})'
@@ -98,7 +99,7 @@ class Loop:
         ok, output = self.runner.check(run['dir'], check_command(repo, cfg))
         if not ok:
             self.end(run, 'failed')
-            return self.failed(t, f'the check failed after the build: {output[-600:]}')
+            return self.failed(t, f'the check failed after the build: {output[-600:]}', reason='check')
         branch = t['branch'] or f'rw/{t["id"]}'
         self.runner.push(run['dir'], branch)
         self.end(run, 'done', sha=sha)
@@ -108,42 +109,71 @@ class Loop:
                     f'{t["body"]}\n\n## Acceptance\n\n{worker.acceptance_lines(t)}\n\n## Worker summary\n\n{summary}')
             pr = self.github.create_pr(repo['path'], t['base'], branch, f'{t["id"]}: {t["title"]}', body)
         db.update_ticket(self.con, t['id'], state='reviewing', stage='review', sha=sha, branch=branch, pr=pr,
-                         review=None, note=None)
+                         review=None, function_review=None, note=None)
         db.event(self.con, 'start', f'{t["id"]} built by {NAMES[run["agent"]]}, check passed; PR #{pr}',
                  repo=t['repo'], ticket=t['id'])
 
     def settle_review(self, t, run, run_dir):
+        """One of the two reviews ended. Both must pass on the same head commit for the gate; either one failing
+        stops the other and spends the fix pass."""
+        role = run['role'] or 'code'
+        label = {'code': 'Code review', 'function': 'Function review'}[role]
         verdict = read_json(run_dir / 'review.json')
         name = NAMES[run['agent']]
         v = (verdict.get('verdict') or '').lower()
         if v not in ('pass', 'fail'):
             self.end(run, 'failed')
-            return self.failed(t, f'{name} ended its review without a verdict')
+            self.stop_reviews(t, but=run['id'])
+            return self.failed(t, f'{name} ended its {label.lower()} without a verdict', reason=f'{role}_review')
+        findings = list(verdict.get('findings') or [])
+        if role == 'function':
+            findings = worker.function_findings(verdict) + findings
+            if findings:
+                v = 'fail'
         if not str(verdict.get('sha') or '').startswith((run['sha'] or 'x')[:7]) or run['sha'] != t['sha']:
             v = 'fail'
-            verdict.setdefault('findings', []).append('the verdict is not for the commit under review')
+            findings.append('the verdict is not for the commit under review')
         raised = (verdict.get('risk') or '').replace('-', '_') == 'not_low' and t['risk'] == 'low'
-        review = f'{name}: {v}' + (', risk raised' if raised else '')
+        builder = self.con.execute("SELECT agent FROM runs WHERE ticket=? AND kind='build' AND outcome='done' "
+                                   "ORDER BY id DESC LIMIT 1", (t['id'],)).fetchone()
+        same = builder is not None and builder['agent'] == run['agent']
+        text = f'{name}{" (fresh session)" if same else ""}: {v}' + (', risk raised' if raised else '')
         self.end(run, v, sha=run['sha'])
-        findings = verdict.get('findings') or []
-        db.event(self.con, 'review', f'{t["id"]} {name}: {v} on {run["sha"][:7]}' + (' (risk raised)' if raised else ''),
-                 repo=t['repo'], ticket=t['id'])
-        fields = {'review': review}
+        db.event(self.con, 'review', f'{t["id"]} {label.lower()} by {name}: {v} on {run["sha"][:7]}'
+                 + (' (risk raised)' if raised else ''), repo=t['repo'], ticket=t['id'])
+        fields = {'review' if role == 'code' else 'function_review': text}
         if raised:
             fields['risk'] = 'not_low'
-        if v == 'pass':
-            db.update_ticket(self.con, t['id'], state='merging', stage='merge', **fields)
-            return self.try_gate(db.ticket(self.con, t['id']))
+        if v == 'fail':
+            db.update_ticket(self.con, t['id'], **fields)
+            self.stop_reviews(t, but=run['id'])
+            notes = '\n'.join(f'- {f}' for f in findings) or (verdict.get('summary') or 'no findings given')
+            return self.failed(db.ticket(self.con, t['id']), f'{name} failed the {label.lower()}:\n{notes}',
+                               reason=f'{role}_review')
         db.update_ticket(self.con, t['id'], **fields)
-        notes = '\n'.join(f'- {f}' for f in findings) or (verdict.get('summary') or 'no findings given')
-        self.failed(db.ticket(self.con, t['id']), f'{name} failed the review:\n{notes}')
+        t = db.ticket(self.con, t['id'])
+        if all(self.passed(t, r) for r in worker.ROLES):
+            db.update_ticket(self.con, t['id'], state='merging', stage='merge')
+            return self.try_gate(db.ticket(self.con, t['id']))
+
+    def passed(self, t, role):
+        """Whether this role's latest review of the ticket's current head commit passed."""
+        row = self.con.execute("SELECT outcome FROM runs WHERE ticket=? AND kind='review' AND role=? AND sha=? "
+                               "AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 1", (t['id'], role, t['sha'])).fetchone()
+        return bool(row and row['outcome'] == 'pass')
+
+    def stop_reviews(self, t, but=None):
+        for r in self.con.execute("SELECT * FROM runs WHERE ticket=? AND kind='review' AND ended_at IS NULL AND id != ?",
+                                  (t['id'], but or -1)).fetchall():
+            self.runner.stop(r['tmux'])
+            self.end(r, 'cancelled')
 
     def end(self, run, outcome, sha=None):
         self.con.execute('UPDATE runs SET ended_at=?, outcome=?, sha=COALESCE(?, sha) WHERE id=?',
                          (db.now(), outcome, sha, run['id']))
 
-    def failed(self, t, why):
-        """A fix pass if one is left, else the person."""
+    def failed(self, t, why, reason='build'):
+        """A fix pass if one is left, else the person. `reason` is why it stopped, for the stats."""
         if t['fix_passes'] < FIX_PASSES:
             db.update_ticket(self.con, t['id'], state='queued', stage=None, fix_passes=t['fix_passes'] + 1,
                              note=f'This is a fix pass. Last time: {why}')
@@ -152,11 +182,12 @@ class Loop:
             self.log(f'{t["id"]} failed, fix pass: {shorten(why, 100)}')
             return
         self.ask(t, 'failed', f'It failed again: {why}', short=f'{t["id"]} failed twice',
-                 go_label='Try again', no_label='Drop it', log=f'{t["id"]} failed twice')
+                 go_label='Try again', no_label='Drop it', log=f'{t["id"]} failed twice',
+                 reason=f'{reason}_failed_twice')
 
-    def ask(self, t, kind, text, short, go_label, no_label, log):
+    def ask(self, t, kind, text, short, go_label, no_label, log, reason=None):
         db.update_ticket(self.con, t['id'], state='needs_you', stage=None,
-                         question={'kind': kind, 'text': text, 'short': short,
+                         question={'kind': kind, 'text': text, 'short': short, 'reason': reason or kind,
                                    'go_label': go_label, 'no_label': no_label})
         db.event(self.con, 'needs_you', log, repo=t['repo'], ticket=t['id'])
         self.log(f'needs you: {log}')
@@ -186,9 +217,9 @@ class Loop:
             self.log(f'merged {t["id"]} (PR #{t["pr"]})')
             return self.cleanup(t)
         why = '; '.join(reasons)
-        self.ask(t, 'merge', f'The build and review passed, but {why}, so it doesn\'t merge on its own. '
+        self.ask(t, 'merge', f'The build and both reviews passed, but {why}, so it doesn\'t merge on its own. '
                  f'Merge PR #{t["pr"]}?', short=f'Merge {t["title"][:40]}?', go_label='Merge', no_label='No',
-                 log=f'{t["id"]} waits for your merge: {why}')
+                 log=f'{t["id"]} waits for your merge: {why}', reason=gate.stop_reason(reasons))
 
     def cleanup(self, t):
         repo = db.repo(self.con, t['repo'])
@@ -205,25 +236,41 @@ class Loop:
         ready = self.con.execute(
             "SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo "
             "WHERE r.active = 1 AND (r.paused_until IS NULL OR r.paused_until < ?) "
-            "AND (t.state = 'queued' OR (t.state = 'reviewing' AND NOT EXISTS "
-            "     (SELECT 1 FROM runs u WHERE u.ticket = t.id AND u.ended_at IS NULL))) "
+            "AND t.state IN ('queued', 'reviewing') "
             "ORDER BY t.state = 'reviewing' DESC, t.filed_at, CAST(SUBSTR(t.id, 3) AS INTEGER)",
             (db.now(),)).fetchall()
         for t in ready:
-            if t['state'] == 'queued' and self.blocked(t):
-                continue
-            runner = self.pick_runner(t, free)
-            if not runner:
-                continue
-            agent = self.pick_agent(t)
-            if not agent:
-                continue
-            try:
-                self.start(t, runner, agent)
-            except db.RunwayError as e:
-                self.failed(t, f'could not start: {e}')
-                continue
-            free[runner] -= 1
+            if t['state'] == 'queued':
+                if self.blocked(t):
+                    continue
+                jobs = [None]
+            else:
+                jobs = self.reviews_due(t)
+            for role in jobs:
+                runner = self.pick_runner(t, free)
+                if not runner:
+                    break
+                agent = self.pick_agent(t, role)
+                if not agent:
+                    continue
+                try:
+                    self.start(t, runner, agent, role)
+                except db.RunwayError as e:
+                    self.failed(t, f'could not start: {e}')
+                    break
+                free[runner] -= 1
+
+    def reviews_due(self, t):
+        """The review roles a built ticket still needs: no verdict on its head commit yet and none running."""
+        due = []
+        for role in worker.ROLES:
+            live = self.con.execute("SELECT 1 FROM runs WHERE ticket=? AND kind='review' AND role=? AND ended_at IS NULL",
+                                    (t['id'], role)).fetchone()
+            done = self.con.execute("SELECT 1 FROM runs WHERE ticket=? AND kind='review' AND role=? AND sha=? "
+                                    "AND outcome IN ('pass', 'fail')", (t['id'], role, t['sha'])).fetchone()
+            if not live and not done:
+                due.append(role)
+        return due
 
     def free_slots(self):
         used = {r['runner']: r['n'] for r in self.con.execute(
@@ -247,35 +294,33 @@ class Loop:
             wanted = sorted(free, key=lambda n: -free[n])
         return next((n for n in wanted if free.get(n, 0) > 0), None)
 
-    def pick_agent(self, t):
-        """Builds: the ticket's agent, or for Any whichever is available (the less busy first). Reviews: the other
-        agent from the one that built it; if that one isn't signed in, the person reviews instead."""
-        if t['state'] == 'reviewing':
-            built = self.con.execute("SELECT agent FROM runs WHERE ticket=? AND kind='build' AND outcome='done' "
-                                     "ORDER BY id DESC LIMIT 1", (t['id'],)).fetchone()
-            other = 'codex' if built and built['agent'] == 'claude' else 'claude'
-            row = self.con.execute('SELECT signed_in FROM agents WHERE kind=?', (other,)).fetchone()
-            if not row or not row['signed_in']:
-                db.update_ticket(self.con, t['id'], state='merging', stage='merge',
-                                 review=f'none ({NAMES[other]} is not signed in)')
-                self.ask(db.ticket(self.con, t['id']), 'merge',
-                         f'{NAMES[other]} is not signed in, so nobody independent reviewed this. Merge PR #{t["pr"]}?',
-                         short=f'Merge {t["title"][:40]}?', go_label='Merge', no_label='No',
-                         log=f'{t["id"]} has no independent review')
-                return None
-            return other if limits.available(self.con, other) else None
-        if t['agent'] != 'any':
-            return t['agent'] if limits.available(self.con, t['agent']) else None
+    def pick_agent(self, t, role=None):
+        """Builds: the ticket's agent, or for Any whichever engine is available (the less busy first).
+
+        Reviews (Joe, 2026-10-25): two fresh sessions, each with its own prompt and none of the builder's context.
+        The code review prefers the other engine from the builder, the function review takes whichever is less busy;
+        with one engine both run on it, and both count toward the gate. An engine resting until its usage limit
+        resets starts nothing: the ticket waits, it doesn't fail."""
         busy = {r['agent']: r['n'] for r in self.con.execute(
             'SELECT agent, COUNT(*) n FROM runs WHERE ended_at IS NULL GROUP BY agent')}
+        if role:
+            built = self.con.execute("SELECT agent FROM runs WHERE ticket=? AND kind='build' AND outcome='done' "
+                                     "ORDER BY id DESC LIMIT 1", (t['id'],)).fetchone()
+            builder = built['agent'] if built else 'claude'
+            other = 'codex' if builder == 'claude' else 'claude'
+            order = (other, builder) if role == 'code' else sorted((builder, other), key=lambda a: busy.get(a, 0))
+            return next((a for a in order if limits.available(self.con, a)), None)
+        if t['agent'] != 'any':
+            return t['agent'] if limits.available(self.con, t['agent']) else None
         choices = [a for a in ('claude', 'codex') if limits.available(self.con, a)]
         return min(choices, key=lambda a: busy.get(a, 0)) if choices else None
 
-    def start(self, t, runner_name, agent):
+    def start(self, t, runner_name, agent, role=None):
         repo = db.repo(self.con, t['repo'])
         kind = 'review' if t['state'] == 'reviewing' else 'build'
-        cur = self.con.execute('INSERT INTO runs(ticket, kind, agent, runner, started_at) VALUES (?, ?, ?, ?, ?)',
-                               (t['id'], kind, agent, runner_name, db.now()))
+        cur = self.con.execute('INSERT INTO runs(ticket, kind, role, agent, runner, started_at) '
+                               'VALUES (?, ?, ?, ?, ?, ?)',
+                               (t['id'], kind, role if kind == 'review' else None, agent, runner_name, db.now()))
         run_id = cur.lastrowid
         run_dir = self.runner.run_dir(run_id)
         cfg = self.runner.config(repo)
@@ -297,7 +342,7 @@ class Loop:
             else:
                 wt = self.runner.worktree(repo, t['id'], run_id, t['sha'])
                 prompt = worker.review_prompt(t, repo['name'], t['sha'], f'origin/{t["base"]}', check,
-                                              run_dir / 'review.json', commands)
+                                              run_dir / 'review.json', commands, role=role or 'code')
         except db.RunwayError:
             self.con.execute("UPDATE runs SET ended_at=?, outcome='failed' WHERE id=?", (db.now(), run_id))
             raise
@@ -311,7 +356,8 @@ class Loop:
         if kind == 'build':
             db.update_ticket(self.con, t['id'], state='building', stage='build', branch=branch)
         where = 'in the cloud' if runner_name == 'Cloud' else f'on {runner_name}'
-        what = f'{t["id"]} review by {NAMES[agent]}' if kind == 'review' else f'{t["id"]} {where} with {NAMES[agent]}'
+        what = (f'{t["id"]} {role or "code"} review by {NAMES[agent]}' if kind == 'review'
+                else f'{t["id"]} {where} with {NAMES[agent]}')
         db.event(self.con, 'start' if kind == 'build' else 'review', what, repo=t['repo'], ticket=t['id'])
         self.log(f'started {what}')
 

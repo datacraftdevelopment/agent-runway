@@ -1,9 +1,10 @@
 """The merge gate for one ticket's PR, as code. It trusts nothing a worker can edit.
 
 It merges on its own only when: the ticket is low risk (set at filing, possibly raised in review, never lowered), the
-other agent's review passed on exactly the PR's head commit, every check on the PR is green, no changed path is
-sensitive, and the repo's runway.json (as the base branch has it) doesn't turn auto-merge off. Anything else waits
-for the person. From PR #3's gate.py.
+code review and the function review (two fresh sessions; on the other engine where there is one, else the same
+engine) both passed on exactly the PR's head commit, every check on the PR is green, no changed path is sensitive,
+and the repo's runway.json (as the base branch has it) doesn't turn auto-merge off. Anything else waits for the
+person. From PR #3's gate.py.
 """
 
 import fnmatch
@@ -34,10 +35,14 @@ def evaluate(ticket, pr, checks, config, fresh=False):
     if ticket['risk'] != 'low':
         reasons.append('it is not low risk' + (' (raised in review)' if (ticket['review'] or '').endswith('risk raised')
                                                else ''))
-    if not (ticket['review'] or '').split(':')[-1].strip().startswith('pass'):
-        reasons.append('no passing review')
+    keys = ticket.keys() if hasattr(ticket, 'keys') else ticket
+    reviews = {'code review': ticket['review'],
+               'function review': ticket['function_review'] if 'function_review' in keys else None}
+    missing = [name for name, text in reviews.items() if not (text or '').split(':')[-1].strip().startswith('pass')]
+    if missing:
+        reasons.append('no passing ' + ' or '.join(missing))
     elif ticket['sha'] != pr['headRefOid']:
-        reasons.append(f'the review passed {(ticket["sha"] or "")[:7]}, but the PR head is {pr["headRefOid"][:7]}')
+        reasons.append(f'the reviews passed {(ticket["sha"] or "")[:7]}, but the PR head is {pr["headRefOid"][:7]}')
     patterns = list(DEFAULT_SENSITIVE) + list(config.get('sensitive_paths', []))
     hits = sensitive_hits([f['path'] for f in pr.get('files', [])], patterns)
     if hits:
@@ -55,3 +60,17 @@ def evaluate(ticket, pr, checks, config, fresh=False):
             return 'wait', ['waiting for checks to start']
         reasons.append('no checks reported on the PR')
     return ('needs_you' if reasons else 'merge'), reasons
+
+
+def stop_reason(reasons):
+    """Why the gate stopped a ticket, as one word for the stats' "where it stopped"."""
+    text = ' '.join(reasons)
+    if 'not low risk' in text:
+        return 'not_low_risk'
+    if 'sensitive paths' in text:
+        return 'sensitive_path'
+    if 'checks failed' in text or 'no checks' in text:
+        return 'check'
+    if 'review' in text:
+        return 'review'
+    return 'other'

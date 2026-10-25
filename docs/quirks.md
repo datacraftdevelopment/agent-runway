@@ -4,6 +4,14 @@ Non-obvious gotchas worth remembering. Check before re-inventing fixes.
 
 > Format: short heading, one or two sentences. Date-stamped. Add new entries at the top. The point is fast scanning, not exhaustive documentation.
 
+## One engine is enough; reviews are separate runs (2026-10-25)
+
+Runway must work on only Claude Code or only Codex (Joe's ruling). A "fresh session" review is simply its own run: a
+new worktree at the head commit, a new prompt, a new Claude session id or Codex thread, nothing passed over from the
+build. So a same-engine review shares no context with the builder, and both reviews (code, function) count toward the
+gate. Tests stub the missing engine off PATH with a temp HOME whose `.zprofile` sets PATH (`runway doctor` reads PATH
+from the login shell).
+
 ## An allow-listed command must be run by name, without a heredoc (2026-10-24)
 
 With `--allowedTools 'Bash(runway:*)'`, a session that found runway with `command -v` and then ran it by its full

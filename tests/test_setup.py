@@ -28,7 +28,7 @@ class SetupTest(unittest.TestCase):
                           "INSERT INTO repos(name, path) VALUES ('old', '/tmp/old');\nCOMMIT;")
         con.close()
         con = db.connect()
-        self.assertEqual(db.meta(con, 'schema_version'), '2')
+        self.assertEqual(db.meta(con, 'schema_version'), str(db.SCHEMA_VERSION))
         self.assertIsNone(db.repo(con, 'old')['check_cmd'])
         con.close()
 
@@ -92,16 +92,78 @@ class SetupTest(unittest.TestCase):
         self.assertIsNone(tools['git']['fix'])
         signins = {s['name']: s for s in rep['signins']}
         self.assertTrue(signins['claude']['ok'])
-        self.assertEqual(signins['codex']['fix'], 'install codex first')
+        # One engine is enough: the missing one is optional, not a failure.
+        self.assertTrue(tools['codex']['optional'])
+        self.assertTrue(signins['codex']['optional'])
         self.assertEqual(signins['github']['fix'], 'gh auth login')
-        self.assertFalse(rep['ready'])
+        self.assertFalse(signins['github']['optional'])
+        self.assertEqual(rep['engines'], ['claude'])
+        self.assertFalse(rep['ready'])                      # GitHub isn't signed in
         self.assertTrue(rep['skills']['built'])        # this checkout carries plugin/
         self.assertFalse(rep['skills']['codex'])       # codex isn't installed in this fake Mac
         row = con.execute("SELECT claude, codex, github FROM setup WHERE runner='This Mac'").fetchone()
-        self.assertEqual(tuple(row), ('yes', 'sign_in', 'sign_in'))
+        self.assertEqual(tuple(row), ('yes', 'optional', 'sign_in'))
         agents = dict(con.execute('SELECT kind, signed_in FROM agents').fetchall())
         self.assertEqual(agents, {'claude': 1, 'codex': 0})
         con.close()
+
+
+STUB = {
+    'claude': 'if [ "$1 $2" = "auth status" ]; then echo \'{"loggedIn": true}\'; fi\nexit 0\n',
+    'codex': 'exit 0\n',
+    'gh': 'exit 0\n',
+    'tmux': 'exit 0\n',
+}
+
+
+class DoctorOneEngineTest(unittest.TestCase):
+    """The real runway doctor, in a temp HOME whose login shell sees only stub tools: one engine is a full green."""
+
+    def run_doctor(self, engines):
+        with tempfile.TemporaryDirectory() as tmp:
+            home, stubs = Path(tmp) / 'home', Path(tmp) / 'stubs'
+            home.mkdir()
+            stubs.mkdir()
+            for name, body in STUB.items():
+                if name in ('claude', 'codex') and name not in engines:
+                    continue                                 # the missing engine is simply not on PATH
+                (stubs / name).write_text('#!/bin/sh\n' + body)
+                (stubs / name).chmod(0o755)
+            (home / '.zprofile').write_text(f'export PATH="{stubs}:/usr/bin:/bin:/usr/sbin:/sbin"\n')
+            env = {'HOME': str(home), 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin',
+                   'RUNWAY_HOME': str(Path(tmp) / 'runway')}
+            cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
+            res = subprocess.run(['/usr/bin/python3', str(cli), 'doctor', '--json'], env=env,
+                                 capture_output=True, text=True, timeout=120)
+            plain = subprocess.run(['/usr/bin/python3', str(cli), 'doctor'], env=env, capture_output=True, text=True,
+                                   timeout=120)
+            return res.returncode, json.loads(res.stdout), plain
+
+    def check(self, engine, missing):
+        code, rep, plain = self.run_doctor({engine})
+        self.assertEqual(code, 0)
+        self.assertTrue(rep['ready'])
+        self.assertEqual(rep['engines'], [engine])
+        tools = {t['name']: t for t in rep['tools']}
+        self.assertFalse(tools[missing]['ok'])
+        self.assertTrue(tools[missing]['optional'])
+        signins = {s['name']: s for s in rep['signins']}
+        self.assertTrue(signins[missing]['optional'])
+        self.assertEqual(plain.returncode, 0)
+        self.assertIn('(optional: one engine is enough)', plain.stdout)
+        self.assertNotIn('NO ', plain.stdout)
+
+    def test_claude_only(self):
+        self.check('claude', 'codex')
+
+    def test_codex_only(self):
+        self.check('codex', 'claude')
+
+    def test_no_engine_is_not_ready(self):
+        code, rep, plain = self.run_doctor(set())
+        self.assertEqual(code, 1)
+        self.assertFalse(rep['ready'])
+        self.assertIn('Runway needs Claude Code or Codex (either one)', plain.stdout)
 
 
 class RepoAddTest(unittest.TestCase):

@@ -175,15 +175,24 @@ def cmd_doctor(con, a):
     rep = setup.report(con)
     if a.json:
         out(rep)
-        return 0
+        return 0 if rep['ready'] else 1
+    def mark(row):
+        return 'ok ' if row['ok'] else '-- ' if row['optional'] else 'NO '
+
+    def tail(row):
+        if row['ok']:
+            return ''
+        return '   (optional: one engine is enough)' if row['optional'] else f'   fix: {row["fix"]}'
     for t in rep['tools']:
-        print(f'{"ok " if t["ok"] else "NO "} {t["name"]}' + ('' if t['ok'] else f'   fix: {t["fix"]}'))
+        print(f'{mark(t)} {t["name"]}{tail(t)}')
     for s in rep['signins']:
-        print(f'{"ok " if s["ok"] else "NO "} {s["label"]} signed in' + ('' if s['ok'] else f'   fix: {s["fix"]}'))
+        print(f'{mark(s)} {s["label"]} signed in{tail(s)}')
+    if not rep['engines']:
+        print('NO  an engine: Runway needs Claude Code or Codex (either one), installed and signed in')
     c = rep['command']
     print(f'{"ok " if c["linked"] else "-- "} runway in Terminal' + ('' if c['linked'] else '   fix: runway install-command'))
     sk = rep['skills']
-    print(f'{"ok " if sk["claude"] and sk["codex"] else "-- "} skills: {sk["note"]}')
+    print(f'{"ok " if sk["installed"] else "-- "} skills: {sk["note"]}')
     return 0 if rep['ready'] else 1
 
 
