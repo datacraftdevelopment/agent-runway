@@ -1,0 +1,14 @@
+{
+  "name": "agent-runway",
+  "displayName": "Agent Runway",
+  "version": "0.1.0",
+  "description": "File tickets for Runway from a normal session, check what is running and what needs you, and set Runway up.",
+  "author": {
+    "name": "DataCraft Development",
+    "url": "https://agentrunway.app"
+  },
+  "homepage": "https://agentrunway.app",
+  "repository": "https://github.com/datacraftdevelopment/agent-runway",
+  "license": "PolyForm-Shield-1.0.0",
+  "keywords": ["runway", "tickets", "headless", "review", "pull requests"]
+}

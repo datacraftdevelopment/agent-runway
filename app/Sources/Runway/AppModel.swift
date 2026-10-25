@@ -201,6 +201,26 @@ final class AppModel {
         }
     }
 
+    /// Asks first: installing the skills changes Claude Code's and Codex's own plugin settings.
+    func installSkills() {
+        guard let cli else { return }
+        let alert = NSAlert()
+        alert.messageText = "Add Runway's skills to Claude Code and Codex?"
+        alert.informativeText = "Runway adds its plugin, agent-runway (file-tickets, runway, setup), through each "
+            + "agent's own plugin commands: claude plugin install and codex plugin add, from the copy inside this app. "
+            + "You can remove it the same way (claude plugin uninstall / codex plugin remove)."
+        alert.addButton(withTitle: "Add the skills")
+        alert.addButton(withTitle: "Not now")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        setupMessage = "Adding the skills…"
+        Task {
+            let result = await cli.run(["install-skills"])
+            setupMessage = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+            runDoctor()
+        }
+    }
+
     /// A folder picker for the first repo; Runway then guesses its name, GitHub repo and check command.
     func chooseRepo() {
         guard let cli else { return }

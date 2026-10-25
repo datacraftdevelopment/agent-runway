@@ -11,7 +11,10 @@ final class SetupReportTests: XCTestCase {
         XCTAssertEqual(report.tools.map(\.name), ["git", "gh", "tmux", "claude", "codex"])
         XCTAssertEqual(report.tools.first { !$0.ok }?.fix, "npm install -g @openai/codex")
         XCTAssertEqual(report.signins.filter { !$0.ok }.map(\.label), ["Codex", "GitHub"])
-        XCTAssertFalse(report.skills.built)
+        XCTAssertTrue(report.skills.built)
+        XCTAssertEqual(report.skills.claude, true)
+        XCTAssertEqual(report.skills.codex, false)
+        XCTAssertFalse(report.skills.installed)
         XCTAssertTrue(report.repos.isEmpty)
     }
 

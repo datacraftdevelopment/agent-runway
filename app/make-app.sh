@@ -114,6 +114,8 @@ mkdir -p "$APP/Contents/Resources/cli/bin" "$APP/Contents/Resources/cli/runway"
 cp "$REPO/bin/runway" "$APP/Contents/Resources/cli/bin/runway"
 cp "$REPO"/runway/*.py "$APP/Contents/Resources/cli/runway/"
 chmod +x "$APP/Contents/Resources/cli/bin/runway"
+# The skills (one plugin for Claude Code and Codex) ride next to the command; first run installs them from here.
+cp -R "$REPO/plugin" "$APP/Contents/Resources/cli/plugin"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

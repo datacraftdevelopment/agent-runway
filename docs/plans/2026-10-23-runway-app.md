@@ -64,15 +64,22 @@ Sparkle (updates), Ringside, rounds and Linear-era code. SwiftTerm stays out for
 
 ## Phase 3: the skills (Claude Code and Codex)
 
-- [ ] 3.1 Plugin layout that installs into both Claude Code and Codex (one skill text, two manifests), no Ringer.
-- [ ] 3.2 `file-tickets`: proposes the batch table (risk with reason, agent, waits on, runs on), files on the typed
+- [x] 3.1 Plugin layout that installs into both Claude Code and Codex (one skill text, two manifests), no Ringer.
+- [x] 3.2 `file-tickets`: proposes the batch table (risk with reason, agent, waits on, runs on), files on the typed
   go with `runway file`; over SSH from a non-Runway Mac; to the `runway/tickets` branch from a cloud session.
-- [ ] 3.3 `setup`: checks tools and sign-ins, adds this computer as a runner, picks repos and their main computer;
+  Done except the cloud path, which waits on `runway import` (the skill says so).
+- [x] 3.3 `setup`: checks tools and sign-ins, adds this computer as a runner, picks repos and their main computer;
   `join` adds another Mac from that Mac; cloud connect. Writes results to the database (the first-run table).
-- [ ] 3.4 `work-ticket` and `review-ticket` (from PR #2, trimmed): worktree, draft PR, outcome file; review pinned to
-  the head commit, may raise risk only.
-- [ ] 3.5 `runway` skill: status, what needs me, go/no on the person's own words, pause/resume.
-- [ ] 3.6 The app's first run installs the command and the skills, then opens Claude Code or Codex on setup.
+  Done for this Mac; `join` and cloud connect say "not yet" until the SSH and cloud runners exist.
+- [x] 3.4 ~~`work-ticket` and `review-ticket` (from PR #2, trimmed): worktree, draft PR, outcome file; review pinned to
+  the head commit, may raise risk only.~~ Ruling (2026-10-24): kept as prompts the CLI renders per run
+  (`runway/worker.py`). Each prompt carries facts only that run knows (the outcome file's path, the exact commit, the
+  allowed commands), and the loop parses what it asks for; as installed skills they would have to be on every runner
+  and could drift from the parser.
+- [x] 3.5 `runway` skill: status, what needs me, go/no on the person's own words, pause/resume.
+- [x] 3.6 The app's first run installs the command and the skills, then opens Claude Code or Codex on setup.
+  Done as the setup screen's step 1 (each install asks first); opening an agent on setup is left out, since the
+  screen runs the same checks itself.
 
 ## Phase 4: the loop across runners
 

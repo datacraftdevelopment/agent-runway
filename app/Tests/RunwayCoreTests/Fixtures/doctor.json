@@ -14,8 +14,11 @@
     { "fix": "gh auth login", "label": "GitHub", "name": "github", "ok": false }
   ],
   "skills": {
-    "built": false,
-    "note": "The Runway skills (file tickets from a normal Claude Code or Codex session, guided setup) are not built yet. Until they are, file tickets with: runway file"
+    "built": true,
+    "claude": true,
+    "codex": false,
+    "note": "Not in Codex yet: runway install-skills adds them.",
+    "path": "/Applications/Runway.app/Contents/Resources/cli/plugin"
   },
   "tools": [
     { "fix": null, "name": "git", "ok": true, "path": "/usr/bin/git", "why": "worktrees and commits" },

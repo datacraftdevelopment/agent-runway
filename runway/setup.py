@@ -23,8 +23,7 @@ SIGNINS = [
     ('codex', 'Codex', 'codex login'),
     ('github', 'GitHub', 'gh auth login'),
 ]
-SKILLS_NOTE = ('The Runway skills (file tickets from a normal Claude Code or Codex session, guided setup) are not '
-               'built yet. Until they are, file tickets with: runway file')
+PLUGIN = 'agent-runway'          # the plugin and its marketplace share this name
 
 
 def login_shell(cmd, timeout=60):
@@ -84,7 +83,7 @@ def report(con, check_signins=True):
         'database': str(db.db_path()),
         'tools': tools,
         'signins': signins,
-        'skills': {'built': False, 'note': SKILLS_NOTE},
+        'skills': skills_status(),
         'repos': [r['name'] for r in con.execute('SELECT name FROM repos ORDER BY name')],
         'ready': all(t['ok'] for t in tools) and all(s['ok'] for s in signins),
     }
@@ -151,3 +150,63 @@ def suggest_check(path):
     if (p / 'Makefile').exists() and 'test:' in (p / 'Makefile').read_text(errors='replace'):
         return 'make test'
     return None
+
+
+# ---- the skills ------------------------------------------------------------------------------------------------
+
+def plugin_dir():
+    """The marketplace folder shipped with this copy: plugin/ in a checkout, cli/plugin/ inside Runway.app."""
+    return Path(__file__).resolve().parent.parent / 'plugin'
+
+
+def installed_in(agent):
+    """Whether the agent-runway plugin is installed in Claude Code or Codex, as their own plugin lists say."""
+    cmd = 'claude plugin list' if agent == 'claude' else 'codex plugin list'
+    res = login_shell(cmd)
+    return res.returncode == 0 and f'{PLUGIN}@{PLUGIN}' in res.stdout
+
+
+def skills_status():
+    built = (plugin_dir() / PLUGIN / 'skills').is_dir()
+    have = {a: bool(shutil.which(a) or login_shell(f'command -v {a}').returncode == 0) for a in ('claude', 'codex')}
+    status = {a: built and have[a] and installed_in(a) for a in ('claude', 'codex')}
+    if not built:
+        note = 'This copy of Runway has no skills folder.'
+    elif all(status.values()):
+        note = 'file-tickets, runway and setup are in Claude Code and Codex.'
+    else:
+        missing = ' and '.join(n for a, n in (('claude', 'Claude Code'), ('codex', 'Codex')) if not status[a])
+        note = f'Not in {missing} yet: runway install-skills adds them.'
+    return {'built': built, 'claude': status['claude'], 'codex': status['codex'], 'path': str(plugin_dir()),
+            'note': note}
+
+
+def install_skills(agents=('claude', 'codex')):
+    """Adds Runway's marketplace (the folder shipped with this copy) to each agent and installs the plugin from it,
+    through the agent's own plugin commands. Safe to run again."""
+    src = plugin_dir()
+    if not (src / PLUGIN / 'skills').is_dir():
+        raise db.RunwayError(f'no skills in {src}')
+    done = []
+    for agent in agents:
+        if login_shell(f'command -v {agent}').returncode != 0:
+            done.append(f'{agent}: not installed, skipped')
+            continue
+        q = shlex_quote(str(src))
+        if agent == 'claude':
+            steps = [f'claude plugin marketplace add {q}', f'claude plugin install {PLUGIN}@{PLUGIN}']
+        else:
+            steps = [f'codex plugin marketplace add {q}', f'codex plugin add {PLUGIN}@{PLUGIN}']
+        for step in steps:
+            res = login_shell(step, timeout=120)
+            said = (res.stdout + res.stderr).strip()
+            if res.returncode != 0 and 'already' not in said.lower():
+                raise db.RunwayError(f'{step} failed: {said[-300:]}')
+        done.append(f'{agent}: installed {PLUGIN} from {src}' if installed_in(agent)
+                    else f'{agent}: ran the install, but its plugin list does not show {PLUGIN} yet')
+    return '\n'.join(done)
+
+
+def shlex_quote(s):
+    import shlex
+    return shlex.quote(s)

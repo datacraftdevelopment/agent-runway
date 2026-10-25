@@ -95,7 +95,8 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(signins['codex']['fix'], 'install codex first')
         self.assertEqual(signins['github']['fix'], 'gh auth login')
         self.assertFalse(rep['ready'])
-        self.assertFalse(rep['skills']['built'])
+        self.assertTrue(rep['skills']['built'])        # this checkout carries plugin/
+        self.assertFalse(rep['skills']['codex'])       # codex isn't installed in this fake Mac
         row = con.execute("SELECT claude, codex, github FROM setup WHERE runner='This Mac'").fetchone()
         self.assertEqual(tuple(row), ('yes', 'sign_in', 'sign_in'))
         agents = dict(con.execute('SELECT kind, signed_in FROM agents').fetchall())

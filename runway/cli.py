@@ -78,7 +78,7 @@ def cmd_file(con, a):
             t.setdefault('key', t.get('id') or Path(f).stem)
         repo, filed_from = a.repo, a.filed_from or 'a terminal'
     else:
-        data = json.loads(sys.stdin.read())
+        data = json.loads(Path(a.batch).read_text() if a.batch else sys.stdin.read())
         repo = a.repo or data.get('repo')
         if not repo:
             raise db.RunwayError('name the repo: --repo, or "repo" in the JSON')
@@ -182,8 +182,29 @@ def cmd_doctor(con, a):
         print(f'{"ok " if s["ok"] else "NO "} {s["label"]} signed in' + ('' if s['ok'] else f'   fix: {s["fix"]}'))
     c = rep['command']
     print(f'{"ok " if c["linked"] else "-- "} runway in Terminal' + ('' if c['linked'] else '   fix: runway install-command'))
-    print(f'-- skills: {rep["skills"]["note"]}')
+    sk = rep['skills']
+    print(f'{"ok " if sk["claude"] and sk["codex"] else "-- "} skills: {sk["note"]}')
     return 0 if rep['ready'] else 1
+
+
+def cmd_install_skills(con, a):
+    from . import setup
+    agents = [x for x in ('claude', 'codex') if getattr(a, x)] or ['claude', 'codex']
+    print(setup.install_skills(agents))
+
+
+def cmd_repo_which(con, a):
+    """The repo Runway knows the given folder (default: here) by, for file-tickets."""
+    res = subprocess.run(['git', '-C', a.path, 'rev-parse', '--show-toplevel'], capture_output=True, text=True)
+    if res.returncode != 0:
+        raise db.RunwayError(f'{a.path} is not inside a git clone')
+    top = str(Path(res.stdout.strip()).resolve())
+    slug = git_slug(top)
+    for r in con.execute('SELECT name, path, slug FROM repos'):
+        if str(Path(r['path']).resolve()) == top or (slug and r['slug'] == slug):
+            print(r['name'])
+            return 0
+    raise db.RunwayError(f'{top} is not watched by Runway; add it with: runway repo add {top}')
 
 
 def cmd_install_command(con, a):
@@ -206,6 +227,9 @@ def parser():
     x.add_argument('--runs-on', default='any', choices=['any', 'main'])
     x.add_argument('--check', help="the repo's test command, used when it has no runway.json (default: a guess)")
     x.set_defaults(fn=cmd_repo_add)
+    x = r.add_parser('which', help='the name Runway knows this clone by')
+    x.add_argument('path', nargs='?', default='.')
+    x.set_defaults(fn=cmd_repo_which)
     x = r.add_parser('suggest-check', help='what Runway would guess for a clone: name, GitHub slug, check command')
     x.add_argument('path')
     x.set_defaults(fn=cmd_repo_suggest)
@@ -222,6 +246,7 @@ def parser():
     x.add_argument('files', nargs='*')
     x.add_argument('--repo')
     x.add_argument('--filed-from', help='where the batch came from, e.g. "Claude Code on this Mac"')
+    x.add_argument('--batch', help='the JSON batch as a file instead of on stdin')
     x.set_defaults(fn=cmd_file)
 
     x = sub.add_parser('status', help='what is up next, running, needing you and done')
@@ -260,6 +285,10 @@ def parser():
     x = sub.add_parser('doctor', help="check this Mac's tools and sign-ins, with the fix for each")
     x.add_argument('--json', action='store_true', help='what the first-run screen shows')
     x.set_defaults(fn=cmd_doctor)
+    x = sub.add_parser('install-skills', help="add Runway's skills to Claude Code and Codex (their plugin commands)")
+    x.add_argument('--claude', action='store_true', help='only Claude Code')
+    x.add_argument('--codex', action='store_true', help='only Codex')
+    x.set_defaults(fn=cmd_install_skills)
     x = sub.add_parser('install-command', help='link runway into ~/.local/bin so Terminal finds it')
     x.add_argument('--to', help='another folder for the link')
     x.set_defaults(fn=cmd_install_command)
