@@ -8,8 +8,8 @@ Website: **[agentrunway.app](https://agentrunway.app)** · Free · Source availa
 
 ![The Runway board: tickets in Needs you, Up next, Running and Done, with the Macs they run on in the sidebar](docs/shipped/screens/board.png)
 
-> **Early preview.** Runway runs real tickets today. Version 0.1 is out: signed, notarised and self-updating.
-> [Download Runway.zip](https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/Runway.zip).
+> **Early preview.** Runway runs real tickets today. Signed, notarised and self-updating.
+> [Download Runway.dmg](https://github.com/datacraftdevelopment/agent-runway/releases/latest/download/Runway.dmg).
 
 ## How it works
 
@@ -41,8 +41,8 @@ The full workflow and every skill in it: [agentrunway.app/skills](https://agentr
 
 ## Install
 
-**The app (recommended):** download `Runway.zip` from
-[Releases](https://github.com/datacraftdevelopment/agent-runway/releases/latest), move Runway to Applications and open
+**The app (recommended):** download `Runway.dmg` from
+[Releases](https://github.com/datacraftdevelopment/agent-runway/releases/latest), drag Runway to Applications and open
 it. Its first-run screen checks your tools and sign-ins, installs the `runway` command and adds the Agent Runway skills
 to Claude Code and Codex.
 
