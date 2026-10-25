@@ -271,6 +271,11 @@ def cmd_doctor(con, a):
     return 0 if rep['ready'] else 1
 
 
+def cmd_init(con, a):
+    """Runway's folder and database. First run's "Set it up" runs this; running it again changes nothing."""
+    print(f'Runway keeps its tickets and runs in {db.db_path()}')
+
+
 def cmd_install_skills(con, a):
     from . import setup
     agents = [x for x in ('claude', 'codex') if getattr(a, x)] or ['claude', 'codex']
@@ -365,6 +370,8 @@ def parser():
     x = sub.add_parser('doctor', help="check this Mac's tools and sign-ins, with the fix for each")
     x.add_argument('--json', action='store_true', help='what the first-run screen shows')
     x.set_defaults(fn=cmd_doctor)
+    x = sub.add_parser('init', help="make Runway's folder and database (~/.runway), if they aren't there yet")
+    x.set_defaults(fn=cmd_init)
     x = sub.add_parser('install-skills', help="add Runway's skills to Claude Code and Codex (their plugin commands)")
     x.add_argument('--claude', action='store_true', help='only Claude Code')
     x.add_argument('--codex', action='store_true', help='only Codex')
@@ -412,7 +419,8 @@ def parser():
 
 def main(argv=None):
     a = parser().parse_args(argv)
-    con = db.connect()
+    # doctor only looks: before first run's "Set it up" (runway init), it checks without making ~/.runway.
+    con = db.connect(':memory:') if a.fn is cmd_doctor and not db.db_path().exists() else db.connect()
     try:
         return a.fn(con, a) or 0
     except db.RunwayError as e:

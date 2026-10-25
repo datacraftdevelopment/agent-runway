@@ -19,6 +19,7 @@ struct RunwayApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 800)
+        .commands { WhatsNewCommand(model: model) }
 
         MenuBarExtra {
             MenuBarContent(model: model, dismiss: { NSApp.keyWindow?.close() })
@@ -36,7 +37,13 @@ struct RunwayApp: App {
         .defaultPosition(.topTrailing)
 
         Window("Set up Runway", id: "runway-setup") {
-            FirstRunView(model: model)
+            SetupGuideView(model: model)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+
+        Window("What's New in Runway", id: "runway-whatsnew") {
+            WhatsNewView(model: model)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
@@ -65,11 +72,33 @@ private struct LaunchOpener: View {
             MoveToApplications.offerIfNeeded()
             let wanted = (ProcessInfo.processInfo.environment["RUNWAY_OPEN"] ?? "").split(separator: ",")
             for id in wanted { openWindow(id: "runway-\(id)") }
-            // First run: until a repo is watched, the setup screen opens on top of the main window.
-            for _ in 0..<20 where model.status == nil && model.source == .live {
-                try? await Task.sleep(nanoseconds: 250_000_000)
+            if wanted.contains("whatsnew") { model.showAllNotes() }
+            // Then the walkthrough (first launch, or something missing) or What's New (after an update).
+            // A menu bar app isn't brought forward on its own, so the window would open behind whatever is in front.
+            switch await model.launchScreen() {
+            case .guide where !wanted.contains("setup"):
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openWindow(id: "runway-setup")
+            case .whatsNew where !wanted.contains("whatsnew"):
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openWindow(id: "runway-whatsnew")
+            default: break
             }
-            if model.needsSetup && !wanted.contains("setup") { openWindow(id: "runway-setup") }
+        }
+    }
+}
+
+/// "What's New…" in the app menu, under About.
+private struct WhatsNewCommand: Commands {
+    let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("What's New…") {
+                model.showAllNotes()
+                openWindow(id: "runway-whatsnew")
+            }
         }
     }
 }

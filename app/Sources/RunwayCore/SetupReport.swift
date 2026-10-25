@@ -43,6 +43,9 @@ public struct SetupReport: Codable, Equatable, Sendable {
 
     public var command: Command
     public var database: String
+    /// Whether ~/.runway's database is there yet. `runway doctor` only looks; `runway init` makes it. Nil from a
+    /// runway too old to say.
+    public var databaseExists: Bool?
     public var tools: [Tool]
     public var signins: [SignIn]
     /// The engines that are ready: Claude Code, Codex, or both. One is enough.
