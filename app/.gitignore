@@ -1,0 +1,4 @@
+.build/
+build/
+# Sparkle is pinned exactly in Package.swift; a resolved file here would make the release see a dirty tree.
+Package.resolved
