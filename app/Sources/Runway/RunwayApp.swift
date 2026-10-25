@@ -72,9 +72,14 @@ private struct LaunchOpener: View {
             for id in wanted { openWindow(id: "runway-\(id)") }
             if wanted.contains("whatsnew") { model.showAllNotes() }
             // Then the walkthrough (first launch, or something missing) or What's New (after an update).
+            // A menu bar app isn't brought forward on its own, so the window would open behind whatever is in front.
             switch await model.launchScreen() {
-            case .guide where !wanted.contains("setup"): openWindow(id: "runway-setup")
-            case .whatsNew where !wanted.contains("whatsnew"): openWindow(id: "runway-whatsnew")
+            case .guide where !wanted.contains("setup"):
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openWindow(id: "runway-setup")
+            case .whatsNew where !wanted.contains("whatsnew"):
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openWindow(id: "runway-whatsnew")
             default: break
             }
         }
