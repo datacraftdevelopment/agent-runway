@@ -6,6 +6,11 @@ import RunwayCore
 struct RunwayApp: App {
     @State private var model = AppModel()
 
+    init() {
+        // Start Sparkle at launch, so its daily check runs whether or not the menu is ever opened.
+        _ = AppUpdater.shared
+    }
+
     // The main window comes first: it is the scene that opens at launch.
     var body: some Scene {
         Window("Runway", id: "runway") {

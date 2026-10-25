@@ -1,0 +1,70 @@
+# Publishes Runway v<app/VERSION> from main: Developer ID signing, notarization, the Sparkle-signed zip and
+# appcast.xml, the v<VERSION> tag and the GitHub release. Run by hand (Actions > release > Run workflow), and only
+# on the person's go: a release reaches every installed copy within a day.
+#
+# Repository secrets (Settings > Secrets and variables > Actions), set once; app/RELEASING.md says how to make each:
+#   RUNWAY_CERT_P12            base64 of the Developer ID Application certificate exported as .p12
+#   RUNWAY_CERT_PASSWORD       that .p12's password
+#   RUNWAY_NOTARY_KEY_P8       base64 of the App Store Connect API key (.p8)
+#   RUNWAY_NOTARY_KEY_ID       its key ID
+#   RUNWAY_NOTARY_ISSUER       its issuer ID
+#   SPARKLE_PRIVATE_KEY        the Sparkle private key (generate_keys -x prints it to a file)
+name: release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Secrets into a throwaway keychain and files
+        env:
+          CERT_P12: ${{ secrets.RUNWAY_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.RUNWAY_CERT_PASSWORD }}
+          NOTARY_KEY_P8: ${{ secrets.RUNWAY_NOTARY_KEY_P8 }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          S="$RUNNER_TEMP/secrets"; mkdir -m 700 "$S"
+          KC="$RUNNER_TEMP/release.keychain-db"; KCPASS="$(uuidgen)"
+          printf '%s' "$CERT_P12" | base64 --decode > "$S/cert.p12"
+          printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$S/notary.p8"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$S/sparkle.key"
+          security create-keychain -p "$KCPASS" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KCPASS" "$KC"
+          security import "$S/cert.p12" -k "$KC" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KCPASS" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm -f "$S/cert.p12"
+          ID="$(security find-identity -v -p codesigning "$KC" | awk '/Developer ID Application/ {print $2; exit}')"
+          test -n "$ID" || { echo "no Developer ID Application identity in RUNWAY_CERT_P12"; exit 1; }
+          {
+            echo "RUNWAY_SIGN_IDENTITY=$ID"
+            echo "RUNWAY_NOTARY_KEY=$S/notary.p8"
+            echo "SPARKLE_KEY_FILE=$S/sparkle.key"
+          } >> "$GITHUB_ENV"
+      - name: Release
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNWAY_RELEASE_REF: main
+          RUNWAY_NOTARY_KEY_ID: ${{ secrets.RUNWAY_NOTARY_KEY_ID }}
+          RUNWAY_NOTARY_ISSUER: ${{ secrets.RUNWAY_NOTARY_ISSUER }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash make-app.sh --release
+      - name: Clean up
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/secrets"
