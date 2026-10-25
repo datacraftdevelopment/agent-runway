@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills · Agent Runway</title>
+<meta name="description" content="The skills behind Agent Runway: discover, prototype, spec, file tickets, then let Runway build, review and merge.">
+<meta property="og:title" content="Agent Runway skills">
+<meta property="og:description" content="Hand small coding tickets to Claude Code and Codex. They run on your own Macs, the other agent reviews, and only low-risk work merges on its own.">
+<meta property="og:image" content="/screens/board.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#1a2330; --muted:#5a6676; --line:#d5dbe3;
+  --accent:#b86e00; --accent-ink:#ffffff; --accent-soft:#fbefd9;
+  --tarmac:#1d252f; --tarmac-ink:#e9eef4; --tarmac-muted:#a8b3c1;
+  --claude:#c96442; --codex:#3b82f6; --any:#8a94a3; --ok:#2f7d4f;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171e; --surface:#1a212a; --ink:#e6ebf1; --muted:#9aa6b5; --line:#2c3642;
+  --accent:#f0a630; --accent-ink:#1a1206; --accent-soft:#3a2c14; --tarmac:#0b0f14;
+  --ok:#5fc48a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171e; --surface:#1a212a; --ink:#e6ebf1; --muted:#9aa6b5; --line:#2c3642;
+  --accent:#f0a630; --accent-ink:#1a1206; --accent-soft:#3a2c14; --tarmac:#0b0f14;
+  --ok:#5fc48a; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.6 var(--body);margin:0}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px))}
+.narrow{max-width:720px}
+h1,h2,h3{font-family:var(--display);line-height:1.05;margin:0;text-wrap:balance}
+h2{font-size:clamp(32px,5vw,46px);font-weight:800}
+h3{font-size:23px;font-weight:600;letter-spacing:.01em}
+p{margin:0}
+code{font-family:var(--mono);font-size:.86em}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:20px;color:var(--muted);max-width:52ch}
+section{padding-block:72px;border-top:1px solid var(--line)}
+.stack{display:grid;gap:18px}
+
+/* nav */
+nav{background:var(--tarmac);color:var(--tarmac-ink)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+nav .brand{display:flex;align-items:center;gap:10px;font:800 22px/1 var(--display);letter-spacing:.02em;text-decoration:none}
+nav .links{display:flex;gap:20px;font-size:15px}
+nav .links a{text-decoration:none;color:var(--tarmac-muted)}
+nav .links a:hover{color:var(--tarmac-ink)}
+
+/* hero */
+.hero{background:var(--tarmac);color:var(--tarmac-ink);padding-block:56px 0;position:relative;overflow:hidden}
+.hero h1{font-size:clamp(60px,12vw,124px);font-weight:800;letter-spacing:.01em}
+.hero h1 span{color:var(--accent)}
+.hero .tagline{font:700 clamp(24px,3.4vw,32px)/1.2 var(--display);margin-top:14px;letter-spacing:.01em}
+.hero .lede{color:var(--tarmac-muted);font-size:21px;max-width:40ch;margin-top:18px}
+.hero .ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.hero .note{margin-top:14px;font-size:14px;color:var(--tarmac-muted)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;border-radius:8px;font:700 16px/1 var(--body);text-decoration:none;border:1px solid transparent}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{border-color:rgba(255,255,255,.25);color:var(--tarmac-ink)}
+.btn.ghost:hover{border-color:rgba(255,255,255,.55)}
+.btn svg{width:18px;height:18px;flex:none}
+.shot{margin-top:52px;position:relative}
+.shot img{border-radius:12px 12px 0 0;box-shadow:0 -10px 60px rgba(0,0,0,.45);width:100%}
+.runway-line{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 48px,transparent 48px 96px);opacity:.9}
+
+/* steps */
+.steps{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));counter-reset:s}
+.steps li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;counter-increment:s}
+.steps li::before{content:counter(s,decimal-leading-zero);display:block;font:600 13px/1 var(--mono);color:var(--accent);margin-bottom:14px;letter-spacing:.1em}
+.steps p{color:var(--muted);font-size:16px;margin-top:8px}
+
+/* agent chips */
+.chip{display:inline-block;padding:1px 8px;border-radius:5px;font:600 13px/1.6 var(--mono)}
+.chip.claude{background:color-mix(in srgb,var(--claude) 18%,transparent);color:var(--claude)}
+.chip.codex{background:color-mix(in srgb,var(--codex) 18%,transparent);color:var(--codex)}
+.chip.any{background:color-mix(in srgb,var(--any) 20%,transparent);color:var(--muted)}
+
+/* features */
+.grid2{display:grid;gap:28px 40px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.feat h3{margin-bottom:6px}
+.feat p{color:var(--muted)}
+
+/* screens */
+.screens{display:grid;gap:24px;grid-template-columns:1.6fr 1fr;align-items:start}
+.screens figure{margin:0}
+.screens img{border-radius:10px;border:1px solid var(--line)}
+figcaption{font-size:14px;color:var(--muted);margin-top:10px}
+.screens .side{display:grid;gap:24px;grid-template-columns:1fr}
+@media (max-width:760px){.screens{grid-template-columns:1fr}}
+
+/* status */
+.status{display:grid;gap:12px;margin-top:8px}
+.status div{display:flex;gap:14px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.status b{font:600 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;min-width:84px;flex:none}
+.status .now b{color:var(--ok)} .status .next b{color:var(--accent)} .status .later b{color:var(--muted)}
+
+/* feedback */
+.feedback{background:var(--accent-soft);border-radius:14px;padding:32px;display:grid;gap:16px}
+.feedback pre{margin:0;background:var(--tarmac);color:var(--tarmac-ink);border-radius:8px;padding:14px 16px;overflow-x:auto;font:400 14px/1.5 var(--mono)}
+.feedback .ctas{display:flex;flex-wrap:wrap;gap:12px}
+.feedback .btn.primary{background:var(--ink);color:var(--bg)}
+.feedback .btn.ghost{border-color:var(--ink);color:var(--ink)}
+
+/* workflow */
+.flow{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.flow li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:8px;align-content:start;min-width:0}
+.flow li.auto{background:var(--tarmac);color:var(--tarmac-ink);border-color:var(--tarmac)}
+.flow li.auto p{color:var(--tarmac-muted)}
+.flow p{color:var(--muted);font-size:15px}
+.lane{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.flow code{font-size:13px;word-break:break-word}
+.more{font-weight:700;color:var(--accent);text-decoration:none}
+.more:hover{text-decoration:underline}
+/* receipt */
+.receipt{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.receipt table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
+.receipt th,.receipt td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+.receipt thead th{font:600 11px/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.receipt tr:last-child td{border-bottom:0}
+.receipt .ok{color:var(--ok);font-weight:700}
+.receipt .you{color:var(--accent);font-weight:700}
+/* faq */
+.faq{display:grid;gap:10px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.faq summary{cursor:pointer;font-weight:700}
+.faq details p{color:var(--muted);margin-top:8px}
+.faq summary:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+footer{border-top:1px solid var(--line);padding-block:32px;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}
+
+@media (max-width:560px){
+  nav .links a.hide-sm{display:none}
+  section{padding-block:56px}
+  .feedback{padding:22px}
+}
+
+/* skills page */
+.page-head{background:var(--tarmac);color:var(--tarmac-ink);padding-block:56px}
+.page-head h1{font-size:clamp(44px,8vw,80px);font-weight:800}
+.page-head .lede{color:var(--tarmac-muted);margin-top:16px}
+.stage{display:grid;grid-template-columns:200px 1fr;gap:24px;padding-block:28px;border-top:1px solid var(--line)}
+.stage:first-of-type{border-top:0}
+.stage>div{min-width:0;display:grid;gap:12px;align-content:start}
+.stage .who{font:600 11px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.stage.auto .who{color:var(--ok)}
+.skill{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:6px}
+.skill header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px}
+.skill code{font:700 15px/1.3 var(--mono)}
+.skill .src{font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.skill p{color:var(--muted);font-size:16px}
+.callout{background:var(--accent-soft);border-radius:12px;padding:22px 24px;display:grid;gap:10px}
+@media (max-width:640px){.stage{grid-template-columns:1fr;gap:12px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">Agent Runway</a>
+    <div class="links">
+      <a class="hide-sm" href="/#how">How it works</a>
+      <a href="/skills">Skills</a>
+      <a class="hide-sm" href="/#faq">FAQ</a>
+      <a class="hide-sm" href="/#feedback">Feedback</a>
+      <a href="https://github.com/datacraftdevelopment/agent-runway">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="page-head">
+  <div class="wrap narrow">
+    <p class="eyebrow">The skills</p>
+    <h1>How work gets to the runway</h1>
+    <p class="lede">Runway runs tickets. The skills are how good tickets get made. You do the thinking with your agent, it turns that thinking into small tickets, and Runway takes it from there.</p>
+  </div>
+  <div class="runway-line" style="margin-top:48px"></div>
+</header>
+
+<main>
+<section style="border-top:0">
+  <div class="wrap narrow stack">
+    <p>There are two sets. The <b>shaping skills</b> are Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>, MIT). Runway was built around how they work, and you install them yourself. The <b>Agent Runway skills</b> come with the app, are installed on first run, and work in both Claude Code and Codex.</p>
+
+    <div class="stage">
+      <div><span class="who">You + your agent</span><h3>1 · Discover</h3></div>
+      <div>
+        <p>Work out what you actually want before anything is built. This is where your judgment does the most good, so take as long as it needs.</p>
+        <div class="skill"><header><code>wayfinder</code><span class="src">Matt Pocock</span></header><p>For work too big for one session. It charts a map of the decisions that have to be made, then works through them one at a time until the way is clear.</p></div>
+        <div class="skill"><header><code>grill-me</code><span class="src">Matt Pocock</span></header><p>Your agent interviews you about the plan until every branch is settled. <code>grill-with-docs</code> does the same while it builds the project's glossary and decision records.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">You + your agent</span><h3>2 · Prototype</h3></div>
+      <div>
+        <p>When seeing beats reading, answer the question with something you can click.</p>
+        <div class="skill"><header><code>prototype</code><span class="src">Matt Pocock</span></header><p>Builds a throwaway prototype, often one HTML file or a few UI variants side by side, to settle a design question. It gets thrown away. The answer is what you keep.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">You + your agent</span><h3>3 · Spec</h3></div>
+      <div>
+        <p>Write down what done looks like, in a form an unattended agent can check.</p>
+        <div class="skill"><header><code>to-spec</code><span class="src">Matt Pocock</span></header><p>Turns the conversation into a spec, without starting a new interview. The acceptance checks in it become the tickets' checks.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">You type go</span><h3>4 · Tickets</h3></div>
+      <div>
+        <p>This is the hand-off point. After your go, nobody needs to watch.</p>
+        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It files only after you type go, and a changed batch needs a fresh go. It does the job of Matt's <code>to-tickets</code>, but it files straight into Runway.</p></div>
+      </div>
+    </div>
+
+    <div class="stage auto">
+      <div><span class="who">Runs on its own</span><h3>5 · Build, check, review</h3></div>
+      <div>
+        <p>The Runway app does this part, in plain code rather than an agent. Each ticket gets a fresh git worktree on a free Mac. The agent builds it, the repo's own check command runs, and a draft pull request opens. Then the other agent reviews it on that exact commit: Codex reviews Claude's work, and Claude reviews Codex's. A failed review gets one fix pass. If a usage limit hits, the next tickets go to the other agent.</p>
+      </div>
+    </div>
+
+    <div class="stage auto">
+      <div><span class="who">Runs on its own · you when it asks</span><h3>6 · Merge or ask</h3></div>
+      <div>
+        <p>Low-risk tickets that pass review and checks, and touch no sensitive paths, merge on their own. Anything else becomes one question on your board, such as "Merge PR #2?", answered with a click or from a session.</p>
+        <div class="skill"><header><code>runway</code><span class="src">Agent Runway</span></header><p>Ask your agent what Runway is doing and what needs you, then say go, no, pause or resume. It acts only on your own words for that ticket, and it gives you the line to reopen any run's session.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">Once per Mac</span><h3>Setup</h3></div>
+      <div>
+        <div class="skill"><header><code>setup</code><span class="src">Agent Runway</span></header><p>Does the same checks as the app's first-run screen, from inside a session. It checks git, gh, tmux, Claude Code and Codex and their sign-ins, and walks you through each fix. Then it watches your first repo with its check command. You sign in yourself, and it never handles a password or token.</p></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <h3>Why the line sits where it does</h3>
+      <p>Everything above step 4 is judgment: what to build, what done means, and how risky it is. Runway leaves that to you, because a wrong spec builds the wrong thing very efficiently. Everything below step 4 is careful repetition, and Runway does it without you.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Agent Runway is free to use. Its source is available under the <a href="https://polyformproject.org/licenses/shield/1.0.0">PolyForm Shield 1.0.0</a> licence: use it, change it, share it, just don't build a competing product from it.</span>
+    <span><a href="https://github.com/datacraftdevelopment/agent-runway">GitHub</a> · <a href="https://github.com/datacraftdevelopment/agent-runway/blob/main/LICENSE">Licence</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
