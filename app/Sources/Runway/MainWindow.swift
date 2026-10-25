@@ -16,9 +16,14 @@ struct MainWindow: View {
                     VStack(spacing: 0) {
                         Toolbar(model: model, status: status)
                         Rectangle().fill(Palette.border).frame(height: 1)
+                        if model.source == .live {
+                            AutonomyStrip(model: model)
+                            Rectangle().fill(Palette.border).frame(height: 1)
+                        }
                         switch model.tab {
                         case .board: BoardView(model: model, status: status)
                         case .activity: ActivityView(status: status, repo: model.selectedRepo)
+                        case .stats: StatsTab(model: model)
                         }
                     }
                 }
@@ -142,7 +147,8 @@ private struct Toolbar: View {
                 Text(action).font(.system(size: 11)).foregroundStyle(Palette.textMuted).lineLimit(1)
             }
             if let repo = model.repo { runsOnMenu(repo) }
-            Segmented(options: [(AppModel.Tab.board, "Board"), (.activity, "Activity")], selection: $model.tab)
+            Segmented(options: [(AppModel.Tab.board, "Board"), (.activity, "Activity"), (.stats, "Stats")],
+                      selection: $model.tab)
             Button(model.repo?.state == .paused ? "Resume" : "Pause") {
                 model.run([model.repo?.state == .paused ? "resume" : "pause", model.selectedRepo ?? ""])
             }

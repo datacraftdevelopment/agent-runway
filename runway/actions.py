@@ -31,8 +31,8 @@ def answer(con, tid, verdict, note=None, github=None):
             gh = github or GitHub()
             pr = gh.pr(r['path'], t['pr'])
             gh.merge(r['path'], t['pr'], pr['headRefOid'])
-            db.update_ticket(con, tid, state='done', stage=None, question=None, note=f'You merged it at '
-                             f'{time.strftime("%H:%M")}.')
+            db.update_ticket(con, tid, state='done', stage=None, question=None, merged_at=db.now(), merged_by='you',
+                             note=f'You merged it at {time.strftime("%H:%M")}.')
             db.event(con, 'merged', f'{tid} PR #{t["pr"]}, merged by you', repo=t['repo'], ticket=tid)
             return f'{tid}: merged PR #{t["pr"]}'
         if note:

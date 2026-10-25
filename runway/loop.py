@@ -169,8 +169,9 @@ class Loop:
             self.end(r, 'cancelled')
 
     def end(self, run, outcome, sha=None):
-        self.con.execute('UPDATE runs SET ended_at=?, outcome=?, sha=COALESCE(?, sha) WHERE id=?',
-                         (db.now(), outcome, sha, run['id']))
+        tin, tout, cost = worker.usage(run['agent'], read(self.runner.run_dir(run['id']) / 'log'))
+        self.con.execute('UPDATE runs SET ended_at=?, outcome=?, sha=COALESCE(?, sha), tokens_in=?, tokens_out=?, '
+                         'cost_usd=? WHERE id=?', (db.now(), outcome, sha, tin, tout, cost, run['id']))
 
     def failed(self, t, why, reason='build'):
         """A fix pass if one is left, else the person. `reason` is why it stopped, for the stats."""
@@ -186,6 +187,9 @@ class Loop:
                  reason=f'{reason}_failed_twice')
 
     def ask(self, t, kind, text, short, go_label, no_label, log, reason=None):
+        last = self.con.execute('SELECT id FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (t['id'],)).fetchone()
+        self.con.execute('INSERT INTO stops(ticket, repo, at, reason, run, detail) VALUES (?, ?, ?, ?, ?, ?)',
+                         (t['id'], t['repo'], db.now(), reason or kind, last['id'] if last else None, text[:4000]))
         db.update_ticket(self.con, t['id'], state='needs_you', stage=None,
                          question={'kind': kind, 'text': text, 'short': short, 'reason': reason or kind,
                                    'go_label': go_label, 'no_label': no_label})
@@ -205,13 +209,14 @@ class Loop:
         if verdict == 'wait':
             return
         if verdict == 'merged':
-            db.update_ticket(self.con, t['id'], state='done', stage=None, note='Merged outside Runway.')
+            db.update_ticket(self.con, t['id'], state='done', stage=None, note='Merged outside Runway.',
+                             merged_at=db.now(), merged_by='outside')
             return self.cleanup(t)
         if verdict == 'merge':
             self.github.merge(repo['path'], t['pr'], pr['headRefOid'], self.runner.config(repo).get('merge_method',
                                                                                                       'merge'))
-            db.update_ticket(self.con, t['id'], state='done', stage=None,
-                             note='Merged on its own: low risk, review passed, checks green.')
+            db.update_ticket(self.con, t['id'], state='done', stage=None, merged_at=db.now(), merged_by='gate',
+                             note='Merged on its own: low risk, both reviews passed, checks green.')
             db.event(self.con, 'merged', f'{t["id"]} PR #{t["pr"]} (low risk, checks green)', repo=t['repo'],
                      ticket=t['id'])
             self.log(f'merged {t["id"]} (PR #{t["pr"]})')

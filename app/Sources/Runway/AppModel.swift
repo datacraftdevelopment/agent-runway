@@ -10,10 +10,13 @@ import RunwayCore
 @MainActor
 @Observable
 final class AppModel {
-    enum Tab: Hashable { case board, activity }
+    enum Tab: Hashable { case board, activity, stats }
     enum Source: Equatable { case live, sample }
 
     private(set) var status: Status?
+    /// `runway stats --json`, read less often than the status.
+    private(set) var stats: StatsSnapshot?
+    var statsDays = 7
     private(set) var loadError: String?
     private(set) var source: Source = .sample
     var selectedRepo: String?
@@ -31,13 +34,17 @@ final class AppModel {
         let env = ProcessInfo.processInfo.environment
         // RUNWAY_TAB=activity and RUNWAY_SELECT=<ticket> open the window in a given state, for screenshots.
         if env["RUNWAY_TAB"] == "activity" { tab = .activity }
+        if env["RUNWAY_TAB"] == "stats" { tab = .stats }
         cli = env["RUNWAY_STATUS_FILE"] == nil ? RunwayCLI.find() : nil
         if let cli {
             source = .live
             if env["RUNWAY_NO_LOOP"] == nil { startLoop(cli) }
             polling = Task { [weak self] in
+                var tick = 0
                 while !Task.isCancelled {
                     await self?.refresh()
+                    if tick % 5 == 0 { await self?.refreshStats() }
+                    tick += 1
                     if let self, RenderMode.folder != nil { return await RenderMode.renderAndQuit(self) }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                 }
@@ -64,6 +71,12 @@ final class AppModel {
         } catch {
             loadError = "Couldn't read runway status: \(error.localizedDescription)"
         }
+    }
+
+    func refreshStats() async {
+        guard let cli else { return }
+        let result = await cli.run(["stats", "--json"])
+        if result.status == 0, let snap = try? StatsSnapshot.decode(Data(result.output.utf8)) { stats = snap }
     }
 
     private func loadSample() {

@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 MIGRATIONS = {
     1: """
@@ -118,6 +118,28 @@ MIGRATIONS = {
     ALTER TABLE tickets ADD COLUMN function_review TEXT;
     UPDATE runs SET role = 'code' WHERE kind = 'review';
     """,
+    # Hands-off features (Joe, 2026-10-25): what each run cost, when and by whom a ticket merged, take backs, and
+    # every stop that needed the person, with its reason.
+    4: """
+    ALTER TABLE runs ADD COLUMN tokens_in INTEGER;
+    ALTER TABLE runs ADD COLUMN tokens_out INTEGER;
+    ALTER TABLE runs ADD COLUMN cost_usd REAL;
+    ALTER TABLE runs ADD COLUMN base_sha TEXT;
+    ALTER TABLE tickets ADD COLUMN merged_at REAL;
+    ALTER TABLE tickets ADD COLUMN merged_by TEXT;
+    ALTER TABLE tickets ADD COLUMN taken INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tickets ADD COLUMN take_dir TEXT;
+    ALTER TABLE tickets ADD COLUMN kind TEXT NOT NULL DEFAULT 'work';
+    CREATE TABLE stops (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        at REAL NOT NULL,
+        reason TEXT NOT NULL,
+        run INTEGER,
+        detail TEXT
+    );
+    """,
 }
 
 # Ticket states and the board column and stage each shows as.
@@ -167,6 +189,39 @@ def migrate(con):
                           + f"\nINSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{v}');\nCOMMIT;")
     if version == 0:
         seed(con)
+    elif version < 4 <= SCHEMA_VERSION:
+        backfill_v4(con)
+
+
+def backfill_v4(con):
+    """Existing databases: merges and stops from the event log, tokens and cost from each run's own log."""
+    from . import worker
+    for e in con.execute("SELECT ticket, at, text FROM events WHERE kind='merged' AND ticket IS NOT NULL ORDER BY id"):
+        con.execute('UPDATE tickets SET merged_at=?, merged_by=? WHERE id=? AND merged_at IS NULL',
+                    (e['at'], 'you' if 'merged by you' in e['text'] else 'gate', e['ticket']))
+    for e in con.execute("SELECT e.ticket, e.at, e.text, t.repo FROM events e JOIN tickets t ON t.id = e.ticket "
+                         "WHERE e.kind='needs_you' ORDER BY e.id"):
+        con.execute('INSERT INTO stops(ticket, repo, at, reason, detail) VALUES (?, ?, ?, ?, ?)',
+                    (e['ticket'], e['repo'], e['at'], reason_from_text(e['text']), e['text']))
+    for r in con.execute('SELECT id, agent FROM runs WHERE cost_usd IS NULL AND tokens_in IS NULL'):
+        log = home() / 'runs' / str(r['id']) / 'log'
+        if log.exists():
+            tin, tout, cost = worker.usage(r['agent'], log.read_text(errors='replace'))
+            con.execute('UPDATE runs SET tokens_in=?, tokens_out=?, cost_usd=? WHERE id=?', (tin, tout, cost, r['id']))
+
+
+def reason_from_text(text):
+    """An old needs-you event's reason, from its wording."""
+    t = text.lower()
+    if 'not low risk' in t:
+        return 'not_low_risk'
+    if 'sensitive paths' in t:
+        return 'sensitive_path'
+    if ' asked: ' in t:
+        return 'worker_question'
+    if 'failed twice' in t:
+        return 'failed_twice'
+    return 'other'
 
 
 def seed(con):

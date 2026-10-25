@@ -182,6 +182,35 @@ def command(agent, prompt_file, run_dir, workdir, check_commands, session_id=Non
     return f'{line} > {log} 2>&1; echo $? > {done}'
 
 
+def usage(agent, log_text):
+    """(tokens in, tokens out, cost in USD) from a run's log, as the agent reported them. Claude Code's JSON carries
+    a dollar cost; Codex reports tokens only, so its cost stays None. Nothing is estimated."""
+    if agent == 'claude':
+        try:
+            data = json.loads(log_text.strip().splitlines()[-1] if log_text.strip() else '{}')
+        except (json.JSONDecodeError, IndexError):
+            try:
+                data = json.loads(log_text)
+            except json.JSONDecodeError:
+                return None, None, None
+        u = data.get('usage') or {}
+        tin = sum(int(u.get(k) or 0) for k in ('input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'))
+        tout = int(u.get('output_tokens') or 0)
+        cost = data.get('total_cost_usd')
+        return (tin or None), (tout or None), (float(cost) if cost is not None else None)
+    tin = tout = 0
+    for line in log_text.splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(ev, dict) and ev.get('type') == 'turn.completed':
+            u = ev.get('usage') or {}
+            tin += int(u.get('input_tokens') or 0)
+            tout += int(u.get('output_tokens') or 0)
+    return (tin or None), (tout or None), None
+
+
 def new_session_id():
     return str(uuid.uuid4())
 
