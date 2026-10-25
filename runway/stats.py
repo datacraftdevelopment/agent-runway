@@ -108,5 +108,9 @@ def snapshot(con, repo=None, days=None):
     def scope(name):
         return {'repo': name, 'windows': [window(con, d, name) for d in windows], 'waiting': waiting(con, name)}
     # Lists, not maps keyed by repo or agent name, so no name is ever rewritten by a client's key decoding.
+    from . import bench
+    rows = bench.latest(con)
+    if repo:
+        rows = [r for r in rows if db.ticket(con, r['ticket'])['repo'] == repo]
     return {'windows': list(windows), 'all': None if repo else scope(None),
-            'by_repo': [scope(name) for name in repos]}
+            'by_repo': [scope(name) for name in repos], 'bench': rows}

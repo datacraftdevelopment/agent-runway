@@ -88,6 +88,10 @@ struct StatsTab: View {
                     Text("Needs both Claude Code and Codex signed in. With one engine, everything else works as "
                          + "normal: two fresh review sessions on that engine.")
                         .foregroundStyle(Palette.textSoft).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+                } else if let rows = model.stats?.bench, !rows.isEmpty {
+                    benchTable(rows)
+                    Text("Runs only when you start it (runway bench <T-n>); never pushes. Uses both subscriptions.")
+                        .font(.system(size: 11)).foregroundStyle(Palette.textMuted)
                 } else {
                     Text("Nothing compared yet. Run runway bench <T-n> --agents claude,codex on done tickets; it "
                          + "never pushes, and uses both subscriptions.")
@@ -98,6 +102,26 @@ struct StatsTab: View {
         .font(.system(size: 12))
         .padding(.horizontal, 20).padding(.vertical, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func benchTable(_ rows: [StatsSnapshot.BenchRow]) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+            GridRow {
+                ForEach(["ticket", "agent", "result", "time · cost"], id: \.self) {
+                    Text($0).foregroundStyle(Palette.textMuted)
+                }
+            }
+            ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
+                GridRow {
+                    Text(i > 0 && rows[i - 1].ticket == row.ticket ? "" : "\(row.ticket) \(row.title)").lineLimit(1)
+                    Text(row.agent == .claude ? "Claude" : "Codex").foregroundStyle(row.agent.choice.foreground)
+                    Text(row.result).foregroundStyle(row.result == "pass" ? Color(hex: 0x7EE59A) : Color(hex: 0xFF9FBF))
+                        .help(row.why ?? "")
+                    Text(StatsFormat.minutes(row.minutes) + " · "
+                         + (row.costUsd.map(StatsFormat.dollars) ?? StatsFormat.tokens(row.tokens)))
+                }
+            }
+        }
     }
 
     private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

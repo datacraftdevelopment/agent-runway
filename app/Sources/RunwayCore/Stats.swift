@@ -55,9 +55,22 @@ public struct StatsSnapshot: Codable, Equatable, Sendable {
         public var label: String
     }
 
+    /// Head-to-head: the latest result per done ticket and engine.
+    public struct BenchRow: Codable, Equatable, Sendable {
+        public var ticket: String
+        public var title: String
+        public var agent: AgentKind
+        public var result: String
+        public var minutes: Double?
+        public var costUsd: Double?
+        public var tokens: Int?
+        public var why: String?
+    }
+
     public var windows: [Int]
     public var all: Scope?
     public var byRepo: [Scope]
+    public var bench: [BenchRow]?
 
     public func scope(repo: String?) -> Scope? {
         guard let repo else { return all }

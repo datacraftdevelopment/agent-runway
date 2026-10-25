@@ -377,6 +377,9 @@ class Loop:
                                             'AND ended_at IS NOT NULL', (t['id'], run_id)).fetchall():
                     self.runner.remove(repo, old['dir'])
                 wt = self.runner.worktree(repo, t['id'], run_id, start_ref, branch=branch)
+                # The base commit, for head-to-head re-runs from the same starting point.
+                self.con.execute('UPDATE runs SET base_sha=? WHERE id=?',
+                                 (self.runner.rev(repo, f'origin/{t["base"]}'), run_id))
                 prompt = worker.build_prompt(t, repo['name'], start_ref, check, run_dir / 'outcome.json', commands)
             else:
                 wt = self.runner.worktree(repo, t['id'], run_id, t['sha'])

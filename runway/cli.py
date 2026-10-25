@@ -130,6 +130,20 @@ def cmd_give(con, a):
     print(f'{a.ticket} is given back at {head[:7]}: it builds again from that commit, then both reviews run on it.')
 
 
+def cmd_bench(con, a):
+    from . import bench
+    results = bench.run(con, a.tickets, agents=a.agents.split(','), log=lambda m: print(m, flush=True))
+    if a.json:
+        out(results)
+        return
+    print()
+    for r in results:
+        cost = f'${r["cost_usd"]:.2f}' if r['cost_usd'] is not None else f'{r["tokens"] or 0} tokens'
+        print(f'{r["ticket"]:6} {r["agent"]:7} {r["result"]:5} {r["minutes"]:5} min  {cost}'
+              + (f'  ({r["why"]})' if r['why'] else ''))
+    print('Nothing was pushed; each run\'s record is in ~/.runway/bench/<ticket>/.')
+
+
 def cmd_retro(con, a):
     """File a retro by hand: for the given reason, or the most frequent one in the last 7 days."""
     from . import retro
@@ -359,6 +373,11 @@ def parser():
     x = sub.add_parser('give', help='give a taken-back ticket back: push your commits, queue it again')
     x.add_argument('ticket')
     x.set_defaults(fn=cmd_give)
+    x = sub.add_parser('bench', help='head-to-head: re-run done tickets with each engine (never pushes)')
+    x.add_argument('tickets', nargs='+')
+    x.add_argument('--agents', default='claude,codex')
+    x.add_argument('--json', action='store_true')
+    x.set_defaults(fn=cmd_bench)
     x = sub.add_parser('retro', help='file a retro ticket now for what keeps stopping tickets')
     x.add_argument('--repo')
     x.add_argument('--reason', help='a stop reason, e.g. check_failed_twice (default: the most frequent)')

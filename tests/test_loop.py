@@ -34,6 +34,9 @@ class FakeRunner:
     def has_ref(self, repo, ref):
         return True
 
+    def rev(self, repo, ref):
+        return 'base0000000000000000000000000000000000000'
+
     def start(self, name, workdir, line):
         self.live.add(name)
         self.started.append((name, line))

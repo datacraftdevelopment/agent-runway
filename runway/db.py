@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 MIGRATIONS = {
     1: """
@@ -152,6 +152,26 @@ MIGRATIONS = {
     6: """
     ALTER TABLE tickets ADD COLUMN retro_reason TEXT;
     ALTER TABLE tickets ADD COLUMN retro_runs TEXT;
+    """,
+    # Head-to-head (Joe, 2026-10-25): re-runs of done tickets from their base commit, one row per engine.
+    7: """
+    CREATE TABLE bench (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket TEXT NOT NULL,
+        agent TEXT NOT NULL,
+        base_sha TEXT,
+        started_at REAL NOT NULL,
+        ended_at REAL,
+        result TEXT,
+        minutes REAL,
+        tokens_in INTEGER,
+        tokens_out INTEGER,
+        cost_usd REAL,
+        detail TEXT,
+        check_output TEXT,
+        run_dir TEXT,
+        worktree TEXT
+    );
     """,
 }
 
