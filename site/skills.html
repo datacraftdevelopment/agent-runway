@@ -191,7 +191,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow stack">
-    <p>You don't have to design a workflow: this is the one Runway comes with. Every skill on this page is part of the Agent Runway plugin. The app installs it on first run, in Claude Code and Codex alike, so there is nothing else to add.</p>
+    <p>You don't have to design a workflow: this is the one Runway comes with. All fifteen skills on this page are part of the Agent Runway plugin. The app installs it on first run, in Claude Code and Codex alike, and offers to update it after each app update, so there is nothing else to add.</p>
 
     <div class="stage">
       <div><span class="who">You + your agent</span><h3>1 · Discover</h3></div>
@@ -222,7 +222,21 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <div><span class="who">You type go</span><h3>4 · Tickets</h3></div>
       <div>
         <p>This is the hand-off point. After your go, nobody needs to watch.</p>
-        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It files only after you type go, and a changed batch needs a fresh go.</p></div>
+        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It sorts the batch into two kinds: <b>Runway tickets</b>, which run on their own, and <b>hands-on tickets</b>, the parts that need you, such as a real device, the simulator, or your eye on how something looks and feels. It files only after you type go, and a changed batch needs a fresh go.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">You, in your own session</span><h3>Hands-on tickets</h3></div>
+      <div>
+        <p>Runway never starts a hands-on ticket. It waits on the board as <b>Hands-on · yours</b>, with a prompt to copy into Claude Code or Codex and <b>Mark done</b>. Runway tickets that depend on it say so, and start once it's done. A ticket you finished yourself shows <b>Done by hand</b>.</p>
+        <div class="skill"><header><code>hands-on</code><span class="src">Agent Runway</span></header><p>Works through your hands-on tickets with you, blockers first. It takes each one into its own worktree, plans it if it's more than a step or two, builds it test-first, and tells you exactly what to check on the device or by eye, then waits for your answer. It never ticks a check you didn't confirm, and closes the ticket only on your go, so the work waiting on it can start.</p></div>
+        <p>To build, it uses six skills from Superpowers that come with the plugin:</p>
+        <div class="skill"><header><code>writing-plans</code><span class="src">Superpowers · MIT</span></header><p>A short plan for work bigger than a step or two, pointing at the spec rather than restating it.</p></div>
+        <div class="skill"><header><code>subagent-driven-development</code> <code>executing-plans</code><span class="src">Superpowers · MIT</span></header><p>Run the plan: a fresh subagent per task with a review after each, or inline in your session when subagents aren't available.</p></div>
+        <div class="skill"><header><code>test-driven-development</code><span class="src">Superpowers · MIT</span></header><p>Every change starts with a failing test.</p></div>
+        <div class="skill"><header><code>systematic-debugging</code><span class="src">Superpowers · MIT</span></header><p>For a bug: reproduce it first, find the cause, then fix it.</p></div>
+        <div class="skill"><header><code>verification-before-completion</code><span class="src">Superpowers · MIT</span></header><p>No "done" without the command that proves it and its output.</p></div>
       </div>
     </div>
 
@@ -267,7 +281,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <h3>Why the line sits where it does</h3>
       <p>Everything above step 4 is judgment: what to build, what done means, and how risky it is. Runway leaves that to you, because a wrong spec builds the wrong thing very efficiently. Everything below step 4 is careful repetition, and Runway does it without you.</p>
     </div>
-    <p class="credit">The shaping steps are inspired by Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>), the way of working Runway was built around. Runway's versions are its own, written to hand work to unattended tickets.</p>
+    <p class="credit">The shaping steps are inspired by Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>), the way of working Runway was built around. Runway's versions are its own, written to hand work to unattended tickets. The six build skills on hands-on tickets come from Jesse Vincent's <a href="https://github.com/obra/superpowers">Superpowers</a>, under its MIT licence, with only the changes listed in the plugin's <a href="https://github.com/datacraftdevelopment/agent-runway/blob/main/plugin/agent-runway/VENDOR.md">VENDOR.md</a>.</p>
   </div>
 </section>
 </main>
