@@ -133,3 +133,55 @@ struct ArchivedSection: View {
         }
     }
 }
+
+/// The check command and what else Runway's sessions may run in a repo, kept in Runway (runway.json on the base
+/// branch, when it says, still wins). Prefilled with what's set, or what the clone suggests.
+struct CheckSheet: View {
+    @State var edit: CheckEdit
+    let model: AppModel
+    @Environment(\.dismiss) private var dismiss
+
+    init(edit: CheckEdit, model: AppModel) {
+        _edit = State(initialValue: edit)
+        self.model = model
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("\(edit.repo): what Runway's sessions may run").font(.system(size: 17, weight: .bold))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Check command (runs before every PR, and reviews use it)").font(.system(size: 11))
+                    .foregroundStyle(Palette.textMuted)
+                TextField("", text: $edit.check, prompt: Text("e.g. swift test").foregroundStyle(Palette.grey))
+                    .textFieldStyle(.plain).font(.system(size: 12, design: .monospaced))
+                    .padding(.horizontal, 8).padding(.vertical, 7)
+                    .background(Palette.code, in: RoundedRectangle(cornerRadius: 6))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Also allowed, one per line (builds, runs)").font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                TextEditor(text: $edit.commands).font(.system(size: 12, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .padding(6).frame(height: 96)
+                    .background(Palette.code, in: RoundedRectangle(cornerRadius: 6))
+            }
+            if let s = edit.suggested, s.check != nil || !s.commands.isEmpty {
+                Text("Found in the repo: " + ([s.check].compactMap { $0 } + s.commands).joined(separator: " · "))
+                    .font(.system(size: 11)).foregroundStyle(Palette.textMuted).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("Kept in Runway, so nothing needs committing. A runway.json on the base branch, when it sets these, wins.")
+                .font(.system(size: 11)).foregroundStyle(Palette.textMuted).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Cancel") { model.checkEdit = nil; dismiss() }.buttonStyle(PlainBoxButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") { model.saveCheck(edit); dismiss() }.buttonStyle(PrimaryButtonStyle())
+            }
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(Palette.text)
+        .padding(24)
+        .frame(width: 520)
+        .background(Palette.window)
+        .preferredColorScheme(.dark)
+    }
+}

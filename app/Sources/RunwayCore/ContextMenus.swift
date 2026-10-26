@@ -8,7 +8,7 @@ public enum MenuAction: Equatable, Sendable {
     case deleteTicket
     // Repos
     case discussRepo, pauseRepo, resumeRepo, repoRunsOn(Repo.RunsOn), mainComputer(String), openGitHub, revealFolder
-    case clearDone, archive, unarchive, removeRepo
+    case clearDone, archive, unarchive, removeRepo, setCheck
     // Runners
     case pauseRunner, resumeRunner, maxSessions(Int)
 }
@@ -73,6 +73,7 @@ public enum ContextMenus {
         if r.slug != nil { items.append(.item("Open on GitHub", .openGitHub)) }
         if r.path != nil { items.append(.item("Reveal folder in Finder", .revealFolder)) }
         items.append(.divider)
+        items.append(.item(r.checkCmd == nil ? "Set check command…" : "Check command…", .setCheck))
         if hasDone { items.append(.item("Clear done", .clearDone)) }
         items += [.item("Archive", .archive), .item("Remove…", .removeRepo, destructive: true)]
         return items

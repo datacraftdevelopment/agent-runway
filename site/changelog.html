@@ -204,6 +204,18 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow log">
+<article class="release" id="v0.1.6">
+  <div class="ver"><h2>0.1.6</h2><span class="when">2026-10-26</span></div>
+  <div class="body">
+<ul>
+<li>A repo no longer needs a runway.json before Runway's sessions can run its tests. When you add a repo, Runway finds the check command and the build and run commands (a Swift package in a subfolder too) and keeps them in Runway, so nothing has to be committed first. A runway.json on the base branch, when it has them, still wins.</li>
+<li>A repo with no check command says so on the board, with "Set check command…". Right-click a repo to change its commands any time.</li>
+<li>"Add a repo…" in the sidebar now opens the folder picker and shows what Runway found.</li>
+<li>In Terminal: <code>runway repo check &lt;repo&gt;</code> shows, sets (<code>--check</code>, <code>--allow</code>) or suggests (<code>--suggest</code>) them.</li>
+</ul>
+<p class="gh"><a href="https://github.com/datacraftdevelopment/agent-runway/releases/tag/v0.1.6">Release on GitHub</a></p>
+  </div>
+</article>
 <article class="release" id="v0.1.5">
   <div class="ver"><h2>0.1.5</h2><span class="when">2026-10-26</span></div>
   <div class="body">

@@ -72,6 +72,8 @@ public struct RepoSuggestion: Codable, Equatable, Sendable {
     public var git: Bool
     public var slug: String?
     public var check: String?
+    /// What else sessions may run (builds, runs), found in the clone. Nil from an older runway.
+    public var commands: [String]? = nil
 
     public static func decode(_ data: Data) throws -> RepoSuggestion {
         try StatusCoding.decoder.decode(RepoSuggestion.self, from: data)

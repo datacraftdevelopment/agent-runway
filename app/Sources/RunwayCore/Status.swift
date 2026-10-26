@@ -75,6 +75,10 @@ public struct Repo: Codable, Equatable, Identifiable, Sendable {
     /// needs you"), and the ticket to look at. Nil while something runs or the next tick will start one.
     public var idleReason: String? = nil
     public var idleTicket: String? = nil
+    /// The check command that applies, and where it's set: "runway.json" on the base branch, "runway" (kept in
+    /// Runway), or nil when there is none and sessions can't run the repo's tests.
+    public var checkCmd: String? = nil
+    public var checkFrom: String? = nil
 
     /// The reason without its "Nothing can run: " lead, for the menu and the side panel.
     public var idleShort: String? { idleReason?.replacingOccurrences(of: "Nothing can run: ", with: "") }

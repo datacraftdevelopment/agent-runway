@@ -39,6 +39,7 @@ struct MainWindow: View {
             if let toast = model.toast { ToastView(toast: toast, model: model).padding(.bottom, 22) }
         }
         .sheet(item: $model.confirm) { ConfirmSheet(confirm: $0, model: model) }
+        .sheet(item: $model.checkEdit) { CheckSheet(edit: $0, model: model) }
         .ignoresSafeArea()
         .frame(minWidth: 1100, minHeight: 640)
         .preferredColorScheme(.dark)
@@ -50,6 +51,7 @@ struct MainWindow: View {
 private struct Sidebar: View {
     let model: AppModel
     let status: Status
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -93,7 +95,13 @@ private struct Sidebar: View {
             }
             .font(.system(size: 11)).foregroundStyle(Palette.textMuted)
             .padding(.horizontal, 8).padding(.top, 6).padding(.bottom, 8)
-            sideButton("Add a repo…", symbol: "plus.circle") { model.act("Add a repo: runway repo add <path> (setup does this in Phase 3)") }
+            sideButton("Add a repo…", symbol: "plus.circle") {
+                // The walkthrough's last step picks the folder and shows the check and session commands it finds.
+                model.guideStep = .next
+                model.chooseRepo()
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openWindow(id: "runway-setup")
+            }
             sideButton("Add a Mac or cloud…", symbol: "display") { model.act("Other Macs and cloud come with their runners") }
         }
         .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 14)
