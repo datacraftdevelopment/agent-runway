@@ -57,6 +57,9 @@ These are the part that matters most. Runway's reviewer walks each one, pass or 
 
 - Each line is observable: something a fresh agent can run or look at, not "works well".
 - Each says how to verify it, with a command where there is one.
+- A reviewer verifies them alone, in a fresh copy of the repo, with the repo's own commands: write lines it can run,
+  or an experiment it can do and undo (change a value, see a named test fail). Something only a person, a device or
+  a file outside the repo can show isn't a line it can pass; say how it will be checked instead.
 - Three to six for a spec. If you need more, the spec is probably two specs.
 
 ## After

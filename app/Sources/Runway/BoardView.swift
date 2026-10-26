@@ -172,21 +172,27 @@ private struct Inspector: View {
     let model: AppModel
     let status: Status
     @State private var note = ""
+    @State private var showAll = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if let ticket = model.ticket {
-                content(ticket)
-            } else {
-                Text("Pick a card").foregroundStyle(Palette.textMuted)
-                Spacer()
+        // Its own scroll view, the window's height at most: a long note or review scrolls here, and never pushes the
+        // toolbar or the stats strip off the window.
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let ticket = model.ticket {
+                    content(ticket)
+                } else {
+                    Text("Pick a card").foregroundStyle(Palette.textMuted)
+                }
             }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(18)
+        .scrollIndicators(.automatic)
         .frame(width: 320)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Palette.inspector)
-        .onChange(of: model.selectedTicket) { note = "" }
+        .onChange(of: model.selectedTicket) { note = ""; showAll = false }
     }
 
     @ViewBuilder private func content(_ ticket: Ticket) -> some View {
@@ -236,7 +242,7 @@ private struct Inspector: View {
             Text(summary).font(.system(size: 12)).foregroundStyle(Palette.textSoft).lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        Spacer()
+        Spacer(minLength: 8)
         if let runs = ticket.retroRuns, !runs.isEmpty { runsBehind(runs) }
         if let prompt = model.takePrompts[ticket.id] { takePrompt(prompt) }
         HStack(spacing: 8) {
@@ -366,6 +372,11 @@ private struct Inspector: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeading(text: "Needs you", color: Palette.needsYouText)
             Text(question.text).font(.system(size: 13)).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+                .lineLimit(showAll ? nil : 12).textSelection(.enabled)
+            if question.text.count > 600 {
+                Button(showAll ? "Show less" : "Show all") { showAll.toggle() }.buttonStyle(.plain)
+                    .font(.system(size: 11)).foregroundStyle(Palette.link)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Note (optional)").font(.system(size: 11)).foregroundStyle(Palette.textMuted)
                 TextField("", text: $note, prompt: Text("Anything the agent should know").foregroundStyle(Palette.grey))

@@ -53,8 +53,7 @@ Write exactly one JSON file to {outcome} and then stop:
 # Review is two fresh sessions, each with its own prompt and none of the builder's context (Joe, 2026-10-25).
 REVIEW_HEAD = """\
 You are a Runway {role_name}, in a fresh session: you didn't build this and you have none of the builder's context.
-You read and run; you never edit, commit or push. Nobody is watching this session: review, write your verdict file,
-stop.
+{hands} Nobody is watching this session: review, write your verdict file, stop.
 
 Ticket {id}: {title}
 Repo: {repo}. This folder is checked out at commit {sha}, the exact commit you are reviewing.
@@ -96,7 +95,8 @@ REVIEW_FUNCTION = """\
 1. Run the repo's check: `{check}`. It must pass.
 2. Walk each Acceptance line above, in order: do what its Verify says (run the command, or exercise the behaviour
    it describes) at this commit, and record pass or fail with the evidence (the command and what it printed, or what
-   you saw). A line you can't verify here is a fail, with the reason.
+   you saw). A line that asks for an experiment (change a value and see a test fail) is one you run here, then undo
+   with git restore. A line you can't verify here is a fail, with the reason.
 3. Pass only when the check passes and every Acceptance line passes. Risk only rises: say "not_low" if running it
    showed something risky the ticket didn't expect. Otherwise repeat the ticket's risk: {risk}.
 {rules}
@@ -117,6 +117,16 @@ folder is already the repo). Only these are allowed: {allowed}. If one is refuse
 """
 
 ROLES = ('code', 'function')
+# What each reviewer may do to the folder. The function reviewer may run experiments an Acceptance line asks for (a
+# mutation: change a threshold, see a test fail): its folder is a throwaway checkout of the commit, never committed
+# or pushed, and removed afterwards (Joe, 2026-10-26: T-5's A3 failed only because a reviewer couldn't edit).
+HANDS = {
+    'code': 'You read and run; you never edit, commit or push.',
+    'function': ('You read and run, and you may change files here for an experiment an Acceptance line asks for (say, '
+                 'change a threshold and see a test fail): this folder is a throwaway checkout of the commit, never '
+                 'committed or pushed, and removed afterwards. Undo each experiment (git restore <file>) before the '
+                 'next one and before your verdict, and never commit or push.'),
+}
 ROLE_NAMES = {'code': 'code reviewer', 'function': 'function reviewer'}
 
 
@@ -141,7 +151,7 @@ def build_prompt(t, repo, start, check, outcome, check_commands=()):
 def review_prompt(t, repo, sha, base_ref, check, outcome, check_commands=(), role='code'):
     fields = dict(id=t['id'], title=t['title'], repo=repo, sha=sha, base_ref=base_ref, body=t['body'] or '(no body)',
                   acceptance=acceptance_lines(t), check=check or 'the repo\'s tests', risk=t['risk'],
-                  outcome=outcome, role_name=ROLE_NAMES[role])
+                  outcome=outcome, role_name=ROLE_NAMES[role], hands=HANDS[role])
     rules = REVIEW_RULES.format(allowed=allowed_list(check_commands or [check]))
     body = (REVIEW_CODE if role == 'code' else REVIEW_FUNCTION).format(rules=rules, **fields)
     return REVIEW_HEAD.format(**fields) + body
@@ -160,7 +170,7 @@ def allowed_tools(check_commands, run_dir):
     """Claude Code's allow-list: file tools, read-only git, the repo's check commands."""
     tools = ['Read', 'Edit', 'Write', 'Glob', 'Grep',
              'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)',
-             'Bash(ls:*)', 'Bash(pwd)']
+             'Bash(git restore:*)', 'Bash(ls:*)', 'Bash(pwd)']
     tools += [f'Bash({c}:*)' for c in check_commands if c]
     return tools
 
