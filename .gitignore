@@ -16,8 +16,9 @@ secrets.*
 # Transcripts — client conversations stay out of the shared repo.
 _pm/transcripts/
 
-# Plan ledgers, review packages and brainstorming mockups (pm-sp's
-# Superpowers skills): local working state, not the shared record.
+# Plan ledgers and review packages for hands-on work: local working state,
+# not the shared record. (.superpowers/ is the pre-0.3.0 name.)
+.runway/
 .superpowers/
 
 # Plan worktrees (using-git-worktrees).

@@ -23,7 +23,7 @@ FileMaker, web, SaaS or pure consulting.
 ├── docs/                ← SHARED record: collaborators and clients read it
 │   ├── inbox.md         ← loose ideas, one line each, no status
 │   ├── agents/
-│   │   └── issue-tracker.md ← where wayfinder keeps maps: docs/maps/
+│   │   └── issue-tracker.md ← where maps live: docs/maps/
 │   └── quirks.md        ← technical gotchas, fast capture
 └── _pm/                 ← PERSONAL log: per person, append-only, never authoritative
     ├── README.md
@@ -36,39 +36,47 @@ what I'm doing, never what is true.
 
 ## How we work
 
-The workflow is the pm-sp plugin's: Superpowers' skills for the work, pm-sp's
-around the session.
+The workflow is Agent Runway's (the `agent-runway` plugin), with pm-sp's
+skills around the session. Shaped work becomes tickets of two kinds: Runway
+tickets run on their own; hands-on tickets are done here, in your own
+session.
 
 - **Open with `whats-next`, close with `stepping-away`.** Several sessions a
   day is normal.
-- **New work starts in `brainstorming`.** It reads the project first, talks it
-  through, shows mockups in a browser tab when seeing beats reading, lays out
-  approaches and writes a design doc. A quick, fully specified task skips it.
-- **Design docs go in `docs/specs/YYYY-MM-DD-<topic>-design.md`, plans in
+- **New work is shaped first:** `grill` talks it through, `prototype` shows it
+  when seeing beats reading, and `spec` writes it up. A quick, fully specified
+  task skips it.
+- **Screens come first.** Work with screens goes data sample, then screens in
+  Claude Design (`design-handoff`), approved, then the spec.
+- **Specs go in `docs/specs/YYYY-MM-DD-<topic>.md`, plans in
   `docs/plans/YYYY-MM-DD-<feature>.md`.** Both are committed.
-- **Every design doc has `## Acceptance`:** three or four observable checks as
-  `- [ ] A1: …` lines. `ship-acceptance` runs them later against the real
+- **Every spec has `## Acceptance`:** three to six observable checks as
+  `- [ ] A1: …` lines, each saying how to verify it. Runway's reviewer walks
+  them on every ticket; `ship-acceptance` runs them again against the real
   candidate and production.
-- **An approved design is not a go to plan.** Ask; the user may want to sit on
+- **An approved spec is not a go to file.** Ask; the user may want to sit on
   it.
-- **Run the plan in one session:** `subagent-driven-development` (a fresh
-  subagent per task, reviewed) or `executing-plans` (inline). Task = commit,
-  never a session. Decisions the plan didn't settle are made and written in the
-  ledger as rulings; only irreversible, security, outside-the-worktree or
-  hopelessly broken steps stop to ask.
+- **`file-tickets` sorts the work:** a Runway ticket when an unattended agent
+  can prove every Acceptance line, a hands-on ticket when one needs a real
+  device or camera, or the user's eye on how it looks and feels. Filed only on
+  the user's typed go.
+- **Hands-on tickets** run in this session with `hands-on`: a plan
+  (`writing-plans`) run by `subagent-driven-development` or `executing-plans`,
+  test-first, the user checks what only they can, then `runway done` on their
+  go. Decisions the plan didn't settle are made and written in the ledger as
+  rulings; only irreversible, security, outside-the-worktree or hopelessly
+  broken steps stop to ask.
 - **Second opinion** (`second-opinion`, Sol through Ringer plus a fresh
-  Opus): on project-sized design docs during brainstorming's builder check,
-  and on the finished branch before it merges. Not after every task.
-- **Parallel lanes** go to `nested-sessions`, only when the plan marks lanes
-  with disjoint files and the user wants them moving at once.
+  Opus): on project-sized specs before they're filed. Runway's two fresh
+  reviews cover every ticket.
 - **Foggy work** with several unknowns that depend on each other: suggest
-  `wayfinder` (it runs when the user names it, never on its own). Its tickets are decisions, never builds; its destination is a set of
-  chunks in order, and each chunk gets its own brainstorm.
+  `map` (never started on its own). It holds decisions, never builds; its
+  destination is a set of chunks in order, and each chunk gets its own spec.
 - **Bugs:** `systematic-debugging`. Reproduce before fixing.
-- **Model economy.** Subagents and nested sessions always name their model:
-  `sonnet` to build, `opus` for judgment and the final review, never Fable or
-  Haiku, whatever the main session runs on. Ordinary sessions run Opus in
-  Claude Code and Sol in Codex. The same two read each design and branch fresh as the second
+- **Model economy.** Subagents always name their model: `sonnet` to build,
+  `opus` for judgment and the final review, never Fable or Haiku, whatever
+  the main session runs on. Ordinary sessions run Opus in Claude Code and Sol
+  in Codex. The same two read a project-sized spec fresh as the second
   opinion; no premium review seat.
 
 ## The taxonomy: known folders, created on first write
@@ -78,15 +86,15 @@ written into it (`mkdir -p`, then write): presence means it was needed.
 
 | Folder | Purpose | Sprout when |
 |---|---|---|
-| `docs/specs/` | Design docs from brainstorming, with Acceptance | the first design is written |
-| `docs/plans/` | Implementation plans from writing-plans | the first plan is written |
+| `docs/specs/` | Specs from `spec`, with Acceptance | the first spec is written |
+| `docs/plans/` | Plans for hands-on work, from writing-plans | the first plan is written |
 | `docs/shipped/` | Delivery records from ship-acceptance | the first acceptance run |
 | `docs/notes/` | Scratch, meeting notes, ad-hoc analysis | first ad-hoc doc that isn't workflow |
 | `knowledge/` | Curated project knowledge, always an OKF bundle (`okf` skill) | facts turn entity-shaped, or a second consumer needs them |
 | `resources/` | Material **you bring in** from outside (`design-handoff/`, `research/`, `history/` as needed) | first external file arrives |
 | `docs/adr/` | Durable decisions, in domain-modeling's format | the first ADR |
-| `docs/maps/<effort>/` | A wayfinder map, its decision tickets and research notes (`docs/agents/issue-tracker.md`) | `/pm-sp:wayfinder` charts its first map |
-| `.superpowers/` | Gitignored working state: plan ledgers, review packages, brainstorming mockups | the first plan run or visual brainstorm |
+| `docs/maps/<effort>/` | A map, its decisions and research notes (`docs/agents/issue-tracker.md`) | `map` charts its first map |
+| `.runway/` | Gitignored working state: plan ledgers and review packages for hands-on work | the first plan run |
 | `docs/agents/client-face.md` | Optional: names a client-facing tracker and its close-out steps; `stepping-away` follows it | the client-face tool's own setup writes it |
 | `_pm/transcripts/` | Meeting transcripts, **gitignored** | first transcript kept (`granola-transcript`) |
 | `_pm/artifacts/` | Other raw inputs: customer docs, exports, recordings | first raw input that isn't a transcript |
@@ -106,7 +114,8 @@ change-request job, a longer doc for a six-month engagement.
 
 One file per session, per person, append-only. `whats-next` writes a two or
 three sentence Intent at the open (push, why, done-for-this-session, not in
-scope); `stepping-away` closes with Shipped / Tried-Learned-Decided /
+scope) when the work is clear; a fuzzy start leaves it unset and the first
+re-aim sets it; `stepping-away` closes with Shipped / Tried-Learned-Decided /
 Intent-vs-outcome and a resumable line per plan in flight. Keep the session's
 exact path and ID in the conversation; close by that binding. `checkpoint`
 appends a dated re-aim only when the session can't be broken.
@@ -123,11 +132,11 @@ Before reporting any task done, fixed or passing:
 - Fix the code, not the test. Never skip or delete a failing test, add a
   suppression or loosen a threshold to get green.
 
-(The full rule: pm-sp's `verification-before-completion` skill.)
+(The full rule: Agent Runway's `verification-before-completion` skill.)
 
 ## Delivery acceptance
 
-After the branch is finished, `ship-acceptance` runs the design doc's
-Acceptance checks against the actual candidate, records the result in
-`docs/shipped/`, and repeats them against production after the human deploys.
-A green plan is not a delivered design.
+When a spec's tickets have all merged, `ship-acceptance` runs its Acceptance
+checks against the actual candidate, records the result in `docs/shipped/`,
+and repeats them against production after the human deploys. Merged tickets
+are not a delivered spec.
