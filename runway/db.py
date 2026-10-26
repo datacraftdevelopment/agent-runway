@@ -218,6 +218,8 @@ def migrate(con):
     if has_meta:
         row = con.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
         version = int(row['value']) if row else 0
+    if 0 < version < SCHEMA_VERSION:
+        back_up(con, version)
     for v in range(version + 1, SCHEMA_VERSION + 1):
         con.executescript('BEGIN;\n' + MIGRATIONS[v]
                           + f"\nINSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{v}');\nCOMMIT;")
@@ -228,6 +230,32 @@ def migrate(con):
             backfill_v4(con)
         if version < 5 <= SCHEMA_VERSION:
             backfill_v5(con)
+
+
+KEEP_BACKUPS = 5
+
+
+def back_up(con, version):
+    """Before a migration changes it: a copy of the database in ~/.runway/backups/runway-v<old schema>-<time>.db,
+    keeping the newest five. Uses SQLite's own backup, so the copy is consistent while the app and loop are open."""
+    path = next((r['file'] for r in con.execute('PRAGMA database_list') if r['name'] == 'main'), '')
+    if not path:
+        return None                                   # an in-memory database: nothing to keep
+    folder = Path(path).parent / 'backups'
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / f'runway-v{version}-{time.strftime("%Y%m%d-%H%M%S")}.db'
+    n = 1
+    while dest.exists():
+        dest = folder / f'runway-v{version}-{time.strftime("%Y%m%d-%H%M%S")}-{n}.db'
+        n += 1
+    out = sqlite3.connect(str(dest))
+    try:
+        con.backup(out)
+    finally:
+        out.close()
+    for old in sorted(folder.glob('runway-v*.db'), key=lambda p: p.stat().st_mtime)[:-KEEP_BACKUPS]:
+        old.unlink()
+    return dest
 
 
 def backfill_v5(con):

@@ -42,7 +42,9 @@ public enum SetupGuide {
         if firstLaunch { return .welcome }
         guard let report else { return .check }
         if !report.ready { return .check }
-        if report.databaseExists == false || report.skills.installed != true { return .install }
+        if report.databaseExists == false || report.skills.installed != true || report.skills.outdated == true {
+            return .install
+        }
         return .next
     }
 
@@ -63,12 +65,25 @@ public enum SetupGuide {
                     : "One link in ~/.local/bin to the command inside this app, so your agent can file tickets. "
                         + "It never replaces a file that's already there.",
                  done: report.command.linked, skipped: false),
-            Item(kind: .skills, title: "The Agent Runway skills in \(into)",
+            report.skills.outdated == true
+                ? Item(kind: .skills, title: "Update the Agent Runway skills in \(into)",
+                       detail: "Yours are " + installedVersions(report) + "; this Runway carries "
+                        + "\(report.skills.version ?? "a newer one"). Updated with each agent's own plugin command.",
+                       done: false, skipped: false)
+                : Item(kind: .skills, title: "The Agent Runway skills in \(into)",
                  detail: "Added with \(into == "Codex" ? "Codex's" : "each agent's") own plugin command. "
                     + "Remove them the same way.",
                  done: report.skills.installed == true,
                  skipped: report.skills.installed != true && (engines.isEmpty || !report.skills.built)),
         ]
+    }
+
+    /// "0.2.0", or "0.2.0 in Claude Code and 0.1.0 in Codex" when they differ.
+    public static func installedVersions(_ report: SetupReport) -> String {
+        let have = [("Claude Code", report.skills.claudeVersion), ("Codex", report.skills.codexVersion)]
+            .compactMap { name, v in v.map { (name, $0) } }
+        if Set(have.map(\.1)).count <= 1 { return have.first?.1 ?? "older" }
+        return have.map { "\($0.1) in \($0.0)" }.joined(separator: " and ")
     }
 
     /// The first prompt to paste into a normal Claude Code or Codex session in the watched repo.

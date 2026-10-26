@@ -13,6 +13,7 @@ struct WhatsNewView: View {
                 Text("What's new in Runway").font(.system(size: 22, weight: .bold))
                 Text("Version \(model.appVersion)").foregroundStyle(Palette.textMuted)
             }
+            if model.setup?.skills.outdated == true { skillsOffer }
             // ImageRenderer draws no ScrollView contents, so a render lays the notes out flat.
             if RenderMode.folder == nil {
                 ScrollView { notes }.scrollIndicators(.automatic)
@@ -32,6 +33,24 @@ struct WhatsNewView: View {
         .background(Palette.window)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+    }
+
+    /// After an update that brought newer skills: one click (it asks first) brings Claude Code and Codex up to date.
+    private var skillsOffer: some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Your Agent Runway skills are older than this Runway").font(.system(size: 13, weight: .semibold))
+                Text("Claude Code or Codex has " + (model.setup.map(SetupGuide.installedVersions) ?? "an older version")
+                     + "; this Runway carries \(model.setup?.skills.version ?? "newer ones").")
+                    .font(.system(size: 12)).foregroundStyle(Palette.textSoft).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button(model.updatingSkills ? "Updating…" : "Update the skills") { model.updateSkills() }
+                .buttonStyle(PrimaryButtonStyle()).disabled(model.updatingSkills)
+        }
+        .padding(14)
+        .background(Palette.needsYouFill, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.needsYouBorder))
     }
 
     private var notes: some View {

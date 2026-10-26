@@ -69,6 +69,24 @@ final class SetupGuideTests: XCTestCase {
         XCTAssertTrue(offPath[1].detail.contains("isn't on your PATH"))
     }
 
+    func testOutdatedSkillsShowAsAnUpdateWithoutReopeningTheWalkthrough() throws {
+        var r = try report(allSet)
+        r.skills.version = "0.2.1"
+        r.skills.claudeVersion = "0.2.0"
+        r.skills.outdated = true
+        // Not a reason to reopen the walkthrough on launch (What's New offers it); opened by hand, it starts there.
+        XCTAssertFalse(SetupGuide.needed(r))
+        XCTAssertEqual(SetupGuide.start(r, firstLaunch: false), .install)
+        let skills = try XCTUnwrap(SetupGuide.items(r).last)
+        XCTAssertEqual(skills.title, "Update the Agent Runway skills in Claude Code")
+        XCTAssertFalse(skills.done)
+        XCTAssertTrue(skills.detail.contains("Yours are 0.2.0; this Runway carries 0.2.1"))
+        r.skills.codexVersion = "0.1.0"
+        XCTAssertEqual(SetupGuide.installedVersions(r), "0.2.0 in Claude Code and 0.1.0 in Codex")
+        r.skills.outdated = false
+        XCTAssertTrue(try XCTUnwrap(SetupGuide.items(r).last).done)
+    }
+
     func testFirstPromptNamesTheRepoAndTheSkill() {
         XCTAssertTrue(SetupGuide.firstPrompt(repo: "app").contains("work on app:"))
         XCTAssertTrue(SetupGuide.firstPrompt(repo: nil).contains("file-tickets skill"))
