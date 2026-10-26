@@ -109,6 +109,10 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertEqual(t.blockedBy?.first?.column, .running)
         XCTAssertEqual(t.blocks, ["T-12"])
         XCTAssertEqual(t.hold, "waiting: This Mac is busy (memory)")
+        XCTAssertTrue(t.heldForCapacity)
+        var overlap = t
+        overlap.hold = "waiting: touches the same files as T-3"
+        XCTAssertFalse(overlap.heldForCapacity)                         // Start anyway is for a busy Mac only
     }
 
     func testArchivedAndRunnerMenus() throws {

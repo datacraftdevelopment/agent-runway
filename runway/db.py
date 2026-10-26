@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 MIGRATIONS = {
     1: """
@@ -188,6 +188,12 @@ MIGRATIONS = {
     ALTER TABLE runners ADD COLUMN reading TEXT;
     ALTER TABLE runners ADD COLUMN hold TEXT;
     ALTER TABLE tickets ADD COLUMN hold TEXT;
+    """,
+    # CPU is real idle %, not load average (Joe, 2026-10-26: a Spotlight-busy Mac held a first ticket); "Start anyway"
+    # lets one ticket skip the capacity check once.
+    10: """
+    ALTER TABLE runners ADD COLUMN min_cpu_idle_pct REAL;
+    ALTER TABLE tickets ADD COLUMN ignore_capacity INTEGER NOT NULL DEFAULT 0;
     """,
 }
 

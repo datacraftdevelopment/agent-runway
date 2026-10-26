@@ -103,6 +103,7 @@ public struct Runner: Codable, Equatable, Identifiable, Sendable {
         public var availableMb: Int?
         public var memoryLevel: Int?
         public var loadRatio: Double?
+        public var cpuUsedPct: Int? = nil
         public var diskFreeGb: Double?
     }
 
@@ -228,6 +229,9 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var blockedBy: [Blocker]? = nil
     public var blocks: [String]? = nil
     public var hold: String? = nil
+
+    /// Held only because its Mac is short of memory, CPU or disk: "Start anyway" can skip that check once.
+    public var heldForCapacity: Bool { column == .upNext && (hold?.contains(" is busy (") ?? false) }
 
     public struct Blocker: Codable, Equatable, Sendable {
         public var id: String

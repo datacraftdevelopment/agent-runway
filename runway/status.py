@@ -85,6 +85,8 @@ def runner_load(r, used):
             'available_mb': reading['available_mb'] if reading else None,
             'memory_level': reading.get('memory_level') if reading else None,
             'load_ratio': round(reading['load1'] / max(reading['ncpu'], 1), 2) if reading else None,
+            'cpu_used_pct': round(100 - reading['cpu_idle_pct']) if reading and reading.get('cpu_idle_pct') is not None
+            else None,
             'disk_free_gb': reading['disk_free_gb'] if reading else None}
 
 

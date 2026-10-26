@@ -19,11 +19,14 @@ Pages inactive:                          150000.
 Pages speculative:                        10000.
 --df
 /dev/disk3s5  971350180 750000000 217900000    78%  3000000 2000000000    0%   /System/Volumes/Data
+--cpu
+CPU usage: 39.70% user, 14.94% sys, 45.36% idle
 """
 
 
 def reading(**kw):
-    r = {'ncpu': 8, 'memory_mb': 16384, 'memory_level': 60, 'available_mb': 8000, 'load1': 2.0, 'disk_free_gb': 100.0}
+    r = {'ncpu': 8, 'memory_mb': 16384, 'memory_level': 60, 'available_mb': 8000, 'load1': 2.0, 'disk_free_gb': 100.0,
+         'cpu_idle_pct': 70.0}
     r.update(kw)
     return r
 
@@ -34,18 +37,33 @@ class CapacityTest(unittest.TestCase):
         self.assertEqual((r['ncpu'], r['memory_mb'], r['memory_level'], r['load1']), (12, 32768, 58, 3.2))
         self.assertEqual(r['available_mb'], (40000 + 150000 + 10000) * 16384 // (1024 * 1024))
         self.assertAlmostEqual(r['disk_free_gb'], round(217900000 / 1024 / 1024, 1))
+        self.assertEqual(r['cpu_idle_pct'], 45.4)
+        self.assertIsNone(capacity.parse(SAMPLE.split('--cpu')[0])['cpu_idle_pct'])     # no top: CPU unknown
 
-    def test_checks_memory_cpu_and_disk(self):
+    def test_checks_an_extra_session_for_memory_cpu_and_disk(self):
         lim = dict(capacity.DEFAULTS)
-        self.assertEqual(capacity.check(reading(), lim), [])
-        self.assertEqual(capacity.check(reading(available_mb=2000), lim), ['memory'])
-        self.assertEqual(capacity.check(reading(memory_level=10), lim), ['memory'])     # kernel says pressure
-        self.assertEqual(capacity.check(reading(load1=7.0), lim), ['cpu'])                # 7/8 >= 0.85
-        self.assertEqual(capacity.check(reading(disk_free_gb=3), lim), ['disk'])
-        self.assertEqual(capacity.check(None, lim), [])                                    # unread: don't hold
-        self.assertEqual(capacity.check(reading(load1=7.0), {**lim, 'max_load': 0.95}), [])
+        kinds = lambda r, running=1: [k for k, _ in capacity.check(r, lim, running)]
+        self.assertEqual(kinds(reading()), [])
+        self.assertEqual(capacity.check(reading(available_mb=2048), lim),
+                         [('memory', '2 GB memory free, a session needs 3 GB')])
+        self.assertEqual(kinds(reading(memory_level=10)), ['memory'])                    # kernel says pressure
+        self.assertEqual(capacity.check(reading(cpu_idle_pct=10), lim), [('cpu', 'CPU 90% used, limit 85%')])
+        self.assertEqual(kinds(reading(load1=40.0)), [])                                 # load average isn't used
+        self.assertEqual(kinds(reading(disk_free_gb=3)), ['disk'])
+        self.assertEqual(kinds(reading(cpu_idle_pct=None)), [])                          # CPU unread: no CPU hold
+        self.assertEqual(capacity.check(None, lim), [])                                   # unread: don't hold
         after = capacity.started(reading(available_mb=4000), lim)
-        self.assertEqual((after['available_mb'], after['load1']), (4000 - 3072, 3.0))
+        self.assertEqual((after['available_mb'], after['cpu_idle_pct']), (4000 - 3072, 70.0 - 12.5))
+
+    def test_the_first_session_waits_only_for_disk_or_critical_memory(self):
+        lim = dict(capacity.DEFAULTS)
+        busy = reading(cpu_idle_pct=2, available_mb=500, memory_level=12, load1=30)
+        self.assertEqual(capacity.check(busy, lim, running=0), [])
+        self.assertEqual([k for k, _ in capacity.check(busy, lim, running=1)], ['memory', 'cpu'])
+        self.assertEqual(capacity.check(reading(memory_level=3), lim, running=0),
+                         [('memory', 'memory pressure critical (3% free)')])
+        self.assertEqual([k for k, _ in capacity.check(reading(disk_free_gb=1), lim, running=0)], ['disk'])
+        self.assertEqual(capacity.summary(reading(available_mb=9420)), 'CPU 30% used · 9.2 GB free')
 
     def test_suggests_sessions_from_the_macs_size(self):
         self.assertEqual(capacity.suggest_sessions(32768, 12), 6)      # min(6, (32-8)/3 = 8)
@@ -110,34 +128,55 @@ class ParallelTest(LoopTest):
         self.loop.tick()
         self.assertEqual(self.building(), [a])
         b = self.file(title='B', touches=['b'])
-        self.runner.reading = reading(available_mb=1000)
+        self.runner.reading = reading(available_mb=1024)
         self.loop.tick()
         self.assertEqual(self.building(), [a])                                   # a keeps going
-        self.assertEqual(db.ticket(self.con, b)['hold'], 'waiting: This Mac is busy (memory)')
+        self.assertEqual(db.ticket(self.con, b)['hold'],
+                         'waiting: This Mac is busy (1 GB memory free, a session needs 3 GB)')
         mac = next(r for r in status.snapshot(self.con)['runners'] if r['name'] == 'This Mac')
-        self.assertEqual((mac['load']['hold'], mac['load']['summary']), ('busy (memory)', 'busy (memory)'))
+        self.assertEqual((mac['load']['hold'], mac['load']['summary']), ('busy (memory)', 'CPU 30% used · 1 GB free'))
         self.assertEqual((mac['load']['sessions_running'], mac['load']['sessions_max']), (1, 3))
         self.runner.reading = reading()                                           # room again: it starts
         self.loop.tick()
         self.assertEqual(self.building(), [a, b])
         self.assertIsNone(db.ticket(self.con, b)['hold'])
         mac = next(r for r in status.snapshot(self.con)['runners'] if r['name'] == 'This Mac')
-        self.assertEqual((mac['load']['hold'], mac['load']['summary']), (None, 'memory ok'))
+        self.assertEqual(mac['load']['hold'], None)
+        self.assertEqual(mac['load']['cpu_used_pct'], 30)
 
     def test_one_tick_only_starts_what_fits_and_reads_once(self):
         a, b, c = (self.file(title=x, touches=[x]) for x in 'abc')
         self.runner.reading = reading(available_mb=7000)                # room for two at 3072 each
         self.loop.tick()
         self.assertEqual(self.building(), [a, b])
-        self.assertEqual(db.ticket(self.con, c)['hold'], 'waiting: This Mac is busy (memory)')
+        self.assertEqual(db.ticket(self.con, c)['hold'], 'waiting: This Mac is busy (0.8 GB memory free, a session '
+                         'needs 3 GB counting the sessions just started)')
         self.assertEqual(self.runner.reads, 1)
 
-    def test_limits_are_per_runner(self):
-        self.con.execute("UPDATE runners SET per_session_mb=1024, max_load=0.95 WHERE name='This Mac'")
-        self.runner.reading = reading(available_mb=2500, load1=7.2)       # fine under these limits
-        a = self.file(title='A', touches=['a'])
+    def test_the_first_ticket_starts_on_a_busy_mac_and_the_second_waits_for_cpu(self):
+        a, b = self.file(title='A', touches=['a']), self.file(title='B', touches=['b'])
+        self.runner.reading = reading(cpu_idle_pct=5)              # e.g. Spotlight indexing
         self.loop.tick()
         self.assertEqual(self.building(), [a])
+        self.assertEqual(db.ticket(self.con, b)['hold'], 'waiting: This Mac is busy (CPU 95% used, limit 85%)')
+
+    def test_start_anyway_skips_the_check_once(self):
+        a, b, c = (self.file(title=x, touches=[x]) for x in 'abc')
+        self.runner.reading = reading(cpu_idle_pct=5)
+        self.loop.tick()
+        self.assertEqual(self.building(), [a])
+        self.con.execute('UPDATE tickets SET ignore_capacity=1 WHERE id=?', (b,))
+        self.loop.tick()
+        self.assertEqual(self.building(), [a, b])                 # b went anyway; c still waits
+        self.assertEqual(db.ticket(self.con, b)['ignore_capacity'], 0)
+        self.assertIn('CPU 95% used', db.ticket(self.con, c)['hold'])
+
+    def test_limits_are_per_runner(self):
+        self.con.execute("UPDATE runners SET per_session_mb=1024, min_cpu_idle_pct=5 WHERE name='This Mac'")
+        self.runner.reading = reading(available_mb=2500, cpu_idle_pct=20)  # room for two under these limits
+        a, b = self.file(title='A', touches=['a']), self.file(title='B', touches=['b'])
+        self.loop.tick()
+        self.assertEqual(self.building(), [a, b])                           # 20% idle, then ~7.5% after a: >= 5
 
 
 class BlockedTest(LoopTest):
