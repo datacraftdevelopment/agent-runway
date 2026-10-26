@@ -14,7 +14,7 @@
     { "name": "This Mac", "kind": "this_mac", "slots_used": 1, "slots_total": 2, "state": "online", "paused_until": null, "load": {"sessions_running": 1, "sessions_max": 2, "hold": null, "summary": "memory ok", "available_mb": 9000, "memory_level": 60, "load_ratio": 0.4, "disk_free_gb": 200.0} },
     { "name": "Mac mini", "kind": "ssh_mac", "slots_used": 1, "slots_total": 2, "state": "online", "paused_until": null, "load": {"sessions_running": 1, "sessions_max": 2, "hold": null, "summary": "memory ok", "available_mb": 9000, "memory_level": 60, "load_ratio": 0.4, "disk_free_gb": 200.0} },
     { "name": "Work Mac", "kind": "ssh_mac", "slots_used": 0, "slots_total": 2, "state": "asleep", "paused_until": null, "load": {"sessions_running": 1, "sessions_max": 2, "hold": null, "summary": "memory ok", "available_mb": 9000, "memory_level": 60, "load_ratio": 0.4, "disk_free_gb": 200.0} },
-    { "name": "Cloud", "kind": "cloud", "slots_used": 1, "slots_total": 3, "state": "online", "paused_until": null, "load": {"sessions_running": 1, "sessions_max": 2, "hold": null, "summary": "memory ok", "available_mb": 9000, "memory_level": 60, "load_ratio": 0.4, "disk_free_gb": 200.0} }
+    { "name": "Cloud", "kind": "cloud", "slots_used": 1, "slots_total": 3, "state": "online", "paused_until": null, "load": {"sessions_running": 1, "sessions_max": 3, "hold": null, "summary": "memory ok", "available_mb": 9000, "memory_level": 60, "load_ratio": 0.4, "disk_free_gb": 200.0} }
   ],
   "agents": [
     { "kind": "claude", "resting_until": "2026-10-23T19:30:00" },

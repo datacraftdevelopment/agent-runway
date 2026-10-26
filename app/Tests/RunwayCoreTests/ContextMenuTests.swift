@@ -88,6 +88,29 @@ final class ContextMenuTests: XCTestCase {
         }
     }
 
+    func testRunnerLoadLineAndMaxSessions() throws {
+        var mac = try status().runners[0]
+        XCTAssertEqual(mac.loadLine, "1 of 2 · memory ok")
+        mac.load?.hold = "busy (memory)"
+        XCTAssertEqual(mac.loadLine, "holding: busy (memory)")
+        mac.load = nil                                                   // an older runway sends no reading
+        XCTAssertEqual(mac.loadLine, "1 of 2")
+        let max = try XCTUnwrap(ContextMenus.runner(mac).first { $0.title == "Max sessions" })
+        XCTAssertEqual(max.children.count, 8)
+        XCTAssertEqual(max.children.first { $0.checked }?.action, .maxSessions(mac.slotsTotal))
+    }
+
+    func testDecodesBlockersAndHolds() throws {
+        let json = #"{"id":"T-9","repo":"r","title":"t","column":"up_next","agent":"any","risk":"low","pinned":false,"#
+            + #""filed_from":"x","filed_at":"2026-10-26T10:00:00Z","waits_on":["T-4"],"#
+            + #""blocked_by":[{"id":"T-4","title":"First","column":"running","waits_on":[]}],"#
+            + #""blocks":["T-12"],"hold":"waiting: This Mac is busy (memory)"}"#
+        let t = try StatusCoding.decoder.decode(Ticket.self, from: Data(json.utf8))
+        XCTAssertEqual(t.blockedBy?.first?.column, .running)
+        XCTAssertEqual(t.blocks, ["T-12"])
+        XCTAssertEqual(t.hold, "waiting: This Mac is busy (memory)")
+    }
+
     func testArchivedAndRunnerMenus() throws {
         let s = try status()
         XCTAssertEqual(actions(ContextMenus.archived(ArchivedRepo(name: "x", tickets: 1))), [.unarchive, .removeRepo])

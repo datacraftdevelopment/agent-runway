@@ -75,7 +75,7 @@ private struct Sidebar: View {
                     Dot(color: runner.pausedUntil != nil ? Palette.orange : runner.state.dot)
                     Text(runner.name)
                     Spacer()
-                    Text(runner.pausedUntil != nil ? "paused" : runner.load).font(.system(size: 11))
+                    Text(runner.loadLine).font(.system(size: 11))
                         .foregroundStyle(Palette.textMuted)
                 }
                 .padding(.horizontal, 8).padding(.vertical, 5)

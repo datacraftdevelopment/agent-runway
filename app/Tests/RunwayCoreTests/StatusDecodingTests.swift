@@ -20,7 +20,8 @@ final class StatusDecodingTests: XCTestCase {
         let status = try sample()
         XCTAssertEqual(status.runners.map(\.name), ["This Mac", "Mac mini", "Work Mac", "Cloud"])
         XCTAssertEqual(status.runners.map(\.kind), [.thisMac, .sshMac, .sshMac, .cloud])
-        XCTAssertEqual(status.runners.map(\.load), ["1 of 2", "1 of 2", "asleep", "1 of 3"])
+        XCTAssertEqual(status.runners.map(\.loadLine),
+                       ["1 of 2 · memory ok", "1 of 2 · memory ok", "asleep", "1 of 3 · memory ok"])
     }
 
     func testAgents() throws {

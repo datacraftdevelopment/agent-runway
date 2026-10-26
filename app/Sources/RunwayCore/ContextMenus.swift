@@ -10,7 +10,7 @@ public enum MenuAction: Equatable, Sendable {
     case discussRepo, pauseRepo, resumeRepo, repoRunsOn(Repo.RunsOn), mainComputer(String), openGitHub, revealFolder
     case clearDone, archive, unarchive, removeRepo
     // Runners
-    case pauseRunner, resumeRunner
+    case pauseRunner, resumeRunner, maxSessions(Int)
 }
 
 public struct MenuItem: Equatable, Sendable {
@@ -83,6 +83,7 @@ public enum ContextMenus {
     }
 
     public static func runner(_ r: Runner) -> [MenuItem] {
-        [r.pausedUntil != nil ? .item("Resume \(r.name)", .resumeRunner) : .item("Pause \(r.name)", .pauseRunner)]
+        [r.pausedUntil != nil ? .item("Resume \(r.name)", .resumeRunner) : .item("Pause \(r.name)", .pauseRunner),
+         .submenu("Max sessions", (1...8).map { .item("\($0)", .maxSessions($0), checked: r.slotsTotal == $0) })]
     }
 }
