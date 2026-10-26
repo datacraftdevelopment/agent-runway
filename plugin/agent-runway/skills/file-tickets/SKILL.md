@@ -32,20 +32,33 @@ RUNWAY repo which
 
 ## 2. Propose the batch
 
-Pick work that can run unattended: each ticket small, with an observable result, and not waiting on a decision only
-the person can make. Two to five tickets is a good batch. Show it as one table, then ask:
+Each ticket small, with an observable result, and not waiting on a decision only the person can make. Two to five
+tickets is a good batch. Sort every ticket into one of two kinds:
 
-| key | title | risk | agent | waits on | runs on |
-| --- | --- | --- | --- | --- | --- |
-| a | Print view for a single recipe | low: new page, no data changes | any | nothing | any |
-| b | Search recipes by ingredient | not low: changes the database query | claude | a | any |
+- **Runway**: an unattended agent can build it and prove each Acceptance line (a test, a command, a screenshot it can
+  take, an experiment in a throwaway copy). Most work is this.
+- **hands-on**: some Acceptance line needs a real device or camera, or the person's eye on how it looks or feels
+  (motion, a sheet that settles, a colour that reads). Runway never starts these; the person does them in their own
+  session with the `hands-on` skill. A build that's slow, or a tool the setup lacks, is not a reason: that is a setup
+  problem for `runway doctor`, not hands-on work.
+
+When one ticket mixes both, split it: the provable part is a Runway ticket, and the part the person must check is a
+hands-on ticket. Show the batch as one table, then ask:
+
+| key | title | kind | risk | agent | waits on | runs on |
+| --- | --- | --- | --- | --- | --- | --- |
+| a | Store each session's frame size | Runway | low: new column, no migration of old rows | any | nothing | any |
+| b | Camera preview fills the frame on a phone | hands-on | not low: camera code | any | a | any |
+| c | Show the frame size in the history list | Runway | low: new label | any | nothing | any |
 
 - **risk** is `low` only with a one-line reason. When unsure, it is `not low`: that ticket waits for the person
   instead of merging on its own. Anything touching auth, payments, data migrations, CI or secrets is `not low`.
 - **agent** is `any`, or an engine this Mac has. Check which with `RUNWAY status --json` (its `agents` list holds
   only the engines that are set up), and propose only those. With one engine, use `any`. Runway refuses a ticket
   for an engine it doesn't have.
-- **waits on** names another key in this batch, or a ticket id already filed (T-12), or nothing.
+- **waits on** names another key in this batch, or a ticket id already filed (T-12), or nothing. A Runway ticket
+  waits on a hands-on one only when it truly needs that work in place (or changes the same files): the rest run while
+  the person does the hands-on ones. Say in a line under the table which Runway tickets wait on hands-on work.
 - **runs on** is `any`, or one runner by name when the work needs something only that machine has.
 
 Under the table, give each ticket's Acceptance lines: one to three observable checks, each with how to verify it (a
@@ -69,7 +82,9 @@ one plain command:
    "acceptance": ["A1: ... Verify: <command>"],
    "risk": "low", "risk_reason": "one line", "agent": "any", "touches": ["path/or/area"], "blocked_by": []},
   {"key": "b", "title": "...", "body": "...", "acceptance": ["A1: ..."],
-   "risk": "not-low", "agent": "claude", "blocked_by": ["a"], "runs_on": null}
+   "risk": "not-low", "agent": "claude", "blocked_by": ["a"], "runs_on": null},
+  {"key": "c", "title": "...", "body": "...", "acceptance": ["A1: ... Check on the phone: <what to look for>"],
+   "risk": "not-low", "hands_on": true, "blocked_by": ["a"]}
  ]}
 ```
 
@@ -79,7 +94,8 @@ RUNWAY file --batch /tmp/runway-batch.json --filed-from "Claude Code session"
 
 (In Codex, write `--filed-from "Codex session"`.) `runway file` checks the whole batch first and files all of it or
 none: a low risk with no reason, an unknown runner or a missing Acceptance line is refused with the reason. Fix it and
-run it again. Then tell the person the ids it printed. They show under Up next in Runway.
+run it again. Then tell the person the ids it printed. They show under Up next in Runway, the hands-on ones marked as
+theirs. If the batch has hands-on tickets, offer to start them now with the `hands-on` skill.
 
 Point the body at the spec or plan when there is one (`docs/specs/...`); don't restate it.
 

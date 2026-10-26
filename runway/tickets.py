@@ -57,7 +57,7 @@ def validate(con, repo, tickets):
     runners = {r['name'] for r in con.execute('SELECT name FROM runners')}
     # One engine is enough; a ticket can only ask for one this Mac has (as the last setup check found).
     engines = [r['kind'] for r in con.execute('SELECT kind FROM agents WHERE signed_in = 1 ORDER BY kind')]
-    if not engines:
+    if not engines and not all(t.get('hands_on') in (True, 1, 'true', 'yes', '1') for t in tickets):
         raise db.RunwayError('no engine is signed in: Runway needs Claude Code or Codex (runway doctor)')
     names = {'claude': 'Claude Code', 'codex': 'Codex'}
     keys = [t.get('key') for t in tickets if t.get('key')]
@@ -89,6 +89,7 @@ def validate(con, repo, tickets):
             acceptance = [acceptance]
         if not acceptance:
             raise db.RunwayError(f'{where}: needs at least one Acceptance line')
+        hands_on = t.get('hands_on') in (True, 1, 'true', 'yes', '1')
         blocked = t.get('blocked_by') or []
         for b in blocked:
             if b in keys:
@@ -97,7 +98,8 @@ def validate(con, repo, tickets):
                 raise db.RunwayError(f'{where}: blocked_by {b!r} is neither in this batch nor filed')
         clean.append({'key': t.get('key'), 'title': title, 'body': t.get('body') or '', 'acceptance': acceptance,
                       'touches': t.get('touches') or [], 'risk': risk, 'risk_reason': reason or None,
-                      'agent': agent, 'runs_on': runs_on, 'pinned': bool(runs_on), 'blocked_by': blocked})
+                      'agent': agent, 'runs_on': runs_on, 'pinned': bool(runs_on), 'blocked_by': blocked,
+                      'hands_on': hands_on})
     return clean
 
 
@@ -115,15 +117,15 @@ def file_batch(con, repo, tickets, filed_from='a terminal'):
             t['id'] = tid
             stamp = db.now()
             con.execute('INSERT INTO tickets(id, repo, base, title, body, acceptance, touches, risk, risk_reason, agent, '
-                        'runs_on, pinned, state, filed_from, filed_at, updated_at) '
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
+                        'runs_on, pinned, state, hands_on, filed_from, filed_at, updated_at) '
+                        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                         (tid, repo, base, t['title'], t['body'], json.dumps(t['acceptance']), json.dumps(t['touches']),
-                         t['risk'], t['risk_reason'], t['agent'], t['runs_on'], int(t['pinned']), filed_from,
-                         stamp, stamp))
+                         t['risk'], t['risk_reason'], t['agent'], t['runs_on'], int(t['pinned']),
+                         'hands_on' if t['hands_on'] else 'queued', int(t['hands_on']), filed_from, stamp, stamp))
         for t in clean:
             for b in t['blocked_by']:
                 con.execute('INSERT INTO blockers(ticket, blocked_by) VALUES (?, ?)', (t['id'], ids.get(b, b)))
-        listed = ', '.join(t['id'] for t in clean)
+        listed = ', '.join(t['id'] + (' hands-on' if t['hands_on'] else '') for t in clean)
         db.event(con, 'filed', f'{len(clean)} ticket{"s" if len(clean) != 1 else ""} from {filed_from} ({listed})',
                  repo=repo)
         con.execute('COMMIT')

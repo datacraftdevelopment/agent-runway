@@ -203,7 +203,11 @@ def cmd_file(con, a):
             raise db.RunwayError('name the repo: --repo, or "repo" in the JSON')
         batch, filed_from = data.get('tickets', []), a.filed_from or data.get('filed_from') or 'a terminal'
     ids = tickets.file_batch(con, repo, batch, filed_from=filed_from)
+    hands = [tid for tid in ids if db.ticket(con, tid)['hands_on']]
     print(f'filed {len(ids)} to {repo}: {", ".join(ids)}')
+    if hands:
+        print(f'yours to do by hand, Runway never starts {"them" if len(hands) > 1 else "it"}: {", ".join(hands)}'
+              f' (the hands-on skill does them in your own session; runway hands-on lists them)')
 
 
 # ---- status ------------------------------------------------------------------------------------------------------
@@ -286,9 +290,32 @@ def cmd_retro(con, a):
         print(f'{repo}: filed {tid}, a retro for "{reason.replace("_", " ")}" (not low risk; it never merges itself)')
 
 
+def cmd_hands_on(con, a):
+    """The tickets that are yours to do, in your own session: Runway never starts one of these."""
+    from . import status
+    rows = [status.ticket_json(con, t, None) for t in con.execute(
+        'SELECT * FROM tickets WHERE state = ? AND cleared_at IS NULL '
+        + ('AND repo = ? ' if a.repo else '')
+        + 'ORDER BY filed_at, CAST(SUBSTR(id, 3) AS INTEGER)',
+        ('hands_on', a.repo) if a.repo else ('hands_on',))]
+    if a.json:
+        out({'tickets': rows})
+        return
+    if not rows:
+        print('nothing is waiting on you by hand')
+        return
+    for t in rows:
+        waits = f' · waits for {", ".join(t["waits_on"])}' if t['waits_on'] else ''
+        blocks = f' · {len(t["blocks"])} Runway ticket{"s" if len(t["blocks"]) != 1 else ""} wait on it' \
+            if t['blocks'] else ''
+        print(f'{t["id"]:6} {t["repo"]}: {t["title"]}{waits}{blocks}')
+    print('runway show <ticket> prints one; runway take <ticket> gives you its worktree; runway done <ticket> on your '
+          'go sends it to the code review and the gate (or closes it, when it changed no code).')
+
+
 def cmd_done(con, a):
     from . import take
-    print(take.done(con, a.ticket, a.note))
+    print(take.done(con, a.ticket, a.note, no_code=a.no_code))
 
 
 def cmd_drop(con, a):
@@ -310,7 +337,8 @@ def cmd_stats(con, a):
         rate = f'{w["hands_off_rate"]:.0%}' if w['hands_off_rate'] is not None else 'n/a'
         c = w['cycle_minutes']
         print(f'last {d} days: {w["hands_off"]} of {w["merged"]} merged hands-off ({rate}); '
-              f'cycle {c["hands_off"]} min hands-off, {c["rest"]} min the rest')
+              f'cycle {c["hands_off"]} min hands-off, {c["rest"]} min the rest'
+              + (f'; {w["by_hand"]} done by hand (not counted)' if w['by_hand'] else ''))
         cost = w['cost_per_ticket']
         for v in cost['by_agent']:
             usd = f'${v["median_usd"]}' if v['median_usd'] is not None else 'no dollar cost reported'
@@ -578,9 +606,15 @@ def parser():
     x.add_argument('--repo')
     x.add_argument('--reason', help='a stop reason, e.g. check_failed_twice (default: the most frequent)')
     x.set_defaults(fn=cmd_retro)
-    x = sub.add_parser('done', help="finish a ticket yourself: merge its PR (only on the person's go)")
+    x = sub.add_parser('hands-on', help='the tickets that are yours to do by hand; Runway never starts these')
+    x.add_argument('--repo')
+    x.add_argument('--json', action='store_true')
+    x.set_defaults(fn=cmd_hands_on)
+    x = sub.add_parser('done', help="finish a ticket yourself: merge its PR, or send a hands-on ticket for review "
+                                    "(only on the person's go)")
     x.add_argument('ticket')
     x.add_argument('--note')
+    x.add_argument('--no-code', action='store_true', help='a hands-on ticket that changed no code: close it')
     x.set_defaults(fn=cmd_done)
     x = sub.add_parser('drop', help='drop a ticket: close its PR, remove its worktrees')
     x.add_argument('ticket')

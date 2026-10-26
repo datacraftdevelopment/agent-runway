@@ -9,6 +9,8 @@ from unittest import mock
 from runway import db, setup
 
 PLUGIN = Path(__file__).resolve().parent.parent / 'plugin'
+VENDORED = ('writing-plans', 'subagent-driven-development', 'executing-plans', 'test-driven-development',
+            'systematic-debugging', 'verification-before-completion')
 
 
 def done(cmd, code=0, out=''):
@@ -37,11 +39,23 @@ class PluginTreeTest(unittest.TestCase):
             self.assertIn(f'name: {skill.name}\n', front)
             self.assertIn('description: ', front)
             names.append(skill.name)
-        self.assertEqual(names, ['file-tickets', 'grill', 'map', 'prototype', 'runway', 'setup', 'spec', 'take-back'])
+        self.assertEqual(names, ['executing-plans', 'file-tickets', 'grill', 'hands-on', 'map', 'prototype', 'runway',
+                                 'setup', 'spec', 'subagent-driven-development', 'systematic-debugging', 'take-back',
+                                 'test-driven-development', 'verification-before-completion', 'writing-plans'])
+
+    def test_vendored_skills_carry_their_licence(self):
+        vendor = (PLUGIN / 'agent-runway/VENDOR.md').read_text()
+        self.assertIn('MIT', (PLUGIN / 'agent-runway/LICENSE.superpowers').read_text())
+        for name in VENDORED:
+            self.assertIn(f'`{name}`', vendor)
+            self.assertNotIn('superpowers:', (PLUGIN / 'agent-runway/skills' / name / 'SKILL.md').read_text())
 
     def test_skills_never_chain_commands_in_their_examples(self):
-        """A session with an allow-list refuses chained commands, so no bash example chains one."""
+        """A session with an allow-list refuses chained commands, so no bash example chains one. (The vendored skills
+        keep upstream's examples: systematic-debugging's chain belongs inside the script being debugged.)"""
         for skill in (PLUGIN / 'agent-runway/skills').iterdir():
+            if skill.name in VENDORED:
+                continue
             text = (skill / 'SKILL.md').read_text()
             for block in text.split('```bash')[1:]:
                 code = block.split('```')[0]

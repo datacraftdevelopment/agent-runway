@@ -203,6 +203,14 @@ class Loop:
 
     def failed(self, t, why, reason='build'):
         """A fix pass if one is left, else the person. `reason` is why it stopped, for the stats."""
+        if t['hands_on']:
+            # Done by hand: Runway can't build it, so it goes back to the person with the findings.
+            self.con.execute('INSERT INTO stops(ticket, repo, at, reason, detail) VALUES (?, ?, ?, ?, ?)',
+                             (t['id'], t['repo'], db.now(), reason, why[:4000]))
+            db.update_ticket(self.con, t['id'], state='hands_on', stage=None, note=f'Back to you: {why}')
+            db.event(self.con, 'failed', f'{t["id"]}: {shorten(why, 140)}; back to you (hands-on)',
+                     repo=t['repo'], ticket=t['id'])
+            return
         if t['fix_passes'] < FIX_PASSES:
             db.update_ticket(self.con, t['id'], state='queued', stage=None, fix_passes=t['fix_passes'] + 1,
                              note=f'This is a fix pass. Last time: {why}')
@@ -230,8 +238,9 @@ class Loop:
         repo = db.repo(self.con, t['repo'])
         pr = self.github.pr(repo['path'], t['pr'])
         checks = self.github.checks(repo['path'], t['pr'])
-        last = self.con.execute("SELECT ended_at FROM runs WHERE ticket=? AND kind='build' ORDER BY id DESC LIMIT 1",
-                                (t['id'],)).fetchone()
+        # The last push: a build, or for a hands-on ticket the person's own submission (recorded as their review).
+        last = self.con.execute("SELECT ended_at FROM runs WHERE ticket=? AND (kind='build' OR agent='you') "
+                                "ORDER BY id DESC LIMIT 1", (t['id'],)).fetchone()
         fresh = bool(last and last['ended_at'] and db.now() - last['ended_at'] < CHECK_GRACE)
         verdict, reasons = gate.evaluate(t, pr, checks, self.runner.config(repo), fresh=fresh)
         if verdict == 'wait':
@@ -274,7 +283,7 @@ class Loop:
         ready = self.con.execute(
             "SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo "
             "WHERE r.active = 1 AND r.archived_at IS NULL AND (r.paused_until IS NULL OR r.paused_until < ?) "
-            "AND t.state IN ('queued', 'reviewing') "
+            "AND t.state IN ('queued', 'reviewing') AND NOT (t.state = 'queued' AND t.hands_on = 1) "
             "ORDER BY t.state = 'reviewing' DESC, t.filed_at, CAST(SUBSTR(t.id, 3) AS INTEGER)",
             (db.now(),)).fetchall()
         for t in ready:
@@ -326,8 +335,10 @@ class Loop:
         mine = json.loads(t['touches'] or '[]')
         free_hand = bool(self.runner.config(db.repo(self.con, t['repo'])).get('parallel_without_touches'))
         for other in self.con.execute(
-                "SELECT id, touches FROM tickets WHERE repo=? AND id != ? AND state IN "
-                "('building', 'checking', 'reviewing', 'merging') ORDER BY CAST(SUBSTR(id, 3) AS INTEGER)",
+                "SELECT id, touches FROM tickets WHERE repo=? AND id != ? AND (state IN "
+                "('building', 'checking', 'reviewing', 'merging') "
+                # The person working a hands-on ticket in its worktree is as busy in those files as a worker.
+                "OR (state = 'hands_on' AND take_dir IS NOT NULL)) ORDER BY CAST(SUBSTR(id, 3) AS INTEGER)",
                 (t['repo'], t['id'])).fetchall():
             theirs = json.loads(other['touches'] or '[]')
             if (not mine or not theirs) and not free_hand:
@@ -395,7 +406,9 @@ class Loop:
             "AND (paused_until IS NULL OR paused_until < ?)", (db.now(),))}
 
     def blocked(self, t):
-        return any(self.con.execute("SELECT 1 FROM tickets WHERE id=? AND state != 'done'", (b,)).fetchone()
+        # A dropped blocker releases its dependents, as the board already shows them (it used to hold them forever).
+        return any(self.con.execute("SELECT 1 FROM tickets WHERE id=? AND state NOT IN ('done', 'dropped')",
+                                    (b,)).fetchone()
                    for b in db.blockers(self.con, t['id']))
 
     def pick_runner(self, t, free):

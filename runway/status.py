@@ -46,7 +46,8 @@ def ticket_json(con, t, run, slugs=None):
         'id': t['id'], 'repo': t['repo'], 'title': t['title'], 'column': column, 'stage': stage,
         'agent': t['agent'], 'risk': t['risk'], 'runs_on': runs_on, 'pinned': bool(t['pinned']),
         'pr': pr_label(t), 'review': t['review'], 'function_review': t['function_review'],
-        'taken': t['state'] == 'taken', 'kind': t['kind'],
+        'taken': t['state'] == 'taken', 'kind': t['kind'], 'hands_on': bool(t['hands_on']),
+        'done_locally': bool(t['hands_on']) and t['state'] == 'done',
         'taken_hours': taken_hours(con, t),
         'retro_runs': [{'ticket': r['ticket'], 'title': r['title'], 'pr_url': r.get('pr_url'),
                         'record': r.get('record')} for r in json.loads(t['retro_runs'] or '[]')] or None,
@@ -123,6 +124,11 @@ def pr_label(t):
 def summary(t, run, open_blockers):
     state = t['state']
     who = AGENT_NAMES.get(run['agent'], run['agent']) if run else None
+    if state == 'hands_on':
+        waits = f' Waits for {", ".join(open_blockers)} first.' if open_blockers else ''
+        back = f' {t["note"]}' if t['note'] else ''
+        return ('Yours to do: Runway never starts this one. Do it in your own session, then '
+                f'runway done {t["id"]}.' + waits + back)
     if state == 'queued':
         if open_blockers:
             return f'Waits for {", ".join(open_blockers)} to finish first.'
@@ -136,6 +142,8 @@ def summary(t, run, open_blockers):
         return f'Building with {who}, {int((db.now() - run["started_at"]) // 60)} min in.'
     if state == 'checking':
         return 'Running the repo\'s check command on the built commit.'
+    if state == 'reviewing' and t['hands_on'] and not run:
+        return 'Done by hand and checked by you; the code review and the gate are next.'
     if state == 'reviewing' and run:
         role = run['role'] or 'code'
         return f'{who} is doing the {role} review of commit {(run["sha"] or "")[:7]}.'
@@ -145,6 +153,8 @@ def summary(t, run, open_blockers):
         return 'Waiting for the PR\'s checks before the gate merges it.'
     if state == 'dropped':
         return 'Dropped.'
+    if state == 'done' and t['merged_by'] == 'you_local':
+        return t['note'] or 'Done by hand.'
     return t['note'] if state == 'done' else None
 
 
@@ -191,7 +201,10 @@ def why_idle(con, r, mine, pause, running_loop):
         return 'Nothing can run: Runway is paused', None
     if not running_loop:
         return "Nothing can run: Runway's loop isn't running", None
-    if all(t['waits_on'] for t in up):
+    mine_hands_on = [t for t in up if t.get('hands_on')]
+    if len(mine_hands_on) == n:
+        return f'Nothing can run: {many} on you, to do by hand', mine_hands_on[0]['id']
+    if all(t['waits_on'] or t.get('hands_on') for t in up):
         # Follow each chain to the tickets that hold everything up: not themselves waiting in Up next.
         by_id = {t['id']: t for t in mine}
         roots, seen = [], set()
@@ -210,6 +223,9 @@ def why_idle(con, r, mine, pause, running_loop):
             for b in t['waits_on']:
                 walk(b)
         where = {'needs_you': 'which needs you', 'running': 'which is running', 'done': 'which is done'}
+        hands = [t['id'] for t in mine_hands_on]
+        if hands and all(r in hands for r in roots):
+            return f'Nothing can run: {many} on {", ".join(hands[:3])}, yours to do by hand', hands[0]
         root = roots[0] if roots else None
         state = where.get(by_id[root]['column'], '') if root in by_id else 'which is in another repo'
         names = ', '.join(roots[:3])

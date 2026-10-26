@@ -1,5 +1,7 @@
 """runway stats: how hands-off Runway is, from the tickets and runs already in the database.
 
+A ticket the person did by hand (hands_on: a real device or camera, how it looks and feels) is
+counted on its own and kept out of the hands-off rate: it was never meant to run unattended, so it is not a failure.
 Hands-off: a merged ticket that needed nothing from the person: the gate merged it, no needs-you question about it was
 answered, and it was never taken back. Cycle time is filing to merge. Cost is what the engines reported for every run
 of the ticket (Claude Code reports dollars and tokens; Codex reports tokens only); nothing is estimated. "Where it
@@ -38,8 +40,10 @@ def median(xs):
 def window(con, days, repo=None):
     since = db.now() - days * 86400
     where, args = ('AND repo = ?', (repo,)) if repo else (ARCHIVED_OUT, ())
-    merged = con.execute(f"SELECT * FROM tickets WHERE merged_at IS NOT NULL AND merged_at >= ? {where} "
-                         "ORDER BY merged_at", (since, *args)).fetchall()
+    all_merged = con.execute(f"SELECT * FROM tickets WHERE merged_at IS NOT NULL AND merged_at >= ? {where} "
+                             "ORDER BY merged_at", (since, *args)).fetchall()
+    by_hand = [t for t in all_merged if t['hands_on']]
+    merged = [t for t in all_merged if not t['hands_on']]
     answered = {r['ticket'] for r in con.execute('SELECT DISTINCT ticket FROM answers')}
     hands_off = [t for t in merged if t['merged_by'] == 'gate' and t['id'] not in answered and not t['taken']]
     rest = [t for t in merged if t not in hands_off]
@@ -64,6 +68,8 @@ def window(con, days, repo=None):
     return {
         'days': days,
         'merged': len(merged),
+        'by_hand': len(by_hand),
+        'by_hand_tickets': [t['id'] for t in by_hand],
         'hands_off': len(hands_off),
         'hands_off_rate': round(len(hands_off) / len(merged), 3) if merged else None,
         'hands_off_tickets': [t['id'] for t in hands_off],
