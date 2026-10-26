@@ -254,6 +254,13 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     /// Each open blocker with where it is and what holds it in turn; the open tickets this one blocks; and why the
     /// loop isn't starting it although it's ready (its touches overlap a running ticket, or its Mac is busy).
     public var blockedBy: [Blocker]? = nil
+    /// The person does it in their own session (a device, the simulator, how it feels); the loop never starts it.
+    public var handsOn: Bool? = nil
+    /// Finished by hand with `runway done`: no PR of Runway's.
+    public var doneLocally: Bool? = nil
+
+    /// Up next and the person's to do by hand.
+    public var yoursToDo: Bool { handsOn == true && column == .upNext }
     public var blocks: [String]? = nil
     public var hold: String? = nil
     /// When it started, finished, entered its current stage or began waiting, and seconds per part. Nil from an
@@ -307,6 +314,7 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
         public var title: String?
         public var column: Column?
         public var waitsOn: [String]
+        public var handsOn: Bool? = nil
     }
     /// Seconds since the current run started (running tickets).
     public var elapsed: Int?

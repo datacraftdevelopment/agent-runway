@@ -187,7 +187,8 @@ class BlockedTest(LoopTest):
         snap = {t['id']: t for t in status.snapshot(self.con)['tickets']}
         self.assertEqual(snap[a]['blocks'], [b])
         self.assertEqual(snap[b]['blocks'], [c])
-        self.assertEqual(snap[c]['blocked_by'], [{'id': b, 'title': 'Second', 'column': 'up_next', 'waits_on': [a]}])
+        self.assertEqual(snap[c]['blocked_by'], [{'id': b, 'title': 'Second', 'column': 'up_next', 'waits_on': [a],
+                                                  'hands_on': False}])
         self.assertEqual(snap[a]['blocked_by'], [])
         # The take-back prompt for the blocker says what finishing it frees.
         self.assertIn(f'It blocks {b}: finishing it (runway give {a} or runway done {a})', take.prompt(self.con, a))

@@ -154,6 +154,28 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertEqual(Duration.words(97200), "1 d 3 h")
     }
 
+    func testHandsOnTicketsAreYoursNotBlocked() throws {
+        let s = try status()
+        var t = try XCTUnwrap(s.tickets.first { $0.column == .upNext })
+        t.handsOn = true
+        XCTAssertTrue(t.yoursToDo)
+        let menu = ContextMenus.ticket(t, runners: s.runners)
+        XCTAssertTrue(menu.contains { $0.action == .markDone })
+        XCTAssertTrue(menu.contains { $0.action == .copyTakePrompt })
+        XCTAssertFalse(menu.contains { $0.action == .takeBack })            // already yours: nothing to take back
+        XCTAssertNil(menu.first { $0.title == "Runs on" })                   // Runway never runs it
+        var done = t
+        done.column = .done
+        done.doneLocally = true
+        XCTAssertFalse(done.yoursToDo)
+        let json = #"{"id":"T-9","repo":"r","title":"t","column":"up_next","agent":"any","risk":"low","pinned":false,"#
+            + #""filed_from":"x","filed_at":"2026-10-26T10:00:00Z","waits_on":["T-3"],"hands_on":false,"#
+            + #""blocked_by":[{"id":"T-3","title":"On the phone","column":"up_next","waits_on":[],"hands_on":true}]}"#
+        let blocked = try StatusCoding.decoder.decode(Ticket.self, from: Data(json.utf8))
+        XCTAssertEqual(blocked.blockedBy?.first?.handsOn, true)
+        XCTAssertFalse(blocked.yoursToDo)
+    }
+
     func testArchivedAndRunnerMenus() throws {
         let s = try status()
         XCTAssertEqual(actions(ContextMenus.archived(ArchivedRepo(name: "x", tickets: 1))), [.unarchive, .removeRepo])
