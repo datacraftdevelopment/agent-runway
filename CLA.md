@@ -18,5 +18,9 @@ us to include in Agent Runway.
 5. **No obligation.** We don't have to use your contribution. You don't have to support it. You give it as is, without
    warranty of any kind.
 
+Files vendored from other projects keep their own licence and are not covered by this agreement: a change to one of
+them is contributed under that file's licence (for the Superpowers skills, MIT; `plugin/agent-runway/VENDOR.md` lists
+them).
+
 You accept this agreement by commenting on your pull request with the sentence the CLA check asks for. Your
 acceptance is recorded once and covers your future contributions too.

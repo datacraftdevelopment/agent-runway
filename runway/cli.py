@@ -207,7 +207,7 @@ def cmd_file(con, a):
     print(f'filed {len(ids)} to {repo}: {", ".join(ids)}')
     if hands:
         print(f'yours to do by hand, Runway never starts {"them" if len(hands) > 1 else "it"}: {", ".join(hands)}'
-              f' (runway hands-on lists them; runway done <ticket> when each is merged)')
+              f' (the hands-on skill does them in your own session; runway hands-on lists them)')
 
 
 # ---- status ------------------------------------------------------------------------------------------------------
@@ -309,8 +309,8 @@ def cmd_hands_on(con, a):
         blocks = f' · {len(t["blocks"])} Runway ticket{"s" if len(t["blocks"]) != 1 else ""} wait on it' \
             if t['blocks'] else ''
         print(f'{t["id"]:6} {t["repo"]}: {t["title"]}{waits}{blocks}')
-    print('runway show <ticket> prints one; runway take <ticket> gives you its worktree; runway done <ticket> when '
-          'its work is merged.')
+    print('runway show <ticket> prints one; runway take <ticket> gives you its worktree; runway done <ticket> on your '
+          'go sends it to the code review and the gate (or closes it, when it changed no code).')
 
 
 def cmd_done(con, a):

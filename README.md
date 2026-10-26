@@ -68,13 +68,18 @@ first run, and it is the only plugin Runway needs.
 | `grill` | Interviews you about the plan, one question at a time, until nothing that changes the build is open. |
 | `prototype` | Builds a throwaway to settle one design question by seeing it. |
 | `spec` | Writes the spec: what it does, what it leaves out, its risk, and acceptance checks. |
-| `file-tickets` | Proposes a short batch of tickets from your session and files them on your go. |
+| `file-tickets` | Proposes a short batch of tickets from your session, sorted into Runway and hands-on, and files them on your go. |
+| `hands-on` | Does the hands-on tickets with you (a real device, how it looks and feels), then sends each through the code review and the gate. |
 | `runway` | What's running, what needs you, pause and resume, go or no on a waiting ticket. |
 | `setup` | Checks this Mac's tools and sign-ins, walks you through each fix, adds a first repo. |
 | `take-back` | Brings a stuck ticket into your session to finish, then hands it back or closes it. |
 
 The shaping skills (map, grill, prototype, spec) are inspired by Matt Pocock's open
 [skills](https://github.com/mattpocock/skills); Runway's versions are written for unattended tickets.
+
+`hands-on` builds with six skills from [Superpowers](https://github.com/obra/superpowers) (MIT), carried in the
+plugin: `writing-plans`, `subagent-driven-development`, `executing-plans`, `test-driven-development`,
+`systematic-debugging` and `verification-before-completion`.
 
 ## Repository
 
@@ -98,6 +103,7 @@ Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). The first one
 
 Source available under the [PolyForm Shield License 1.0.0](LICENSE): free to use, change and share for any purpose
 except providing a product that competes with Agent Runway. Third-party code vendored into this repo keeps its own
-licence, recorded beside it.
+licence, recorded beside it: six skills in `plugin/agent-runway/skills/` come from
+[Superpowers](https://github.com/obra/superpowers) and stay MIT (see `plugin/agent-runway/VENDOR.md`).
 
 Made by DataCraft Development.
