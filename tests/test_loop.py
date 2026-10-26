@@ -17,7 +17,9 @@ class FakeRunner:
         self.started = []
         self.check_ok = True
         self.changes = True
-        self.cfg = {'check_cmd': 'python3 -m unittest -q'}
+        # These tests are about slots, engines and reviews: tickets with no touches may run side by side here.
+        # The overlap rule itself is tested in test_parallel.py.
+        self.cfg = {'check_cmd': 'python3 -m unittest -q', 'parallel_without_touches': True}
         self.pushed = []
         self.removed = []
 

@@ -122,6 +122,20 @@ def cmd_runner_list(con, a):
     out([dict(r) for r in con.execute('SELECT * FROM runners ORDER BY name')])
 
 
+def cmd_runner_limits(con, a):
+    """A runner's limits for starting one more session: memory per session, CPU load, free disk."""
+    from . import capacity
+    if not con.execute('SELECT 1 FROM runners WHERE name=?', (a.name,)).fetchone():
+        raise db.RunwayError(f'no runner called {a.name!r}')
+    for col, val in (('per_session_mb', a.per_session_mb), ('max_load', a.max_load), ('min_disk_gb', a.min_disk_gb)):
+        if val is not None:
+            con.execute(f'UPDATE runners SET {col}=? WHERE name=?', (val, a.name))
+    row = con.execute('SELECT * FROM runners WHERE name=?', (a.name,)).fetchone()
+    lim = capacity.limits(row)
+    print(f'{a.name}: up to {row["slots"]} sessions; each needs {lim["per_session_mb"]} MB free, load under '
+          f'{lim["max_load"]:.2f} per core, {lim["min_disk_gb"]:g} GB free disk')
+
+
 def cmd_runner_set(con, a):
     con.execute('UPDATE runners SET slots=? WHERE name=?', (a.slots, a.name))
     print(f'{a.name}: {a.slots} slots')
@@ -342,8 +356,18 @@ def cmd_doctor(con, a):
 
 
 def cmd_init(con, a):
-    """Runway's folder and database. First run's "Set it up" runs this; running it again changes nothing."""
+    """Runway's folder and database. First run's "Set it up" runs this; running it again changes nothing. The first
+    time, it sizes This Mac's sessions to the Mac: half its cores, 3 GB each after 8 GB for the person."""
+    from . import capacity
     print(f'Runway keeps its tickets and runs in {db.db_path()}')
+    if db.meta(con, 'sessions_sized') is None:
+        r = capacity.read(db.home())
+        if r:
+            n = capacity.suggest_sessions(r['memory_mb'], r['ncpu'])
+            con.execute("UPDATE runners SET slots=? WHERE name='This Mac'", (n,))
+            print(f'This Mac runs up to {n} sessions at once ({r["ncpu"]} cores, {r["memory_mb"] // 1024} GB); '
+                  'change it with: runway runner slots "This Mac" <n>')
+        db.set_meta(con, 'sessions_sized', 1)
 
 
 def cmd_install_skills(con, a):
@@ -411,6 +435,12 @@ def parser():
 
     r = sub.add_parser('runner', help='places tickets run').add_subparsers(dest='sub', required=True)
     r.add_parser('list').set_defaults(fn=cmd_runner_list)
+    x = r.add_parser('limits', help='what a runner needs free before it starts another session')
+    x.add_argument('name')
+    x.add_argument('--per-session-mb', type=int, help='memory each session needs (default 3072)')
+    x.add_argument('--max-load', type=float, help='1-minute load per core to stay under (default 0.85)')
+    x.add_argument('--min-disk-gb', type=float, help='free disk to keep (default 5)')
+    x.set_defaults(fn=cmd_runner_limits)
     x = r.add_parser('slots', help='how many tickets a runner takes at once')
     x.add_argument('name')
     x.add_argument('slots', type=int)

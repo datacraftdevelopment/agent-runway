@@ -101,6 +101,7 @@ extension AppModel {
         switch action {
         case .pauseRunner: step(["pause", name], undo: ["resume", name])
         case .resumeRunner: step(["resume", name])
+        case .maxSessions(let n): step(["runner", "slots", name, String(n)])
         default: break
         }
     }

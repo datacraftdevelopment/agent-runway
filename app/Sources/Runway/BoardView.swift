@@ -40,7 +40,9 @@ struct BoardView: View {
                 VStack(spacing: 8) {
                     ForEach(tickets) { ticket in
                         Button { model.selectedTicket = ticket.id } label: {
-                            TicketCard(ticket: ticket, selected: model.selectedTicket == ticket.id)
+                            TicketCard(ticket: ticket, selected: model.selectedTicket == ticket.id) {
+                                model.selectedTicket = $0
+                            }
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
@@ -60,6 +62,10 @@ struct BoardView: View {
 struct TicketCard: View {
     let ticket: Ticket
     let selected: Bool
+    /// Selects another ticket (a blocker's id on this card).
+    var select: ((String) -> Void)? = nil
+
+    private var blocked: Bool { !ticket.waitsOn.isEmpty && ticket.column == .upNext }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -67,6 +73,27 @@ struct TicketCard: View {
                 .lineSpacing(2).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
             Text("\(ticket.id) · \(ticket.placeLine)").font(.system(size: 11)).foregroundStyle(Palette.textMuted)
             if ticket.column == .running, let stage = ticket.stage { StageBar(stage: stage) }
+            if blocked {
+                // Which tickets it waits on, each one clickable.
+                HStack(spacing: 4) {
+                    Image(systemName: "lock").font(.system(size: 9))
+                    Text("Blocked by")
+                    ForEach(ticket.waitsOn, id: \.self) { id in
+                        Button(id) { select?(id) }.buttonStyle(.plain).foregroundStyle(Palette.link)
+                    }
+                }
+                .font(.system(size: 11)).foregroundStyle(Palette.textSoft)
+            } else if let hold = ticket.hold, ticket.column == .upNext {
+                // Ready, but the loop is holding it: overlapping files, or a busy Mac.
+                HStack(spacing: 4) {
+                    Image(systemName: "hourglass").font(.system(size: 9))
+                    Text(hold.replacingOccurrences(of: "waiting: ", with: "Waiting: ")).lineLimit(2)
+                }
+                .font(.system(size: 11)).foregroundStyle(Palette.needsYouText)
+            }
+            if let blocks = ticket.blocks, !blocks.isEmpty, ticket.column != .done {
+                Text("Blocks \(blocks.joined(separator: ", "))").font(.system(size: 11)).foregroundStyle(Palette.place)
+            }
             HStack(spacing: 4) {
                 AgentChip(agent: ticket.agent)
                 RiskChip(risk: ticket.risk)
@@ -84,6 +111,7 @@ struct TicketCard: View {
         .padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+        .opacity(blocked && !selected ? 0.6 : 1)
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? Palette.blue : Palette.border,
                                                                 lineWidth: selected ? 2 : 1))
         .contentShape(Rectangle())
@@ -135,9 +163,11 @@ private struct Inspector: View {
             }
             row("Code review", ticket.review ?? "not yet")
             row("Function review", ticket.functionReview ?? "not yet")
-            if !ticket.waitsOn.isEmpty { row("Waits on", ticket.waitsOn.joined(separator: ", ")) }
+            if let blocks = ticket.blocks, !blocks.isEmpty { row("Blocks", blocks.joined(separator: ", ")) }
+            if let hold = ticket.hold, ticket.column == .upNext { row("Waiting", hold.replacingOccurrences(of: "waiting: ", with: "")) }
         }
         .font(.system(size: 12))
+        if let blockers = ticket.blockedBy, !blockers.isEmpty { waitsOn(blockers) }
         if ticket.column == .needsYou, ticket.taken != true, let question = ticket.question { needsYou(ticket, question) }
         if ticket.takenLong {
             Text("Taken back \(Int((ticket.takenHours ?? 0) / 24)) day(s) ago and still open. Finish it with the "
@@ -181,6 +211,37 @@ private struct Inspector: View {
                 .help("Pushes your commits and queues it again; both reviews run on your commit")
             }
         }
+    }
+
+    /// Each ticket this one waits on, where it is, and what holds that one; with a take-back button, so the person
+    /// can unblock things in their own session.
+    private func waitsOn(_ blockers: [Ticket.Blocker]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeading(text: "Waits on")
+            ForEach(blockers, id: \.id) { b in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Button(b.id) { model.selectedTicket = b.id }.buttonStyle(.plain).foregroundStyle(Palette.link)
+                        Text(b.title ?? "").lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text(b.column?.title ?? "gone").font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                    }
+                    if !b.waitsOn.isEmpty {
+                        Text("which waits on \(b.waitsOn.joined(separator: ", "))").font(.system(size: 11))
+                            .foregroundStyle(Palette.textMuted)
+                    }
+                    if b.column == .upNext || b.column == .needsYou {
+                        Button("Take back \(b.id) · copy prompt") { model.takeBack(b.id) }
+                            .buttonStyle(PlainBoxButtonStyle(small: true))
+                            .help("Claims it so Runway won't start it, and copies a prompt to do it in your own session")
+                    }
+                }
+            }
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
     }
 
     /// A retro's failing runs, each linked to its PR when it has one.

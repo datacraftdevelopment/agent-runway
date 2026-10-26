@@ -92,6 +92,31 @@ public struct Runner: Codable, Equatable, Identifiable, Sendable {
     public var state: State
     /// Paused by the person until then (nil: not paused, or an older runway).
     public var pausedUntil: Date? = nil
+    /// Its last reading and whether it's holding new work back (nil from an older runway).
+    public var load: Load? = nil
+
+    public struct Load: Codable, Equatable, Sendable {
+        public var sessionsRunning: Int
+        public var sessionsMax: Int
+        public var hold: String?
+        public var summary: String
+        public var availableMb: Int?
+        public var memoryLevel: Int?
+        public var loadRatio: Double?
+        public var diskFreeGb: Double?
+    }
+
+    /// "2 of 3 · memory ok", or "holding: busy (memory)" while it's holding new work back.
+    public var loadLine: String {
+        guard state == .online else { return state.rawValue }
+        if pausedUntil != nil { return "paused" }
+        guard let load else { return load_ }
+        if let hold = load.hold { return "holding: \(hold)" }
+        return "\(load.sessionsRunning) of \(load.sessionsMax) · \(load.summary)"
+    }
+
+    /// "1 of 2": an older runway sends no reading.
+    private var load_: String { "\(slotsUsed) of \(slotsTotal)" }
 
     public var id: String { name }
 
@@ -103,8 +128,6 @@ public struct Runner: Codable, Equatable, Identifiable, Sendable {
         self.state = state
     }
 
-    /// "1 of 2", or the state when the runner can't take work.
-    public var load: String { state == .online ? "\(slotsUsed) of \(slotsTotal)" : state.rawValue }
 }
 
 /// A repo taken off the board with `runway repo archive`, and how many tickets it keeps.
@@ -200,6 +223,18 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var filedFrom: String
     public var filedAt: Date
     public var waitsOn: [String]
+    /// Each open blocker with where it is and what holds it in turn; the open tickets this one blocks; and why the
+    /// loop isn't starting it although it's ready (its touches overlap a running ticket, or its Mac is busy).
+    public var blockedBy: [Blocker]? = nil
+    public var blocks: [String]? = nil
+    public var hold: String? = nil
+
+    public struct Blocker: Codable, Equatable, Sendable {
+        public var id: String
+        public var title: String?
+        public var column: Column?
+        public var waitsOn: [String]
+    }
     /// Seconds since the current run started (running tickets).
     public var elapsed: Int?
     /// One line the inspector shows under the fields.

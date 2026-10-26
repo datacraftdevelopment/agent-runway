@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 MIGRATIONS = {
     1: """
@@ -178,6 +178,16 @@ MIGRATIONS = {
     8: """
     ALTER TABLE repos ADD COLUMN archived_at REAL;
     ALTER TABLE tickets ADD COLUMN cleared_at REAL;
+    """,
+    # Several tickets at once (Joe, 2026-10-26): each runner's limits (slots is its max sessions) and its last
+    # reading, and why a ready ticket is held back: its touches overlap a running one, or its Mac is busy.
+    9: """
+    ALTER TABLE runners ADD COLUMN per_session_mb INTEGER;
+    ALTER TABLE runners ADD COLUMN max_load REAL;
+    ALTER TABLE runners ADD COLUMN min_disk_gb REAL;
+    ALTER TABLE runners ADD COLUMN reading TEXT;
+    ALTER TABLE runners ADD COLUMN hold TEXT;
+    ALTER TABLE tickets ADD COLUMN hold TEXT;
     """,
 }
 
