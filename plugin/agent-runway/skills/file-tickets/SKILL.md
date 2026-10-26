@@ -49,7 +49,9 @@ the person can make. Two to five tickets is a good batch. Show it as one table, 
 - **runs on** is `any`, or one runner by name when the work needs something only that machine has.
 
 Under the table, give each ticket's Acceptance lines: one to three observable checks, each with how to verify it (a
-command where there is one). Then ask, in your own words: "File these N tickets?" and **stop**. Do not file in the
+command where there is one). Write lines a fresh reviewer can verify from the repo alone, with the repo's own
+commands: a test or command it runs, or an experiment it can do and undo (change a value, see a named test fail).
+Not something that needs a person, a phone, a camera or a file that isn't in the repo. Then ask, in your own words: "File these N tickets?" and **stop**. Do not file in the
 same turn.
 
 ## 3. File on go

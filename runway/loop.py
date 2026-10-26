@@ -472,7 +472,8 @@ class Loop:
         (run_dir / 'prompt.md').write_text(prompt)
         session = worker.new_session_id() if agent == 'claude' else None
         name = f'rw-{t["id"]}-{run_id}'
-        line = worker.command(agent, run_dir / 'prompt.md', run_dir, wt, commands, session_id=session)
+        line = worker.command(agent, run_dir / 'prompt.md', run_dir, wt, commands, session_id=session,
+                              cache=db.home() / 'cache' / repo['name'])
         self.runner.start(name, wt, line)
         self.con.execute('UPDATE runs SET dir=?, tmux=?, session_id=?, sha=?, branch=? WHERE id=?',
                          (str(wt), name, session, t['sha'] if kind == 'review' else None,
