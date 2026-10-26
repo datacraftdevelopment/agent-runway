@@ -39,6 +39,12 @@ public struct SetupReport: Codable, Equatable, Sendable {
         public var note: String
         /// In every engine this Mac has (one engine is enough).
         public var installed: Bool?
+        /// The version this Runway carries, what each engine has installed, and whether any is older (an app update
+        /// brought newer skills). Nil from a runway too old to say.
+        public var version: String? = nil
+        public var claudeVersion: String? = nil
+        public var codexVersion: String? = nil
+        public var outdated: Bool? = nil
     }
 
     public var command: Command
