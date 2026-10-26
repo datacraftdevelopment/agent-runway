@@ -165,7 +165,7 @@ class TakeBackTest(unittest.TestCase):
     def test_show_lists_every_run_and_its_record(self):
         out = take.show(self.con, self.tid)
         self.assertIn('A1: it counts', out)
-        self.assertIn('1. build by codex: done, stopped at reviews', out)
+        self.assertRegex(out, r'1\. build by codex: done \(\d+ (s|min)\), stopped at reviews')
         self.assertIn('outcome.json', out)
         self.assertIn('session: thread-1', out)
 

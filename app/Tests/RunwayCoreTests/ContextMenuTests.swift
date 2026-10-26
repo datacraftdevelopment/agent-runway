@@ -136,6 +136,24 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertEqual(s.commands, ["swift build --package-path Core"])
     }
 
+    func testTimerLinesPerColumn() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func ticket(_ column: String, _ timing: String) throws -> Ticket {
+            let json = #"{"id":"T-1","repo":"r","title":"t","column":"\#(column)","agent":"any","risk":"low","pinned":false,"#
+                + #""filed_from":"x","filed_at":"2026-10-26T10:00:00Z","waits_on":[],"timing":\#(timing)}"#
+            return try StatusCoding.decoder.decode(Ticket.self, from: Data(json.utf8))
+        }
+        let iso = { (s: Double) in ISO8601DateFormatter().string(from: now.addingTimeInterval(-s)) }
+        let running = try ticket("running", #"{"started_at":"\#(iso(2280))","stage":"build","stage_started_at":"\#(iso(720))"}"#)
+        XCTAssertEqual(running.timerLine(now: now), "Build · 12 min · 38 min in all")
+        XCTAssertEqual(try ticket("up_next", #"{"waiting_since":"\#(iso(3600))"}"#).timerLine(now: now), "Waiting 1 h")
+        XCTAssertEqual(try ticket("needs_you", #"{"waiting_since":"\#(iso(1200))"}"#).timerLine(now: now),
+                       "Waiting for you 20 min")
+        XCTAssertEqual(try ticket("done", #"{"total_seconds":4320,"parts":{"build":600}}"#).timerLine(now: now),
+                       "Took 1 h 12 min")
+        XCTAssertEqual(Duration.words(97200), "1 d 3 h")
+    }
+
     func testArchivedAndRunnerMenus() throws {
         let s = try status()
         XCTAssertEqual(actions(ContextMenus.archived(ArchivedRepo(name: "x", tickets: 1))), [.unarchive, .removeRepo])

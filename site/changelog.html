@@ -204,6 +204,19 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow log">
+<article class="release" id="v0.1.7">
+  <div class="ver"><h2>0.1.7</h2><span class="when">2026-10-26</span></div>
+  <div class="body">
+<ul>
+<li>Timers on every card: a running ticket shows its stage and how long ("Build · 12 min · 38 min in all"), Up next shows how long it has waited, Needs you shows how long it has waited for you, and Done shows how long it took.</li>
+<li>The ticket panel has a Time section: when it started, and for a finished ticket how the time split between build, fix passes, reviews, waiting for you and the queue. <code>runway show</code> prints the same.</li>
+<li>"No" on a merge question now closes the pull request (its branch stays), the same as dropping a ticket.</li>
+<li>A first build now always starts from the newest copy of your base branch. Before, it could start from an older one.</li>
+<li>The Board, Activity and Stats tabs no longer wrap when a long status message is showing.</li>
+</ul>
+<p class="gh"><a href="https://github.com/datacraftdevelopment/agent-runway/releases/tag/v0.1.7">Release on GitHub</a></p>
+  </div>
+</article>
 <article class="release" id="v0.1.6">
   <div class="ver"><h2>0.1.6</h2><span class="when">2026-10-26</span></div>
   <div class="body">

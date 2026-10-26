@@ -15,6 +15,9 @@ class FakeGitHub:
     def merge(self, path, number, head, method='merge'):
         self.merged.append((number, head))
 
+    def close(self, path, number, comment=None):
+        self.closed = getattr(self, 'closed', []) + [number]
+
 
 class ActionsTest(unittest.TestCase):
     def setUp(self):
@@ -48,9 +51,21 @@ class ActionsTest(unittest.TestCase):
         self.assertEqual(t['state'], 'queued')
         self.assertIn('rename the flag', t['note'])
 
-    def test_no_on_merge_alone_drops(self):
+    def test_no_on_merge_alone_drops_and_closes_the_pr(self):
         self.ask('merge')
-        actions.answer(self.con, 'T-1', 'no')
+        gh = FakeGitHub()
+        self.assertEqual(actions.answer(self.con, 'T-1', 'no', github=gh), 'T-1: dropped, PR #7 closed')
+        self.assertEqual(db.ticket(self.con, 'T-1')['state'], 'dropped')
+        self.assertEqual(gh.closed, [7])
+
+    def test_no_on_merge_says_when_closing_failed(self):
+        self.ask('merge')
+
+        class Down(FakeGitHub):
+            def close(self, *a, **k):
+                raise RuntimeError('gh: not signed in')
+        said = actions.answer(self.con, 'T-1', 'no', github=Down())
+        self.assertIn('left open (closing it failed)', said)
         self.assertEqual(db.ticket(self.con, 'T-1')['state'], 'dropped')
 
     def test_question_go_uses_the_recommendation(self):

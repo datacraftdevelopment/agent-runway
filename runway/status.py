@@ -60,9 +60,21 @@ def ticket_json(con, t, run, slugs=None):
             "SELECT b.ticket FROM blockers b JOIN tickets x ON x.id = b.ticket WHERE b.blocked_by=? "
             "AND x.state NOT IN ('done', 'dropped') ORDER BY CAST(SUBSTR(b.ticket, 3) AS INTEGER)", (t['id'],))],
         'hold': t['hold'] if 'hold' in t.keys() else None,
+        'timing': timing_json(con, t, run),
         'elapsed': int(db.now() - run['started_at']) if run else None,
         'summary': summary(t, run, open_blockers),
     }
+
+
+def timing_json(con, t, run):
+    """The ticket's times for the board's timers: ISO timestamps the app ticks itself, and seconds per part."""
+    from . import timing
+    x = timing.ticket(con, t, run)
+    return {'started_at': iso(x['started_at']), 'finished_at': iso(x['finished_at']), 'stage': x['stage'],
+            'stage_started_at': iso(x['stage_started_at']), 'waiting_since': iso(x['waiting_since']),
+            'total_seconds': x['total_seconds'], 'parts': x['parts'],
+            'runs': [{'kind': r['kind'], 'role': r['role'], 'agent': r['agent'], 'seconds': r['seconds']}
+                     for r in x['runs']]}
 
 
 def blocker_json(con, tid):

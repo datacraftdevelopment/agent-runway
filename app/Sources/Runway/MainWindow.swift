@@ -169,11 +169,14 @@ private struct Toolbar: View {
             }
             Spacer()
             if let action = model.lastAction {
+                // The last thing a button did: it gives way (truncates) before the tabs and buttons do.
                 Text(action).font(.system(size: 11)).foregroundStyle(Palette.textMuted).lineLimit(1)
+                    .truncationMode(.middle).layoutPriority(-1).help(action)
             }
             if let repo = model.repo { runsOnMenu(repo) }
             Segmented(options: [(AppModel.Tab.board, "Board"), (.activity, "Activity"), (.stats, "Stats")],
                       selection: $model.tab)
+                .fixedSize()
             Button(model.repo?.state == .paused ? "Resume" : "Pause") {
                 model.run([model.repo?.state == .paused ? "resume" : "pause", model.selectedRepo ?? ""])
             }

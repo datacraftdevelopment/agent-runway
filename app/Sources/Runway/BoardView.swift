@@ -109,6 +109,19 @@ struct TicketCard: View {
                 .lineSpacing(2).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
             Text("\(ticket.id) · \(ticket.placeLine)").font(.system(size: 11)).foregroundStyle(Palette.textMuted)
             if ticket.column == .running, let stage = ticket.stage { StageBar(stage: stage) }
+            if ticket.timing != nil {
+                // Ticks in the app from the status's timestamps: no extra reads.
+                TimelineView(.periodic(from: .now, by: ticket.column == .running ? 1 : 30)) { context in
+                    if let line = ticket.timerLine(now: context.date) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock").font(.system(size: 9))
+                            Text(line).monospacedDigit()
+                        }
+                        .font(.system(size: 11))
+                        .foregroundStyle(ticket.column == .needsYou ? Palette.needsYouText : Palette.textMuted)
+                    }
+                }
+            }
             if blocked {
                 // Which tickets it waits on, each one clickable.
                 HStack(spacing: 4) {
@@ -211,6 +224,7 @@ private struct Inspector: View {
             .help("Starts this ticket on the next tick without the memory and CPU check, this once")
         }
         if let blockers = ticket.blockedBy, !blockers.isEmpty { waitsOn(blockers) }
+        if let timing = ticket.timing, timing.startedAt != nil || timing.waitingSince != nil { timeSection(ticket, timing) }
         if ticket.column == .needsYou, ticket.taken != true, let question = ticket.question { needsYou(ticket, question) }
         if ticket.takenLong {
             Text("Taken back \(Int((ticket.takenHours ?? 0) / 24)) day(s) ago and still open. Finish it with the "
@@ -253,6 +267,28 @@ private struct Inspector: View {
                 .disabled(ticket.taken != true)
                 .help("Pushes your commits and queues it again; both reviews run on your commit")
             }
+        }
+    }
+
+    /// When it started and how the time went: per part for a finished ticket, so far for a running one.
+    private func timeSection(_ ticket: Ticket, _ t: Ticket.Timing) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(alignment: .leading, spacing: 4) {
+                SectionHeading(text: "Time")
+                if let line = ticket.timerLine(now: context.date) { Text(line).monospacedDigit() }
+                if let start = t.startedAt { row("Started", Clock.time(start)) }
+                let labels = [("build", "Build and check"), ("fix", "Fix passes"), ("review", "Reviews"),
+                              ("waiting_for_you", "Waiting for you"), ("queued", "In the queue")]
+                ForEach(labels, id: \.0) { key, label in
+                    if let s = t.parts?[key], s > 0 { row(label, Duration.words(Double(s))) }
+                }
+                if let runs = t.runs, runs.count > 1 {
+                    Text(runs.map { "\($0.kind == "build" ? "build" : "\($0.role ?? "code") review") \(Duration.words(Double($0.seconds)))" }
+                        .joined(separator: " · "))
+                        .font(.system(size: 11)).foregroundStyle(Palette.textMuted).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .font(.system(size: 12))
         }
     }
 

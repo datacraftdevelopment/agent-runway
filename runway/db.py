@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 MIGRATIONS = {
     1: """
@@ -199,6 +199,10 @@ MIGRATIONS = {
     # still run its tests and builds. runway.json, when present, wins.
     11: """
     ALTER TABLE repos ADD COLUMN worker_commands TEXT;
+    """,
+    # Timers (Joe, 2026-10-26): when a run's current stage (build, check, push, review) began.
+    12: """
+    ALTER TABLE runs ADD COLUMN stage_at REAL;
     """,
 }
 

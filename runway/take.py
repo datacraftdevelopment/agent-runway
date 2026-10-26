@@ -41,11 +41,22 @@ def show(con, tid):
               f'Function review: {verdict_line(t["function_review"])}']
     if t['body']:
         lines += ['', 'The ticket:', t['body']]
+    from . import timing
+    x = timing.ticket(con, t, con.execute('SELECT * FROM runs WHERE ticket=? AND ended_at IS NULL', (tid,)).fetchone())
+    w = timing.words
+    if x['started_at']:
+        lines += ['', f'Time: {w(x["total_seconds"])} since it first started'
+                  + (' (finished)' if x['finished_at'] else '') + '; ' + ', '.join(
+                      f'{k.replace("_", " ")} {w(v)}' for k, v in x['parts'].items() if v)]
+    if x['waiting_since']:
+        lines.append(f'Waiting {w(db.now() - x["waiting_since"])}' + (' for you' if t['state'] in ('needs_you', 'taken')
+                                                                     else ' in Up next'))
     lines += ['', 'Runs:']
     for n, r in enumerate(runs(con, tid), 1):
         what = r['kind'] if r['kind'] == 'build' else f'{r["role"] or "code"} review'
         rd = db.run_dir(con, r)
-        lines.append(f'  {n}. {what} by {r["agent"]}: {r["outcome"] or "running"}, stopped at {r["stage"] or "?"}'
+        took = timing.words((r['ended_at'] or db.now()) - r['started_at'])
+        lines.append(f'  {n}. {what} by {r["agent"]}: {r["outcome"] or "running"} ({took}), stopped at {r["stage"] or "?"}'
                      + (f', commit {r["sha"][:7]}' if r['sha'] else ''))
         lines.append(f'     record: {short_home(rd)}/  (' + ', '.join(
             name for name in ('outcome.json', 'review.json', 'transcript.jsonl', 'reviews', 'log')
