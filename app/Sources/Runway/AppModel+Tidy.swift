@@ -142,8 +142,9 @@ extension AppModel {
             }
             confirm = Confirm(
                 title: "Remove \(name) from Runway?",
-                goes: ["\(p.tickets) ticket\(p.tickets == 1 ? "" : "s") and \(p.runs) run\(p.runs == 1 ? "" : "s") of history "
-                       + "(logs, transcripts, reviews)", "Runway's working copies for them"],
+                goes: ["\(p.tickets) ticket\(p.tickets == 1 ? "" : "s")"
+                       + (p.runs > 0 ? " and \(p.runs) run\(p.runs == 1 ? "" : "s") of history (logs, transcripts, reviews)" : "")]
+                    + (p.runs > 0 ? ["Runway's working copies for them"] : []),
                 stays: ["Your folder, \(shortHome(p.path))", "Its branches", "Its pull requests on GitHub"],
                 button: "Remove", args: ["repo", "remove", name, "--yes"])
         }
@@ -158,7 +159,8 @@ extension AppModel {
             if p.running { return say("\(t.id) is running: delete it when it finishes", error: true) }
             confirm = Confirm(
                 title: "Delete \(t.id)?",
-                goes: ["“\(p.title)”", "Its \(p.runs) run\(p.runs == 1 ? "" : "s") of history (logs, transcripts, reviews)"],
+                goes: ["“\(p.title)”"]
+                    + (p.runs > 0 ? ["Its \(p.runs) run\(p.runs == 1 ? "" : "s") of history (logs, transcripts, reviews)"] : []),
                 stays: ["Its branch\(p.branch.map { " (\($0))" } ?? "") on GitHub"]
                     + (p.pr.map { ["Its pull request #\($0): close it on GitHub if you don't want it"] } ?? []),
                 button: "Delete", args: ["delete", t.id, "--yes"])
