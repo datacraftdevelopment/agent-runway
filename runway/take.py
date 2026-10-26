@@ -13,7 +13,7 @@ from pathlib import Path
 from . import db, worker
 from .runner import LocalRunner, git
 
-OPEN_STATES = ('queued', 'building', 'checking', 'reviewing', 'merging', 'needs_you', 'taken')
+OPEN_STATES = ('queued', 'hands_on', 'building', 'checking', 'reviewing', 'merging', 'needs_you', 'taken')
 
 
 def runs(con, tid):
@@ -215,6 +215,8 @@ def done(con, tid, note=None, github=None, runner=None):
         return f'{tid} is already done'
     if t['state'] not in OPEN_STATES:
         raise db.RunwayError(f'{tid} is {t["state"]}')
+    if not t['pr'] and t['hands_on']:
+        return done_locally(con, t, note, runner)
     if not t['pr']:
         raise db.RunwayError(f'{tid} has no PR to merge yet: runway give {tid} lets Runway open one, or drop it')
     repo = db.repo(con, t['repo'])
@@ -229,6 +231,36 @@ def done(con, tid, note=None, github=None, runner=None):
                      + (f' Note: {note}' if note else ''))
     db.event(con, 'merged', f'{tid} PR #{t["pr"]}, merged by you after taking it back', repo=t['repo'], ticket=tid)
     return f'{tid}: merged PR #{t["pr"]} and marked done'
+
+
+def done_locally(con, t, note, runner):
+    """A hands-on ticket the person did in their own session, with no Runway PR. Its work must already be in the base
+    branch (Runway tickets wait on it, and they build from the base), unless it changed no code at all."""
+    tid, repo = t['id'], db.repo(con, t['repo'])
+    wt = t['take_dir'] if t['take_dir'] and Path(t['take_dir']).exists() else None
+    if wt:
+        if git('status', '--porcelain', cwd=wt).stdout.strip():
+            raise db.RunwayError(f'{short_home(wt)} has uncommitted changes; commit them (or stash them) first')
+        head = runner.head(wt)
+        git('fetch', '--quiet', 'origin', repo['base'], cwd=repo['path'], check=False)
+        merged = git('merge-base', '--is-ancestor', head, f'origin/{repo["base"]}',
+                     cwd=wt, check=False).returncode == 0
+        if not merged:
+            raise db.RunwayError(
+                f'{head[:7]} is not in {repo["base"]} yet, and the tickets waiting on {tid} build from it. Merge your '
+                f'work into {repo["base"]} and push, then run this again (or runway give {tid} to let Runway open the '
+                f'PR and review it).')
+    con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'go', ?, ?)", (tid, note, db.now()))
+    remove_worktrees(con, t, runner)
+    db.update_ticket(con, tid, state='done', stage=None, question=None, take_dir=None, merged_at=db.now(),
+                     merged_by='you_local', note='You did this one yourself, outside Runway.'
+                     + (f' Note: {note}' if note else ''))
+    db.event(con, 'merged', f'{tid} done by hand, outside Runway', repo=t['repo'], ticket=tid)
+    waiting = [r['ticket'] for r in con.execute(
+        "SELECT b.ticket FROM blockers b JOIN tickets x ON x.id = b.ticket WHERE b.blocked_by=? "
+        "AND x.state = 'queued' ORDER BY CAST(SUBSTR(b.ticket, 3) AS INTEGER)", (tid,))]
+    return (f'{tid}: done by hand, outside Runway'
+            + (f'. {", ".join(waiting)} can start now.' if waiting else '.'))
 
 
 def drop(con, tid, reason=None, github=None, runner=None):

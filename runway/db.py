@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 MIGRATIONS = {
     1: """
@@ -204,11 +204,18 @@ MIGRATIONS = {
     12: """
     ALTER TABLE runs ADD COLUMN stage_at REAL;
     """,
+    # Hands-on tickets (Joe, 2026-10-26): work an unattended agent can't prove (a device, the simulator, how the UI
+    # feels, an experiment) is filed beside the Runway batch, done by the person in their own session, never started
+    # by the loop, and kept on the board and in the history as done locally.
+    13: """
+    ALTER TABLE tickets ADD COLUMN hands_on INTEGER NOT NULL DEFAULT 0;
+    """,
 }
 
 # Ticket states and the board column and stage each shows as.
 STATES = {
     'queued': ('up_next', None),
+    'hands_on': ('up_next', None),     # the person does it in their own session; the loop never starts it
     'building': ('running', 'build'),
     'checking': ('running', 'check'),
     'reviewing': ('running', 'review'),
