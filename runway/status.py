@@ -81,11 +81,11 @@ def timing_json(con, t, run):
 def blocker_json(con, tid):
     b = con.execute('SELECT * FROM tickets WHERE id=?', (tid,)).fetchone()
     if not b:
-        return {'id': tid, 'column': None, 'title': None, 'waits_on': []}
+        return {'id': tid, 'column': None, 'title': None, 'waits_on': [], 'hands_on': False}
     theirs = [x for x in db.blockers(con, tid)
               if con.execute("SELECT 1 FROM tickets WHERE id=? AND state NOT IN ('done', 'dropped')", (x,)).fetchone()]
     return {'id': tid, 'title': b['title'], 'column': db.STATES.get(b['state'], ('up_next', None))[0],
-            'waits_on': theirs}
+            'waits_on': theirs, 'hands_on': bool(b['hands_on']) if 'hands_on' in b.keys() else False}
 
 
 def runner_load(r, used):

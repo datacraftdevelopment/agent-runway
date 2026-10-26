@@ -28,6 +28,9 @@ enum Palette {
     static let needsYouFill = Color(hex: 0x3A2A12)
     static let needsYouBorder = Color(hex: 0x6B4A17)
     static let needsYouText = Color(hex: 0xFFC46B)
+    // Hands-on: the person's own work, not a block and not a question.
+    static let handsOnFill = Color(hex: 0x123238)
+    static let handsOnText = Color(hex: 0x7FD8E6)
 
     static let runningPillFill = Color(hex: 0x1F3A26)
     static let runningPillText = Color(hex: 0x7EE59A)
@@ -196,6 +199,7 @@ struct Chip: View {
 
     var body: some View {
         Text(text).font(.system(size: 11)).foregroundStyle(foreground)
+            .lineLimit(1).fixedSize()                      // a chip never wraps ("not / low")
             .padding(.horizontal, 7).padding(.vertical, 2)
             .background(background, in: Capsule())
     }

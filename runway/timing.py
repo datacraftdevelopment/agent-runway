@@ -68,7 +68,8 @@ def ticket(con, t, live=None):
     return {
         'filed_at': t['filed_at'], 'started_at': started, 'finished_at': finished,
         'stage': stage, 'stage_started_at': stage_at, 'waiting_since': waiting_since,
-        'total_seconds': round(end - started) if started else None,
+        # A ticket done by hand has no runs: its time is filing to done.
+        'total_seconds': round(end - started) if started else (round(end - t['filed_at']) if finished else None),
         'parts': {k: round(v) for k, v in parts.items()},
         'runs': [{'kind': r['kind'], 'role': r['role'], 'agent': r['agent'], 'started_at': r['started_at'],
                   'ended_at': r['ended_at'], 'seconds': round((r['ended_at'] or now) - r['started_at'])} for r in runs],

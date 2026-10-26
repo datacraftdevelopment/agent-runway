@@ -4,7 +4,7 @@ import Foundation
 /// without a window: the app turns each action into a `runway` command (or a copy, a link, a reveal).
 public enum MenuAction: Equatable, Sendable {
     // Tickets
-    case discussTicket, takeBack, copyTakePrompt, giveBack, go, no, openPR, copyTicketID, ticketRunsOn(String?)
+    case discussTicket, takeBack, copyTakePrompt, giveBack, go, no, openPR, copyTicketID, ticketRunsOn(String?), markDone
     case deleteTicket
     // Repos
     case discussRepo, pauseRepo, resumeRepo, repoRunsOn(Repo.RunsOn), mainComputer(String), openGitHub, revealFolder
@@ -36,7 +36,10 @@ public struct MenuItem: Equatable, Sendable {
 public enum ContextMenus {
     public static func ticket(_ t: Ticket, runners: [Runner]) -> [MenuItem] {
         var items: [MenuItem] = [.item("Chat about this ticket…", .discussTicket)]
-        if t.column != .done {
+        if t.yoursToDo {
+            // Yours by hand: the prompt for your own session, and done when you've done it. Runway never starts it.
+            items += [.item("Copy prompt", .copyTakePrompt), .item("Mark done", .markDone)]
+        } else if t.column != .done {
             if t.taken == true {
                 items += [.item("Copy take-back prompt again", .copyTakePrompt), .item("Give back", .giveBack)]
             } else {
@@ -49,7 +52,7 @@ public enum ContextMenus {
         items.append(.divider)
         if t.prUrl != nil { items.append(.item("Open PR", .openPR)) }
         items.append(.item("Copy ticket id (\(t.id))", .copyTicketID))
-        if t.column == .upNext || t.column == .needsYou {
+        if (t.column == .upNext || t.column == .needsYou) && !t.yoursToDo {
             items.append(.submenu("Runs on", [.item("Any free runner", .ticketRunsOn(nil), checked: t.runsOn == nil)]
                 + runners.map { .item($0.name, .ticketRunsOn($0.name), checked: t.runsOn == $0.name) }))
         }

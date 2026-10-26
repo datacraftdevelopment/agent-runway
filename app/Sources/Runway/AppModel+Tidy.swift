@@ -88,6 +88,7 @@ extension AppModel {
             say("Copied \(t.id)")
         case .ticketRunsOn(let runner): step(["runs-on", t.id, runner ?? "any"])
         case .deleteTicket: confirmDelete(t)
+        case .markDone: step(["done", t.id], ok: "\(t.id) marked done")
         default: break
         }
     }
