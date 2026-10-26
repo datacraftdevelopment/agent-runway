@@ -348,6 +348,8 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
 
     /// What the card's second line says about where it runs.
     public var placeLine: String {
+        if doneLocally == true && column == .done { return "done by hand" }
+        if handsOn == true && column == .upNext { return "yours, by hand" }
         guard let runsOn else { return "next free runner" }
         return pinned ? "\(runsOn) (pinned)" : runsOn
     }

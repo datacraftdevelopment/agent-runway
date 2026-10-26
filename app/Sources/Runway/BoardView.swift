@@ -130,7 +130,7 @@ struct TicketCard: View {
                     ForEach(ticket.waitsOn, id: \.self) { id in
                         Button(id) { select?(id) }.buttonStyle(.plain).foregroundStyle(Palette.link)
                         if ticket.blockedBy?.first(where: { $0.id == id })?.handsOn == true {
-                            Text("(hands-on, yours)").foregroundStyle(Palette.handsOnText)
+                            Text("· yours").foregroundStyle(Palette.handsOnText).fixedSize()
                         }
                     }
                 }
@@ -212,9 +212,13 @@ private struct Inspector: View {
         VStack(alignment: .leading, spacing: 6) {
             row("Filed", "\(ticket.filedFrom), \(Clock.time(ticket.filedAt))")
             row("Agent", ticket.agent.longLabel)
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                label("Runs on")
-                runsOnMenu(ticket)
+            if ticket.yoursToDo {
+                row("Runs on", "you, by hand")
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    label("Runs on")
+                    runsOnMenu(ticket)
+                }
             }
             row("Risk", ticket.risk.longLabel)
             HStack(alignment: .firstTextBaseline, spacing: 0) {

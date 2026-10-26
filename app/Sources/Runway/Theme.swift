@@ -199,6 +199,7 @@ struct Chip: View {
 
     var body: some View {
         Text(text).font(.system(size: 11)).foregroundStyle(foreground)
+            .lineLimit(1).fixedSize()                      // a chip never wraps ("not / low")
             .padding(.horizontal, 7).padding(.vertical, 2)
             .background(background, in: Capsule())
     }
