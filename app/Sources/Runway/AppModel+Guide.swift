@@ -54,6 +54,7 @@ extension AppModel {
             guideStep = SetupGuide.start(report, firstLaunch: false)
             return .guide
         }
+        await updateSkillsAfterUpdate()
         let decision = WhatsNew.decide(current: appVersion, lastSeen: defaults.string(forKey: Self.lastSeenKey),
                                        firstLaunch: false, notes: Self.releaseNotes())
         if decision.remember { rememberSeen() }
@@ -64,6 +65,26 @@ extension AppModel {
     private func rememberSeen() {
         guard AppVersion(appVersion) != nil, RenderMode.folder == nil else { return }
         defaults.set(appVersion, forKey: Self.lastSeenKey)
+    }
+
+    /// After an app update brought newer skills: update the Agent Runway plugin in each engine that already has it,
+    /// without asking (it's the install the person approved at setup; nothing is added to an engine without it).
+    /// What's New then says what happened; if it didn't work, why, with "Update the skills" to try again.
+    func updateSkillsAfterUpdate() async {
+        guard let cli, setup?.skills.outdated == true else { return }
+        updatingSkills = true
+        let result = await cli.run(["install-skills", "--update-only"])
+        updatingSkills = false
+        let said = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+        let after = await checkMac()
+        if result.status == 0, after?.skills.outdated != true {
+            let engines = [after?.skills.claudeVersion.map { _ in "Claude Code" },
+                           after?.skills.codexVersion.map { _ in "Codex" }].compactMap { $0 }
+            skillsNote = "Skills updated to \(after?.skills.version ?? "the new version") in "
+                + engines.joined(separator: " and ") + ". Restart your Claude Code or Codex sessions to load them."
+        } else {
+            skillsNote = "The skills didn't update on their own: \(said.isEmpty ? "no reason given" : String(said.suffix(300)))"
+        }
     }
 
     /// What's New's "Update the skills": asks first, then `runway install-skills`, which updates an older install

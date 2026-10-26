@@ -19,7 +19,10 @@ Only app releases are published on this repo, because "latest" must always be th
 ## Cutting a release
 
 1. Bump `app/VERSION` on a branch (e.g. `0.1.0` to `0.2.0`) and write `app/release-notes/<VERSION>.md`: a few plain
-   `- ` lines. The same file is the release page (and so Sparkle's update window) and the app's What's New screen. For
+   `- ` lines. **Put what the person must know or do first**: start with a `### Do this after updating` section when
+   there's anything (restart sessions, a setting), and when the release changes the Agent Runway plugin, say so there
+   and add `plugin: <version>` to the front matter (a test checks the plugin's version is declared in some notes file
+   that talks about the skills first). Then `### New`, then `### Fixed`, short lines. The same file is the release page (and so Sparkle's update window) and the app's What's New screen. For
    a major release, start it with front matter `---` / `big: true` / `---` and add `### ` sections: What's New shows
    each as a step in a fuller recap (the front matter is stripped from the release page). Add `date: YYYY-MM-DD` to the
    front matter, then run `python3 scripts/site_changelog.py`: the website's changelog is built from these files, and a

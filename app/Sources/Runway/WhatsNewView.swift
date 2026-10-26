@@ -13,7 +13,12 @@ struct WhatsNewView: View {
                 Text("What's new in Runway").font(.system(size: 22, weight: .bold))
                 Text("Version \(model.appVersion)").foregroundStyle(Palette.textMuted)
             }
-            if model.setup?.skills.outdated == true { skillsOffer }
+            if model.setup?.skills.outdated == true {
+                skillsOffer
+            } else if let note = model.skillsNote {
+                Label(note, systemImage: "checkmark.circle").font(.system(size: 12))
+                    .foregroundStyle(Palette.runningPillText).fixedSize(horizontal: false, vertical: true)
+            }
             // ImageRenderer draws no ScrollView contents, so a render lays the notes out flat.
             if RenderMode.folder == nil {
                 ScrollView { notes }.scrollIndicators(.automatic)
@@ -43,6 +48,10 @@ struct WhatsNewView: View {
                 Text("Claude Code or Codex has " + (model.setup.map(SetupGuide.installedVersions) ?? "an older version")
                      + "; this Runway carries \(model.setup?.skills.version ?? "newer ones").")
                     .font(.system(size: 12)).foregroundStyle(Palette.textSoft).fixedSize(horizontal: false, vertical: true)
+                if let note = model.skillsNote {
+                    Text(note).font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
             Button(model.updatingSkills ? "Updating…" : "Update the skills") { model.updateSkills() }

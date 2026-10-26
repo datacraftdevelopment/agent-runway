@@ -177,6 +177,8 @@ final class AppModel {
     // What's New (AppModel+Guide.swift).
     var whatsNew: [ReleaseNote] = []
     var updatingSkills = false
+    /// What the automatic skills update after an app update did, for What's New.
+    var skillsNote: String?
 
     func runDoctor() {
         guard let cli else { return setupMessage = "Sample data: no runway command to check with" }

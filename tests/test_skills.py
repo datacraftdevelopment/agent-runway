@@ -74,8 +74,12 @@ class SkillsTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         os.environ['RUNWAY_HOME'] = self.tmp.name
+        # Never this Mac's own Claude Code record: the tests feed the plugin list themselves.
+        self.config = mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': self.tmp.name})
+        self.config.start()
 
     def tearDown(self):
+        self.config.stop()
         self.tmp.cleanup()
         os.environ.pop('RUNWAY_HOME', None)
 
