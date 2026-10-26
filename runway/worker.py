@@ -175,21 +175,45 @@ def allowed_tools(check_commands, run_dir):
     return tools
 
 
-def command(agent, prompt_file, run_dir, workdir, check_commands, session_id=None):
-    """The shell line tmux runs: the agent, its log, then its exit code, so the loop can read both later."""
+# Where Xcode, SwiftPM and the simulator keep their caches on a Mac. Codex's workspace-write sandbox only lets a
+# session write its worktree and the folders it is given, so these are given (the ones that exist) rather than the
+# sandbox loosened: without them no Swift or iOS build ever ran under Runway (Joe, 2026-10-26, handstand-log T-7).
+TOOL_CACHES = ('Library/Developer/Xcode/DerivedData', 'Library/Caches/org.swift.swiftpm', 'Library/org.swift.swiftpm',
+               'Library/Caches/com.apple.dt.Xcode', 'Library/Developer/CoreSimulator')
+
+
+def build_env(cache):
+    """For a run: its own temp and clang module cache under `cache` (~/.runway/cache/<repo>, kept between runs so
+    builds stay quick), as shell exports, and the folders a sandboxed session must be able to write."""
+    from pathlib import Path
+    cache = Path(cache)
+    tmp, modules = cache / 'tmp', cache / 'ModuleCache'
+    for d in (tmp, modules):
+        d.mkdir(parents=True, exist_ok=True)
+    exports = f'export TMPDIR={shlex.quote(str(tmp))}/ CLANG_MODULE_CACHE_PATH={shlex.quote(str(modules))}; '
+    home = Path.home()
+    writable = [cache] + [home / d for d in TOOL_CACHES if (home / d).is_dir()]
+    return exports, writable
+
+
+def command(agent, prompt_file, run_dir, workdir, check_commands, session_id=None, cache=None):
+    """The shell line tmux runs: the agent, its log, then its exit code, so the loop can read both later. With
+    `cache`, builds get their own temp and module cache, and Codex can write the tool caches it needs."""
     log = shlex.quote(str(run_dir / 'log'))
     done = shlex.quote(str(run_dir / 'exit'))
     prompt = f'"$(cat {shlex.quote(str(prompt_file))})"'
+    exports, writable = build_env(cache) if cache else ('', [])
     if agent == 'claude':
         tools = ' '.join(shlex.quote(t) for t in allowed_tools(check_commands, run_dir))
         line = (f'claude -p {prompt} --session-id {session_id} --permission-mode dontAsk '
                 f'--add-dir {shlex.quote(str(run_dir))} --allowedTools {tools} --output-format json')
     elif agent == 'codex':
-        line = (f'codex exec -s workspace-write --add-dir {shlex.quote(str(run_dir))} --json '
+        extra = ''.join(f' --add-dir {shlex.quote(str(d))}' for d in writable)
+        line = (f'codex exec -s workspace-write --add-dir {shlex.quote(str(run_dir))}{extra} --json '
                 f'-C {shlex.quote(str(workdir))} -o {shlex.quote(str(run_dir / "last-message.txt"))} {prompt}')
     else:
         raise ValueError(agent)
-    return f'{line} > {log} 2>&1; echo $? > {done}'
+    return f'{exports}{line} > {log} 2>&1; echo $? > {done}'
 
 
 def usage(agent, log_text):
