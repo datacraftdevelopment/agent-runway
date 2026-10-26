@@ -118,7 +118,7 @@ def file(con, repo, reason, by_hand=False):
 def check(con, config_for):
     """Each loop tick: file the retros that are due. `config_for(repo)` gives the repo's runway.json."""
     filed = []
-    for r in con.execute('SELECT * FROM repos WHERE active = 1').fetchall():
+    for r in con.execute('SELECT * FROM repos WHERE active = 1 AND archived_at IS NULL').fetchall():
         threshold = int(config_for(r).get('retro_threshold') or DEFAULT_THRESHOLD)
         for reason in due(con, r['name'], threshold):
             filed.append(file(con, r['name'], reason))

@@ -139,13 +139,35 @@ def repo_json(con, r, tickets, pause):
             'runs_on': r['runs_on']}
 
 
+def repo_prompt(con, name):
+    """What the person pastes to talk a repo's work over in Claude Code or Codex: the runway skill first, then what
+    is queued, running, waiting and recently done, for a session without the plugin."""
+    db.repo(con, name)
+    snap = snapshot(con)
+    mine = [t for t in snap['tickets'] if t['repo'] == name]
+    cols = {'needs_you': 'Needs you', 'running': 'Running', 'up_next': 'Up next', 'done': 'Done lately'}
+    lines = []
+    for col, label in cols.items():
+        ts = [t for t in mine if t['column'] == col][-5:] if col == 'done' else [t for t in mine if t['column'] == col]
+        if ts:
+            lines.append(f'{label}: ' + '; '.join(f'{t["id"]} {t["title"]}' for t in ts))
+    return (f'Use the runway skill to look at the {name} repo with me: what is queued, running and waiting for me, '
+            f'and how the last tickets went. Don\'t change anything unless I ask.\n'
+            f'\n'
+            f'Without the plugin: ' + ('. '.join(lines) if lines else 'nothing on the board') +
+            f'. runway status prints the board, runway show <ticket> one ticket.')
+
+
 def snapshot(con):
     global _CON
     _CON = con
     runs = {r['ticket']: r for r in live_runs(con)}
     slugs = {r['name']: r['slug'] for r in con.execute('SELECT name, slug FROM repos')}
+    # Archived repos and their tickets, and cleared Done tickets, are off the board (still in the database).
     tickets = [ticket_json(con, t, runs.get(t['id']), slugs)
-               for t in con.execute('SELECT * FROM tickets ORDER BY filed_at, CAST(SUBSTR(id, 3) AS INTEGER)')]
+               for t in con.execute('SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo '
+                                    'WHERE r.archived_at IS NULL AND t.cleared_at IS NULL '
+                                    'ORDER BY t.filed_at, CAST(SUBSTR(t.id, 3) AS INTEGER)')]
     pause = paused_until(con)
     used = {}
     for r in runs.values():
@@ -155,7 +177,11 @@ def snapshot(con):
         'version': 1,
         'generated_at': iso(db.now()),
         'paused_until': iso(pause),
-        'repos': [repo_json(con, r, tickets, pause) for r in con.execute('SELECT * FROM repos ORDER BY name')],
+        'repos': [repo_json(con, r, tickets, pause)
+                  for r in con.execute('SELECT * FROM repos WHERE archived_at IS NULL ORDER BY name')],
+        'archived': [{'name': r['name'], 'tickets': r['n']} for r in con.execute(
+            'SELECT r.name, COUNT(t.id) n FROM repos r LEFT JOIN tickets t ON t.repo = r.name '
+            'WHERE r.archived_at IS NOT NULL GROUP BY r.name ORDER BY r.name')],
         'runners': [{'name': r['name'], 'kind': r['kind'], 'slots_used': used.get(r['name'], 0),
                      'slots_total': r['slots'], 'state': r['state']}
                     for r in con.execute("SELECT * FROM runners ORDER BY kind != 'this_mac', name")],
