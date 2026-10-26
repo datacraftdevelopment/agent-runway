@@ -1,6 +1,7 @@
 """runway status --json: the one snapshot the app draws. Same shape as app/Tests/.../sample-status.json."""
 
 import json
+import os
 import time
 
 from . import db
@@ -152,7 +153,63 @@ def resting_for(t):
     return None
 
 
-def repo_json(con, r, tickets, pause):
+def loop_running(con):
+    """Whether the loop that last started is still alive (its pid, from the database)."""
+    pid = db.meta(con, 'loop_pid')
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (TypeError, ValueError, ProcessLookupError):
+        return False
+    except PermissionError:
+        return True
+
+
+def why_idle(con, r, mine, pause, running_loop):
+    """When a repo has tickets up next but none running, the one reason nothing starts, and the ticket to look at.
+    None while something runs, nothing is queued, or the next tick will start one."""
+    up = [t for t in mine if t['column'] == 'up_next']
+    if not up or any(t['column'] == 'running' for t in mine):
+        return None, None
+    n = len(up)
+    many = f'{n} ticket{"s" if n != 1 else ""} wait{"s" if n == 1 else ""}'
+    if not r['active']:
+        return f'Nothing can run: {r["name"]} is stopped', None
+    if pause or (r['paused_until'] and r['paused_until'] > db.now()):
+        return 'Nothing can run: Runway is paused', None
+    if not running_loop:
+        return "Nothing can run: Runway's loop isn't running", None
+    if all(t['waits_on'] for t in up):
+        # Follow each chain to the tickets that hold everything up: not themselves waiting in Up next.
+        by_id = {t['id']: t for t in mine}
+        roots, seen = [], set()
+
+        def walk(tid):
+            if tid in seen:
+                return
+            seen.add(tid)
+            t = by_id.get(tid)
+            if t and t['column'] == 'up_next' and t['waits_on']:
+                for b in t['waits_on']:
+                    walk(b)
+            elif tid not in roots:
+                roots.append(tid)
+        for t in up:
+            for b in t['waits_on']:
+                walk(b)
+        where = {'needs_you': 'which needs you', 'running': 'which is running', 'done': 'which is done'}
+        root = roots[0] if roots else None
+        state = where.get(by_id[root]['column'], '') if root in by_id else 'which is in another repo'
+        names = ', '.join(roots[:3])
+        return f'Nothing can run: {many} on {names}' + (f', {state}' if len(roots) == 1 else ''), root
+    held = [t for t in up if t.get('hold') and ' is busy (' in t['hold']]
+    if held and len(held) + sum(1 for t in up if t['waits_on']) == n:
+        runner = held[0]['hold'].split('waiting: ', 1)[-1].split(' is busy', 1)[0]
+        return f'Nothing can run: {many} for room on {runner}', held[0]['id']
+    return None, None
+
+
+def repo_json(con, r, tickets, pause, running_loop=True):
     mine = [t for t in tickets if t['repo'] == r['name']]
     running = [t for t in mine if t['column'] == 'running']
     need = [t for t in mine if t['column'] == 'needs_you']
@@ -168,8 +225,9 @@ def repo_json(con, r, tickets, pause):
         state, line = 'needs_you', f'{len(need)} need{"s" if len(need) == 1 else ""} you'
     else:
         state, line = 'idle', f'Idle · {len(up)} up next' if up else 'Idle · nothing queued'
+    idle, look = why_idle(con, r, mine, until, running_loop)
     return {'name': r['name'], 'state': state, 'status_line': line, 'main_computer': r['main_computer'],
-            'runs_on': r['runs_on'], 'slug': r['slug'], 'path': r['path']}
+            'runs_on': r['runs_on'], 'slug': r['slug'], 'path': r['path'], 'idle_reason': idle, 'idle_ticket': look}
 
 
 def repo_prompt(con, name):
@@ -210,7 +268,8 @@ def snapshot(con):
         'version': 1,
         'generated_at': iso(db.now()),
         'paused_until': iso(pause),
-        'repos': [repo_json(con, r, tickets, pause)
+        'loop_running': (alive := loop_running(con)),
+        'repos': [repo_json(con, r, tickets, pause, alive)
                   for r in con.execute('SELECT * FROM repos WHERE archived_at IS NULL ORDER BY name')],
         'archived': [{'name': r['name'], 'tickets': r['n']} for r in con.execute(
             'SELECT r.name, COUNT(t.id) n FROM repos r LEFT JOIN tickets t ON t.repo = r.name '

@@ -27,6 +27,8 @@ final class AppModel {
 
     let cli: RunwayCLI?
     private var loop: Process?
+    private var loopStarted = Date.distantPast
+    private var loopObserved = false
     private var polling: Task<Void, Never>?
     private let logger = Logger(subsystem: "dev.datacraft.runway-agent", category: "actions")
 
@@ -62,6 +64,7 @@ final class AppModel {
                 var tick = 0
                 while !Task.isCancelled {
                     await self?.refresh()
+                    self?.keepLoopRunning()
                     if tick % 5 == 0 { await self?.refreshStats() }
                     tick += 1
                     if let self, RenderMode.folder != nil { return await RenderMode.renderAndQuit(self) }
@@ -322,10 +325,30 @@ final class AppModel {
         let log = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".runway/loop.log")
         try? FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
         loop = cli.startLoop(log: log)
-        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
-                                               queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.loop?.terminate() }
+        loopStarted = Date()
+        if !loopObserved {
+            loopObserved = true
+            NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
+                                                   queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.loop?.terminate() }
+            }
         }
+    }
+
+    /// The loop is the app's child: if it has stopped (it gave up waiting for an old one after an update, or it
+    /// crashed), start it again, at most every 20 seconds.
+    func keepLoopRunning() {
+        guard let cli, source == .live, ProcessInfo.processInfo.environment["RUNWAY_NO_LOOP"] == nil,
+              !loopRunning, Date().timeIntervalSince(loopStarted) > 20 else { return }
+        logger.info("loop not running: starting it again")
+        startLoop(cli)
+    }
+
+    /// "Start the loop" on the board, when it says the loop isn't running.
+    func restartLoop() {
+        guard let cli, !loopRunning else { return }
+        startLoop(cli)
+        act("Started Runway's loop")
     }
 
     var loopRunning: Bool { loop?.isRunning ?? false }

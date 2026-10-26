@@ -115,6 +115,16 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertFalse(overlap.heldForCapacity)                         // Start anyway is for a busy Mac only
     }
 
+    func testIdleReasonDecodesAndShortens() throws {
+        let json = #"{"name":"handstand-log","state":"needs_you","status_line":"1 needs you","main_computer":"This Mac","#
+            + #""runs_on":"main","idle_reason":"Nothing can run: 4 tickets wait on T-4, which needs you","idle_ticket":"T-4"}"#
+        let repo = try StatusCoding.decoder.decode(Repo.self, from: Data(json.utf8))
+        XCTAssertEqual(repo.idleTicket, "T-4")
+        XCTAssertEqual(repo.idleShort, "4 tickets wait on T-4, which needs you")
+        XCTAssertEqual(try status().loopRunning, true)
+        XCTAssertNil(try status().repos[0].idleReason)
+    }
+
     func testArchivedAndRunnerMenus() throws {
         let s = try status()
         XCTAssertEqual(actions(ContextMenus.archived(ArchivedRepo(name: "x", tickets: 1))), [.unarchive, .removeRepo])

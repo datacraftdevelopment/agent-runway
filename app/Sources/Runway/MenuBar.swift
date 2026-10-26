@@ -45,11 +45,16 @@ struct MenuBarContent: View {
                         model.select(repo: repo.name)
                         open("runway")
                     } label: {
-                        HStack(spacing: 8) {
-                            Dot(color: repo.state.dot)
-                            Text(repo.name)
-                            Spacer()
-                            Text(repoNote(repo, status)).font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 8) {
+                                Dot(color: repo.state.dot)
+                                Text(repo.name)
+                                Spacer()
+                                Text(repoNote(repo, status)).font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                            }
+                            if let why = repo.idleShort {
+                                Text(why).font(.system(size: 11)).foregroundStyle(Palette.needsYouText).padding(.leading, 16)
+                            }
                         }
                     }
                 }
