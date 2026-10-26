@@ -123,50 +123,70 @@ class DoneByHandTest(unittest.TestCase):
         sh('push', '-q', 'origin', f'HEAD:refs/heads/{branch}', cwd=wt)
         return sh('rev-parse', 'HEAD', cwd=wt)
 
-    def test_take_work_merge_then_done(self):
+    def test_take_work_then_done_goes_through_the_code_review_and_the_gate(self):
         wt, branch = take.take(self.con, self.a, runner=self.runner)
         self.assertEqual(branch, f'rw/{self.a}')
+        t = db.ticket(self.con, self.a)
+        self.assertEqual((t['state'], t['taken']), ('hands_on', 0))        # still the person's, in Up next
+        self.assertEqual(self.con.execute('SELECT COUNT(*) FROM stops').fetchone()[0], 0)
 
-        mine = self.commit(wt, 'sheet.swift', '// settled\n', f'{self.a}: sheet', branch=branch)
+        mine = self.commit(wt, 'sheet.swift', '// settled\n', f'{self.a}: sheet', branch='scratch')
 
         # Uncommitted work is refused.
         (Path(wt) / 'sheet.swift').write_text('// more\n')
+        gh = FakeGitHub()
         with self.assertRaisesRegex(db.RunwayError, 'uncommitted'):
-            take.done(self.con, self.a, runner=self.runner, github=FakeGitHub())
+            take.done(self.con, self.a, runner=self.runner, github=gh)
         sh('checkout', '--', 'sheet.swift', cwd=wt)
 
-        # Committed but not in main: refused, because the tickets waiting on it build from main.
-        with self.assertRaisesRegex(db.RunwayError, 'not in main yet'):
-            take.done(self.con, self.a, runner=self.runner, github=FakeGitHub())
-        self.assertEqual(db.ticket(self.con, self.a)['state'], 'taken')
+        said = take.done(self.con, self.a, note='settles on the phone', runner=self.runner, github=gh)
+        self.assertIn('code review and the gate run next', said)
+        t = db.ticket(self.con, self.a)
+        self.assertEqual((t['state'], t['pr'], t['sha'], t['take_dir']), ('reviewing', 7, mine, None))
+        self.assertEqual(t['function_review'], 'You, by hand: pass (settles on the phone)')
+        self.assertEqual(sh('rev-parse', f'refs/heads/{branch}', cwd=self.origin), mine)
+        self.assertEqual(gh.merged, [])                                  # nothing merged on the person's word alone
         self.assertEqual(db.ticket(self.con, self.b)['state'], 'queued')
 
-        # Merged into main, as the person's own session would: now it closes.
-        sh('fetch', '-q', 'origin', branch, cwd=self.clone)
-        sh('-c', 'user.name=t', '-c', 'user.email=t@t', 'merge', '-q', '--no-edit', 'FETCH_HEAD', cwd=self.clone)
-        sh('push', '-q', 'origin', 'main', cwd=self.clone)
-        said = take.done(self.con, self.a, note='checked on the phone', runner=self.runner, github=FakeGitHub())
-        self.assertIn('outside Runway', said)
-        self.assertIn(self.b, said)                                     # it says what can start now
+        # The loop owes it only the code review; the function review is the person's.
+        loop = Loop(self.con, runner=FakeRunner(self.tmp.name), github=gh, log=lambda *_: None)
+        self.assertEqual(loop.reviews_due(t), ['code'])
+        self.assertTrue(loop.passed(t, 'function'))
+        self.assertFalse(loop.passed(t, 'code'))
+
+    def test_a_failed_code_review_goes_back_to_the_person(self):
+        wt, branch = take.take(self.con, self.a, runner=self.runner)
+        self.commit(wt, 'sheet.swift', '// settled\n', f'{self.a}: sheet', branch='scratch')
+        take.done(self.con, self.a, runner=self.runner, github=FakeGitHub())
+        loop = Loop(self.con, runner=FakeRunner(self.tmp.name), github=FakeGitHub(), log=lambda *_: None)
+        loop.failed(db.ticket(self.con, self.a), 'Codex failed the code review:\n- the height is never saved',
+                    reason='code_review')
         t = db.ticket(self.con, self.a)
-        self.assertEqual((t['state'], t['merged_by'], t['take_dir']), ('done', 'you_local', None))
-        self.assertIn('yourself', t['note'])
-        self.assertIn('checked on the phone', t['note'])
-        self.assertEqual(take.done(self.con, self.a, runner=self.runner, github=FakeGitHub()),
-                         f'{self.a} is already done')                   # twice is harmless
-        self.assertEqual(mine, sh('rev-parse', f'refs/heads/{branch}', cwd=self.origin))
+        self.assertEqual(t['state'], 'hands_on')                         # never built by Runway
+        self.assertIn('never saved', status.summary(t, None, []))
+
+        # Fixed by hand on the same branch; done again reuses the PR.
+        wt, _ = take.take(self.con, self.a, runner=self.runner)
+        fixed = self.commit(wt, 'sheet.swift', '// saved\n', 'save it', branch='scratch')
+        take.done(self.con, self.a, runner=self.runner, github=FakeGitHub())
+        t = db.ticket(self.con, self.a)
+        self.assertEqual((t['state'], t['pr'], t['sha']), ('reviewing', 7, fixed))
 
     def test_a_hands_on_ticket_with_nothing_to_merge_closes(self):
         """Work that changed no code at all: a check on a device, a look at how something feels."""
         said = take.done(self.con, self.a, note='looked at it on the phone', runner=self.runner, github=FakeGitHub())
-        self.assertIn('outside Runway', said)
-        self.assertEqual(db.ticket(self.con, self.a)['merged_by'], 'you_local')
+        self.assertIn('no code to merge', said)
+        self.assertIn(self.b, said)                                     # it says what can start now
+        t = db.ticket(self.con, self.a)
+        self.assertEqual((t['state'], t['merged_by']), ('done', 'you_local'))
+        self.assertTrue(status.ticket_json(self.con, t, None)['done_locally'])
+        self.assertEqual(take.done(self.con, self.a, runner=self.runner, github=FakeGitHub()),
+                         f'{self.a} is already done')                   # twice is harmless
 
-    def test_it_can_still_be_given_to_runway_instead(self):
-        wt, branch = take.take(self.con, self.a, runner=self.runner)
-        self.commit(wt, 'sheet.swift', '// settled\n', f'{self.a}: sheet', branch=branch)
-        take.give(self.con, self.a, runner=self.runner)
-        self.assertEqual(db.ticket(self.con, self.a)['state'], 'queued')   # Runway reviews it like any other
+    def test_a_dropped_hands_on_ticket_releases_what_waited_on_it(self):
+        take.drop(self.con, self.a, reason='not needed after all', runner=self.runner, github=FakeGitHub())
+        loop = Loop(self.con, runner=FakeRunner(self.tmp.name), github=FakeGitHub(), log=lambda *_: None)
+        self.assertFalse(loop.blocked(db.ticket(self.con, self.b)))
 
 
 if __name__ == '__main__':

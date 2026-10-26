@@ -127,8 +127,15 @@ def take(con, tid, runner=None):
         raise db.RunwayError(f'{tid} is {t["state"]}; only an open ticket can be taken back')
     repo = db.repo(con, t['repo'])
     branch = t['branch'] or f'rw/{tid}'
-    if t['state'] == 'taken' and t['take_dir'] and Path(t['take_dir']).exists():
+    if t['state'] in ('taken', 'hands_on') and t['take_dir'] and Path(t['take_dir']).exists():
         return t['take_dir'], branch
+    if t['state'] == 'hands_on':
+        # Already the person's: a worktree on its branch, nothing stopped, no stop recorded.
+        wt = worktree_for(con, t, repo, branch, runner)
+        db.update_ticket(con, tid, branch=branch, take_dir=str(wt))
+        db.event(con, 'answer', f'{tid} worktree {short_home(wt)}, branch {branch} (hands-on)', repo=t['repo'],
+                 ticket=tid)
+        return str(wt), branch
     for r in con.execute('SELECT * FROM runs WHERE ticket=? AND ended_at IS NULL', (tid,)).fetchall():
         runner.stop(r['tmux'])
         con.execute("UPDATE runs SET ended_at=?, outcome='taken' WHERE id=?", (db.now(), r['id']))
@@ -215,8 +222,8 @@ def done(con, tid, note=None, github=None, runner=None):
         return f'{tid} is already done'
     if t['state'] not in OPEN_STATES:
         raise db.RunwayError(f'{tid} is {t["state"]}')
-    if not t['pr'] and t['hands_on']:
-        return done_locally(con, t, note, runner)
+    if t['hands_on'] and t['state'] in ('hands_on', 'taken'):
+        return done_by_hand(con, t, note, gh, runner)
     if not t['pr']:
         raise db.RunwayError(f'{tid} has no PR to merge yet: runway give {tid} lets Runway open one, or drop it')
     repo = db.repo(con, t['repo'])
@@ -233,34 +240,54 @@ def done(con, tid, note=None, github=None, runner=None):
     return f'{tid}: merged PR #{t["pr"]} and marked done'
 
 
-def done_locally(con, t, note, runner):
-    """A hands-on ticket the person did in their own session, with no Runway PR. Its work must already be in the base
-    branch (Runway tickets wait on it, and they build from the base), unless it changed no code at all."""
+def done_by_hand(con, t, note, gh, runner):
+    """A hands-on ticket the person finished in their own session, on their typed go.
+
+    With commits: push the branch, open (or reuse) the PR, and record the person's go as the function review of that
+    head commit, since only they could check it on the device or by eye. The loop then runs the fresh code review and
+    the gate as for any ticket, so nothing reaches the base branch unreviewed. Without commits (a check on a device, a
+    look at how something feels): it closes, done by hand."""
     tid, repo = t['id'], db.repo(con, t['repo'])
+    branch = t['branch'] or f'rw/{tid}'
     wt = t['take_dir'] if t['take_dir'] and Path(t['take_dir']).exists() else None
+    ahead = 0
     if wt:
         if git('status', '--porcelain', cwd=wt).stdout.strip():
             raise db.RunwayError(f'{short_home(wt)} has uncommitted changes; commit them (or stash them) first')
-        head = runner.head(wt)
-        git('fetch', '--quiet', 'origin', repo['base'], cwd=repo['path'], check=False)
-        merged = git('merge-base', '--is-ancestor', head, f'origin/{repo["base"]}',
-                     cwd=wt, check=False).returncode == 0
-        if not merged:
-            raise db.RunwayError(
-                f'{head[:7]} is not in {repo["base"]} yet, and the tickets waiting on {tid} build from it. Merge your '
-                f'work into {repo["base"]} and push, then run this again (or runway give {tid} to let Runway open the '
-                f'PR and review it).')
+        git('fetch', '--quiet', 'origin', repo['base'], cwd=wt, check=False)
+        ahead = int(git('rev-list', '--count', f'origin/{repo["base"]}..HEAD', cwd=wt).stdout.strip() or 0)
     con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'go', ?, ?)", (tid, note, db.now()))
-    remove_worktrees(con, t, runner)
-    db.update_ticket(con, tid, state='done', stage=None, question=None, take_dir=None, merged_at=db.now(),
-                     merged_by='you_local', note='You did this one yourself, outside Runway.'
-                     + (f' Note: {note}' if note else ''))
-    db.event(con, 'merged', f'{tid} done by hand, outside Runway', repo=t['repo'], ticket=tid)
+    if not ahead:
+        remove_worktrees(con, t, runner)
+        db.update_ticket(con, tid, state='done', stage=None, question=None, take_dir=None, merged_at=db.now(),
+                         merged_by='you_local', note='You did this one by hand; it changed no code.'
+                         + (f' Note: {note}' if note else ''))
+        db.event(con, 'merged', f'{tid} done by hand (no code change)', repo=t['repo'], ticket=tid)
+        return f'{tid}: done by hand, no code to merge.' + released(con, tid)
+    head = runner.head(wt)
+    runner.push(wt, branch)
+    pr = t['pr'] or gh.create_pr(repo['path'], t['base'], branch, f'{tid}: {t["title"]}',
+                                 f'Runway ticket {tid}, done by hand in the person\'s own session.\n\n{t["body"]}\n\n'
+                                 f'## Acceptance\n\n' + '\n'.join(f'- {a}' for a in json.loads(t['acceptance'] or '[]')))
+    verdict = 'You, by hand: pass' + (f' ({note})' if note else '')
+    stamp = db.now()
+    con.execute("INSERT INTO runs(ticket, kind, role, agent, runner, sha, started_at, ended_at, outcome, stage) "
+                "VALUES (?, 'review', 'function', 'you', 'by hand', ?, ?, ?, 'pass', 'function review')",
+                (tid, head, stamp, stamp))
+    runner.remove(repo, wt)
+    db.update_ticket(con, tid, state='reviewing', stage='review', branch=branch, pr=pr, sha=head, take_dir=None,
+                     question=None, review=None, function_review=verdict)
+    db.event(con, 'review', f'{tid} function review by you, by hand: pass on {head[:7]}; PR #{pr}', repo=t['repo'],
+             ticket=tid)
+    return (f'{tid}: pushed {head[:7]}, PR #{pr}. Your go stands as its function review; the code review and the '
+            f'gate run next, as for any ticket.')
+
+
+def released(con, tid):
     waiting = [r['ticket'] for r in con.execute(
         "SELECT b.ticket FROM blockers b JOIN tickets x ON x.id = b.ticket WHERE b.blocked_by=? "
         "AND x.state = 'queued' ORDER BY CAST(SUBSTR(b.ticket, 3) AS INTEGER)", (tid,))]
-    return (f'{tid}: done by hand, outside Runway'
-            + (f'. {", ".join(waiting)} can start now.' if waiting else '.'))
+    return f' {", ".join(waiting)} can start now.' if waiting else ''
 
 
 def drop(con, tid, reason=None, github=None, runner=None):

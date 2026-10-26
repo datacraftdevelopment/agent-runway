@@ -126,8 +126,9 @@ def summary(t, run, open_blockers):
     who = AGENT_NAMES.get(run['agent'], run['agent']) if run else None
     if state == 'hands_on':
         waits = f' Waits for {", ".join(open_blockers)} first.' if open_blockers else ''
+        back = f' {t["note"]}' if t['note'] else ''
         return ('Yours to do: Runway never starts this one. Do it in your own session, then '
-                f'runway done {t["id"]}.' + waits)
+                f'runway done {t["id"]}.' + waits + back)
     if state == 'queued':
         if open_blockers:
             return f'Waits for {", ".join(open_blockers)} to finish first.'
@@ -151,7 +152,7 @@ def summary(t, run, open_blockers):
     if state == 'dropped':
         return 'Dropped.'
     if state == 'done' and t['merged_by'] == 'you_local':
-        return t['note'] or 'You did this one yourself, outside Runway.'
+        return t['note'] or 'Done by hand.'
     return t['note'] if state == 'done' else None
 
 

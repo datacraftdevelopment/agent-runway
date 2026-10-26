@@ -203,6 +203,14 @@ class Loop:
 
     def failed(self, t, why, reason='build'):
         """A fix pass if one is left, else the person. `reason` is why it stopped, for the stats."""
+        if t['hands_on']:
+            # Done by hand: Runway can't build it, so it goes back to the person with the findings.
+            self.con.execute('INSERT INTO stops(ticket, repo, at, reason, detail) VALUES (?, ?, ?, ?, ?)',
+                             (t['id'], t['repo'], db.now(), reason, why[:4000]))
+            db.update_ticket(self.con, t['id'], state='hands_on', stage=None, note=f'Back to you: {why}')
+            db.event(self.con, 'failed', f'{t["id"]}: {shorten(why, 140)}; back to you (hands-on)',
+                     repo=t['repo'], ticket=t['id'])
+            return
         if t['fix_passes'] < FIX_PASSES:
             db.update_ticket(self.con, t['id'], state='queued', stage=None, fix_passes=t['fix_passes'] + 1,
                              note=f'This is a fix pass. Last time: {why}')
@@ -395,7 +403,9 @@ class Loop:
             "AND (paused_until IS NULL OR paused_until < ?)", (db.now(),))}
 
     def blocked(self, t):
-        return any(self.con.execute("SELECT 1 FROM tickets WHERE id=? AND state != 'done'", (b,)).fetchone()
+        # A dropped blocker releases its dependents, as the board already shows them (it used to hold them forever).
+        return any(self.con.execute("SELECT 1 FROM tickets WHERE id=? AND state NOT IN ('done', 'dropped')",
+                                    (b,)).fetchone()
                    for b in db.blockers(self.con, t['id']))
 
     def pick_runner(self, t, free):
