@@ -3,18 +3,18 @@
   "generated_at": "2026-10-23T19:16:00",
   "paused_until": null,
   "repos": [
-    { "name": "recipe-app", "state": "running", "status_line": "Running · 2 need you", "main_computer": "This Mac", "runs_on": "any" },
-    { "name": "my-website", "state": "idle", "status_line": "Idle · nothing queued", "main_computer": "Mac mini", "runs_on": "any" },
-    { "name": "invoice-tool", "state": "paused", "status_line": "Paused until tomorrow", "main_computer": "Work Mac", "runs_on": "main" }
+    { "name": "recipe-app", "state": "running", "status_line": "Running · 2 need you", "main_computer": "This Mac", "runs_on": "any", "slug": "someone/recipe-app", "path": "/Users/someone/code/recipe-app" },
+    { "name": "my-website", "state": "idle", "status_line": "Idle · nothing queued", "main_computer": "Mac mini", "runs_on": "any", "slug": "someone/my-website", "path": "/Users/someone/code/my-website" },
+    { "name": "invoice-tool", "state": "paused", "status_line": "Paused until tomorrow", "main_computer": "Work Mac", "runs_on": "main", "slug": "someone/invoice-tool", "path": "/Users/someone/code/invoice-tool" }
   ],
   "archived": [
     {"name": "old-site", "tickets": 4}
   ],
   "runners": [
-    { "name": "This Mac", "kind": "this_mac", "slots_used": 1, "slots_total": 2, "state": "online" },
-    { "name": "Mac mini", "kind": "ssh_mac", "slots_used": 1, "slots_total": 2, "state": "online" },
-    { "name": "Work Mac", "kind": "ssh_mac", "slots_used": 0, "slots_total": 2, "state": "asleep" },
-    { "name": "Cloud", "kind": "cloud", "slots_used": 1, "slots_total": 3, "state": "online" }
+    { "name": "This Mac", "kind": "this_mac", "slots_used": 1, "slots_total": 2, "state": "online", "paused_until": null },
+    { "name": "Mac mini", "kind": "ssh_mac", "slots_used": 1, "slots_total": 2, "state": "online", "paused_until": null },
+    { "name": "Work Mac", "kind": "ssh_mac", "slots_used": 0, "slots_total": 2, "state": "asleep", "paused_until": null },
+    { "name": "Cloud", "kind": "cloud", "slots_used": 1, "slots_total": 3, "state": "online", "paused_until": null }
   ],
   "agents": [
     { "kind": "claude", "resting_until": "2026-10-23T19:30:00" },

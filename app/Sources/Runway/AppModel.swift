@@ -281,6 +281,12 @@ final class AppModel {
         setupMessage = "Copied: \(text)"
     }
 
+    // Clearing things away and the context menus (AppModel+Tidy.swift).
+    /// A short note at the bottom of the window, with Undo when the step can be undone.
+    var toast: Toast?
+    /// A confirm sheet for a step that deletes: what goes and what stays.
+    var confirm: Confirm?
+
     /// Take-back prompts copied this session, by ticket, shown in the inspector.
     private(set) var takePrompts: [String: String] = [:]
 

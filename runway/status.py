@@ -136,7 +136,7 @@ def repo_json(con, r, tickets, pause):
     else:
         state, line = 'idle', f'Idle · {len(up)} up next' if up else 'Idle · nothing queued'
     return {'name': r['name'], 'state': state, 'status_line': line, 'main_computer': r['main_computer'],
-            'runs_on': r['runs_on']}
+            'runs_on': r['runs_on'], 'slug': r['slug'], 'path': r['path']}
 
 
 def repo_prompt(con, name):
@@ -183,7 +183,9 @@ def snapshot(con):
             'SELECT r.name, COUNT(t.id) n FROM repos r LEFT JOIN tickets t ON t.repo = r.name '
             'WHERE r.archived_at IS NOT NULL GROUP BY r.name ORDER BY r.name')],
         'runners': [{'name': r['name'], 'kind': r['kind'], 'slots_used': used.get(r['name'], 0),
-                     'slots_total': r['slots'], 'state': r['state']}
+                     'slots_total': r['slots'], 'state': r['state'],
+                     'paused_until': iso(r['paused_until']) if r['paused_until'] and r['paused_until'] > db.now()
+                     else None}
                     for r in con.execute("SELECT * FROM runners ORDER BY kind != 'this_mac', name")],
         # Only the engines this Mac has: one is enough, and the board never shows one you don't use.
         'agents': [{'kind': a['kind'],

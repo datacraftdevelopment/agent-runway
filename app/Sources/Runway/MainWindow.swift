@@ -35,6 +35,10 @@ struct MainWindow: View {
         .font(.system(size: 13))
         .foregroundStyle(Palette.text)
         .background(Palette.window)
+        .overlay(alignment: .bottom) {
+            if let toast = model.toast { ToastView(toast: toast, model: model).padding(.bottom, 22) }
+        }
+        .sheet(item: $model.confirm) { ConfirmSheet(confirm: $0, model: model) }
         .ignoresSafeArea()
         .frame(minWidth: 1100, minHeight: 640)
         .preferredColorScheme(.dark)
@@ -55,17 +59,30 @@ private struct Sidebar: View {
             ForEach(status.repos) { repo in
                 Button { model.select(repo: repo.name) } label: { repoRow(repo) }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        MenuItemsView(items: ContextMenus.repo(
+                            repo, runners: status.runners,
+                            hasDone: !status.tickets(repo: repo.name, in: .done).isEmpty)) { model.perform($0, repo: repo.name) }
+                    }
+            }
+            if let archived = status.archived, !archived.isEmpty {
+                ArchivedSection(model: model, archived: archived).padding(.top, 4)
             }
             Spacer(minLength: 12)
             SectionHeading(text: "Where tickets run").padding(.horizontal, 8).padding(.vertical, 4)
             ForEach(status.runners) { runner in
                 HStack(spacing: 8) {
-                    Dot(color: runner.state.dot)
+                    Dot(color: runner.pausedUntil != nil ? Palette.orange : runner.state.dot)
                     Text(runner.name)
                     Spacer()
-                    Text(runner.load).font(.system(size: 11)).foregroundStyle(Palette.textMuted)
+                    Text(runner.pausedUntil != nil ? "paused" : runner.load).font(.system(size: 11))
+                        .foregroundStyle(Palette.textMuted)
                 }
                 .padding(.horizontal, 8).padding(.vertical, 5)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    MenuItemsView(items: ContextMenus.runner(runner)) { model.perform($0, runner: runner.name) }
+                }
             }
             VStack(alignment: .leading, spacing: 3) {
                 // Only the engines this Mac has: one is enough.
