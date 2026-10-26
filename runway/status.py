@@ -47,7 +47,7 @@ def ticket_json(con, t, run, slugs=None):
         'agent': t['agent'], 'risk': t['risk'], 'runs_on': runs_on, 'pinned': bool(t['pinned']),
         'pr': pr_label(t), 'review': t['review'], 'function_review': t['function_review'],
         'taken': t['state'] == 'taken', 'kind': t['kind'], 'hands_on': bool(t['hands_on']),
-        'done_locally': t['merged_by'] == 'you_local',
+        'done_locally': bool(t['hands_on']) and t['state'] == 'done',
         'taken_hours': taken_hours(con, t),
         'retro_runs': [{'ticket': r['ticket'], 'title': r['title'], 'pr_url': r.get('pr_url'),
                         'record': r.get('record')} for r in json.loads(t['retro_runs'] or '[]')] or None,
@@ -142,6 +142,8 @@ def summary(t, run, open_blockers):
         return f'Building with {who}, {int((db.now() - run["started_at"]) // 60)} min in.'
     if state == 'checking':
         return 'Running the repo\'s check command on the built commit.'
+    if state == 'reviewing' and t['hands_on'] and not run:
+        return 'Done by hand and checked by you; the code review and the gate are next.'
     if state == 'reviewing' and run:
         role = run['role'] or 'code'
         return f'{who} is doing the {role} review of commit {(run["sha"] or "")[:7]}.'

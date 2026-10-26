@@ -212,7 +212,7 @@ def remove_worktrees(con, t, runner):
             runner.remove(repo, d)
 
 
-def done(con, tid, note=None, github=None, runner=None):
+def done(con, tid, note=None, github=None, runner=None, no_code=False):
     """The person's go, from the session that took it over: push their commits, merge the PR if it isn't merged, and
     record it like runway go. Safe to run again."""
     from .github import GitHub
@@ -223,7 +223,7 @@ def done(con, tid, note=None, github=None, runner=None):
     if t['state'] not in OPEN_STATES:
         raise db.RunwayError(f'{tid} is {t["state"]}')
     if t['hands_on'] and t['state'] in ('hands_on', 'taken'):
-        return done_by_hand(con, t, note, gh, runner)
+        return done_by_hand(con, t, note, gh, runner, no_code)
     if not t['pr']:
         raise db.RunwayError(f'{tid} has no PR to merge yet: runway give {tid} lets Runway open one, or drop it')
     repo = db.repo(con, t['repo'])
@@ -240,13 +240,16 @@ def done(con, tid, note=None, github=None, runner=None):
     return f'{tid}: merged PR #{t["pr"]} and marked done'
 
 
-def done_by_hand(con, t, note, gh, runner):
+def done_by_hand(con, t, note, gh, runner, no_code=False):
     """A hands-on ticket the person finished in their own session, on their typed go.
 
-    With commits: push the branch, open (or reuse) the PR, and record the person's go as the function review of that
-    head commit, since only they could check it on the device or by eye. The loop then runs the fresh code review and
-    the gate as for any ticket, so nothing reaches the base branch unreviewed. Without commits (a check on a device, a
-    look at how something feels): it closes, done by hand."""
+    With commits in its worktree (from runway take): run the repo's check on them, push the branch, open (or reuse) the
+    PR, and record the person's go as the function review of that head commit, since only they could check it on the
+    device or by eye. The loop then runs the fresh code review and the gate as for any ticket, so nothing reaches the
+    base branch unreviewed. Without commits, it closes only when the person says it changed no code (no_code): a check
+    on a device, a look at how something feels. Anything else (no worktree, commits already in the base branch, a
+    pushed rw/ branch Runway can't see) is refused with what to do, never closed unreviewed."""
+    from .loop import check_command
     tid, repo = t['id'], db.repo(con, t['repo'])
     branch = t['branch'] or f'rw/{tid}'
     wt = t['take_dir'] if t['take_dir'] and Path(t['take_dir']).exists() else None
@@ -256,16 +259,36 @@ def done_by_hand(con, t, note, gh, runner):
             raise db.RunwayError(f'{short_home(wt)} has uncommitted changes; commit them (or stash them) first')
         git('fetch', '--quiet', 'origin', repo['base'], cwd=wt, check=False)
         ahead = int(git('rev-list', '--count', f'origin/{repo["base"]}..HEAD', cwd=wt).stdout.strip() or 0)
-    con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'go', ?, ?)", (tid, note, db.now()))
     if not ahead:
+        pushed = git('ls-remote', '--heads', 'origin', branch, cwd=repo['path'], check=False).stdout.strip()
+        if not no_code:
+            if not wt:
+                why = f'{tid} has no worktree, so Runway can\'t see its code. runway take {tid}, do the work there'
+            else:
+                why = f'{short_home(wt)} has no commits that aren\'t already in {repo["base"]}. Commit the work there'
+            raise db.RunwayError(why + f', then runway done {tid} again; or, if it changed no code at all, '
+                                       f'runway done {tid} --no-code --note "what you checked".'
+                                       ' Code merged into the base by hand skips the review: don\'t.')
+        if pushed and not wt:
+            raise db.RunwayError(f'{branch} is pushed but has no worktree here: runway take {tid} picks it up, then '
+                                 f'runway done {tid}.')
+        con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'go', ?, ?)", (tid, note, db.now()))
         remove_worktrees(con, t, runner)
         db.update_ticket(con, tid, state='done', stage=None, question=None, take_dir=None, merged_at=db.now(),
                          merged_by='you_local', note='You did this one by hand; it changed no code.'
                          + (f' Note: {note}' if note else ''))
         db.event(con, 'merged', f'{tid} done by hand (no code change)', repo=t['repo'], ticket=tid)
         return f'{tid}: done by hand, no code to merge.' + released(con, tid)
+    cfg = runner.config(repo)
+    check = check_command(repo, cfg)
+    if check:
+        ok, output = runner.check(wt, check)
+        if not ok:
+            raise db.RunwayError(f'the repo\'s check fails on your commits, so it isn\'t sent for review yet:\n'
+                                 f'{output[-800:]}')
     head = runner.head(wt)
     runner.push(wt, branch)
+    con.execute("INSERT INTO answers(ticket, answer, note, at) VALUES (?, 'go', ?, ?)", (tid, note, db.now()))
     pr = t['pr'] or gh.create_pr(repo['path'], t['base'], branch, f'{tid}: {t["title"]}',
                                  f'Runway ticket {tid}, done by hand in the person\'s own session.\n\n{t["body"]}\n\n'
                                  f'## Acceptance\n\n' + '\n'.join(f'- {a}' for a in json.loads(t['acceptance'] or '[]')))
@@ -279,8 +302,8 @@ def done_by_hand(con, t, note, gh, runner):
                      question=None, review=None, function_review=verdict)
     db.event(con, 'review', f'{tid} function review by you, by hand: pass on {head[:7]}; PR #{pr}', repo=t['repo'],
              ticket=tid)
-    return (f'{tid}: pushed {head[:7]}, PR #{pr}. Your go stands as its function review; the code review and the '
-            f'gate run next, as for any ticket.')
+    return (f'{tid}: check passed, pushed {head[:7]}, PR #{pr}. Your go stands as its function review; a fresh code '
+            f'review and the gate run next, as for any ticket (not low risk: it asks you to merge).')
 
 
 def released(con, tid):
@@ -311,4 +334,4 @@ def drop(con, tid, reason=None, github=None, runner=None):
     db.update_ticket(con, tid, state='dropped', stage='dropped', question=None, take_dir=None,
                      note='Dropped by you.' + (f' Reason: {reason}' if reason else ''))
     db.event(con, 'answer', f'{tid}: dropped by you' + (f' ({reason})' if reason else ''), repo=t['repo'], ticket=tid)
-    return f'{tid}: dropped' + (f', PR #{t["pr"]} closed' if t['pr'] else '')
+    return f'{tid}: dropped' + (f', PR #{t["pr"]} closed' if t['pr'] else '') + '.' + released(con, tid)

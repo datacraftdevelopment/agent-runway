@@ -315,7 +315,7 @@ def cmd_hands_on(con, a):
 
 def cmd_done(con, a):
     from . import take
-    print(take.done(con, a.ticket, a.note))
+    print(take.done(con, a.ticket, a.note, no_code=a.no_code))
 
 
 def cmd_drop(con, a):
@@ -610,9 +610,11 @@ def parser():
     x.add_argument('--repo')
     x.add_argument('--json', action='store_true')
     x.set_defaults(fn=cmd_hands_on)
-    x = sub.add_parser('done', help="finish a ticket yourself: merge its PR (only on the person's go)")
+    x = sub.add_parser('done', help="finish a ticket yourself: merge its PR, or send a hands-on ticket for review "
+                                    "(only on the person's go)")
     x.add_argument('ticket')
     x.add_argument('--note')
+    x.add_argument('--no-code', action='store_true', help='a hands-on ticket that changed no code: close it')
     x.set_defaults(fn=cmd_done)
     x = sub.add_parser('drop', help='drop a ticket: close its PR, remove its worktrees')
     x.add_argument('ticket')

@@ -1,6 +1,6 @@
 """runway stats: how hands-off Runway is, from the tickets and runs already in the database.
 
-A ticket the person did by hand (hands_on: a device, the simulator, how the UI feels, an experiment) is
+A ticket the person did by hand (hands_on: a real device or camera, how it looks and feels) is
 counted on its own and kept out of the hands-off rate: it was never meant to run unattended, so it is not a failure.
 Hands-off: a merged ticket that needed nothing from the person: the gate merged it, no needs-you question about it was
 answered, and it was never taken back. Cycle time is filing to merge. Cost is what the engines reported for every run

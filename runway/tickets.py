@@ -57,7 +57,7 @@ def validate(con, repo, tickets):
     runners = {r['name'] for r in con.execute('SELECT name FROM runners')}
     # One engine is enough; a ticket can only ask for one this Mac has (as the last setup check found).
     engines = [r['kind'] for r in con.execute('SELECT kind FROM agents WHERE signed_in = 1 ORDER BY kind')]
-    if not engines:
+    if not engines and not all(t.get('hands_on') in (True, 1, 'true', 'yes', '1') for t in tickets):
         raise db.RunwayError('no engine is signed in: Runway needs Claude Code or Codex (runway doctor)')
     names = {'claude': 'Claude Code', 'codex': 'Codex'}
     keys = [t.get('key') for t in tickets if t.get('key')]
