@@ -173,6 +173,7 @@ final class AppModel {
 
     // What's New (AppModel+Guide.swift).
     var whatsNew: [ReleaseNote] = []
+    var updatingSkills = false
 
     func runDoctor() {
         guard let cli else { return setupMessage = "Sample data: no runway command to check with" }

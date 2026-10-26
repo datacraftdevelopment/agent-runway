@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import RunwayCore
 
@@ -63,6 +64,29 @@ extension AppModel {
     private func rememberSeen() {
         guard AppVersion(appVersion) != nil, RenderMode.folder == nil else { return }
         defaults.set(appVersion, forKey: Self.lastSeenKey)
+    }
+
+    /// What's New's "Update the skills": asks first, then `runway install-skills`, which updates an older install
+    /// through each agent's own plugin commands. The check runs again after, so the offer goes away once it's done.
+    func updateSkills() {
+        guard let cli, let skills = setup?.skills else { return }
+        let alert = NSAlert()
+        alert.messageText = "Update the Agent Runway skills?"
+        alert.informativeText = "Your skills are \(SetupGuide.installedVersions(setup!)); this Runway carries "
+            + "\(skills.version ?? "a newer version"). Runway updates them with each agent's own plugin commands "
+            + "(claude plugin update, and codex plugin remove then add). Restart Claude Code or Codex sessions "
+            + "afterwards to use them."
+        alert.addButton(withTitle: "Update the skills")
+        alert.addButton(withTitle: "Not now")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        updatingSkills = true
+        Task {
+            let result = await cli.run(["install-skills"])
+            updatingSkills = false
+            setupMessage = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+            await checkMac()
+        }
     }
 
     /// "What's New…" in the menu: every version up to this one.

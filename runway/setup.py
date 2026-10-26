@@ -174,36 +174,96 @@ def plugin_dir():
     return Path(__file__).resolve().parent.parent / 'plugin'
 
 
+def plugin_list(agent):
+    res = login_shell('claude plugin list' if agent == 'claude' else 'codex plugin list')
+    return res.stdout if res.returncode == 0 else ''
+
+
 def installed_in(agent):
     """Whether the agent-runway plugin is installed in Claude Code or Codex, as their own plugin lists say."""
-    cmd = 'claude plugin list' if agent == 'claude' else 'codex plugin list'
-    res = login_shell(cmd)
-    return res.returncode == 0 and f'{PLUGIN}@{PLUGIN}' in res.stdout
+    return f'{PLUGIN}@{PLUGIN}' in plugin_list(agent)
+
+
+def installed_version(agent, listing=None):
+    """The agent-runway version Claude Code or Codex has installed, from its plugin list; None if not installed.
+
+    Claude Code prints a block per plugin ("❯ agent-runway@agent-runway" then "Version: 0.2.0"); Codex prints a table
+    row ("agent-runway@agent-runway  installed, enabled  0.2.0  <source>")."""
+    import re
+    text = plugin_list(agent) if listing is None else listing
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if f'{PLUGIN}@{PLUGIN}' not in line:
+            continue
+        if agent == 'claude':
+            for after in lines[i + 1:i + 6]:
+                m = re.match(r'\s*Version:\s*(\S+)', after)
+                if m:
+                    return m.group(1)
+        else:
+            m = re.search(r'\s(\d+(?:\.\d+)+)\s', line + ' ')
+            if m:
+                return m.group(1)
+        return 'unknown'
+    return None
+
+
+def bundled_version():
+    """The skills version this copy of Runway carries (plugin.json)."""
+    try:
+        return json.loads((plugin_dir() / PLUGIN / '.claude-plugin' / 'plugin.json').read_text()).get('version')
+    except (OSError, ValueError):
+        return None
+
+
+def version_key(v):
+    try:
+        return tuple(int(x) for x in v.split('-')[0].split('.'))
+    except (AttributeError, ValueError):
+        return ()
+
+
+def older(installed, bundled):
+    """An installed version older than the one this Runway carries. One the agent's list doesn't show a readable
+    version for is left alone: if its output changes shape, Runway shouldn't reinstall on every check."""
+    if not installed or not bundled or installed == 'unknown':
+        return False
+    return version_key(installed) < version_key(bundled)
 
 
 def skills_status():
     built = (plugin_dir() / PLUGIN / 'skills').is_dir()
     have = {a: bool(shutil.which(a) or login_shell(f'command -v {a}').returncode == 0) for a in ('claude', 'codex')}
-    status = {a: built and have[a] and installed_in(a) for a in ('claude', 'codex')}
+    versions = {a: installed_version(a) if built and have[a] else None for a in ('claude', 'codex')}
+    status = {a: versions[a] is not None for a in ('claude', 'codex')}
+    bundled = bundled_version()
+    stale = [a for a in ('claude', 'codex') if older(versions[a], bundled)]
     names = {'claude': 'Claude Code', 'codex': 'Codex'}
     present = [a for a in ('claude', 'codex') if have[a]]
     if not built:
         note = 'This copy of Runway has no skills folder.'
     elif not present:
         note = 'Install Claude Code or Codex first; the skills go into whichever you use.'
+    elif stale:
+        note = (f'The skills in {" and ".join(names[a] for a in stale)} are older ('
+                + ', '.join(versions[a] for a in stale) + f') than this Runway\'s {bundled}: runway install-skills '
+                'updates them.')
     elif all(status[a] for a in present):
         note = 'The Agent Runway skills are in ' + ' and '.join(names[a] for a in present) + '.'
     else:
         missing = ' and '.join(names[a] for a in present if not status[a])
         note = f'Not in {missing} yet: runway install-skills adds them.'
-    # installed: in every engine this Mac has (one is enough).
+    # installed: in every engine this Mac has (one is enough). outdated: some engine has an older version.
     return {'built': built, 'claude': status['claude'], 'codex': status['codex'], 'path': str(plugin_dir()),
-            'installed': bool(present) and all(status[a] for a in present), 'note': note}
+            'installed': bool(present) and all(status[a] for a in present), 'note': note,
+            'version': bundled, 'claude_version': versions['claude'], 'codex_version': versions['codex'],
+            'outdated': bool(stale)}
 
 
 def install_skills(agents=('claude', 'codex')):
     """Adds Runway's marketplace (the folder shipped with this copy) to each agent and installs the plugin from it,
-    through the agent's own plugin commands. Safe to run again."""
+    through the agent's own plugin commands. When an older version is installed (an app update brought newer skills),
+    it updates it instead. Safe to run again."""
     src = plugin_dir()
     if not (src / PLUGIN / 'skills').is_dir():
         raise db.RunwayError(f'no skills in {src}')
@@ -213,17 +273,29 @@ def install_skills(agents=('claude', 'codex')):
             done.append(f'{agent}: not installed, skipped')
             continue
         q = shlex_quote(str(src))
+        had = installed_version(agent)
+        stale = older(had, bundled_version())
         if agent == 'claude':
-            steps = [f'claude plugin marketplace add {q}', f'claude plugin install {PLUGIN}@{PLUGIN}']
+            steps = [f'claude plugin marketplace add {q}']
+            steps += ([f'claude plugin marketplace update {PLUGIN}', f'claude plugin update {PLUGIN}@{PLUGIN}']
+                      if stale else [f'claude plugin install {PLUGIN}@{PLUGIN}'])
         else:
-            steps = [f'codex plugin marketplace add {q}', f'codex plugin add {PLUGIN}@{PLUGIN}']
+            # Codex keeps its own copy of a local marketplace's plugin: remove and add again picks up the new one.
+            steps = [f'codex plugin marketplace add {q}']
+            steps += ([f'codex plugin remove {PLUGIN}@{PLUGIN}'] if stale else []) + [f'codex plugin add {PLUGIN}@{PLUGIN}']
         for step in steps:
             res = login_shell(step, timeout=120)
             said = (res.stdout + res.stderr).strip()
             if res.returncode != 0 and 'already' not in said.lower():
                 raise db.RunwayError(f'{step} failed: {said[-300:]}')
-        done.append(f'{agent}: installed {PLUGIN} from {src}' if installed_in(agent)
-                    else f'{agent}: ran the install, but its plugin list does not show {PLUGIN} yet')
+        now = installed_version(agent)
+        if not now:
+            done.append(f'{agent}: ran the install, but its plugin list does not show {PLUGIN} yet')
+        elif stale:
+            done.append(f'{agent}: updated {PLUGIN} from {had} to {now}' + ('' if not older(now, bundled_version())
+                        else f' (still older than {bundled_version()}; restart {agent} and run it again)'))
+        else:
+            done.append(f'{agent}: installed {PLUGIN} {now} from {src}')
     return '\n'.join(done)
 
 
