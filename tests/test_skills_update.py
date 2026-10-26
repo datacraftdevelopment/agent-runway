@@ -119,6 +119,30 @@ class UpdateTest(unittest.TestCase):
         self.assertFalse(skills['outdated'])
         self.assertEqual(skills['claude_version'], setup.bundled_version())
 
+    def test_claudes_own_record_wins_over_its_list(self):
+        """Joe's Mac, 26 Oct: claude plugin list said 0.2.1 (read from the app's folder) while Claude Code ran its
+        cached 0.2.0. The record in installed_plugins.json is what's in use."""
+        (self.home / 'claude-version').write_text(setup.bundled_version())      # the list says current
+        record = self.home / '.claude' / 'plugins'
+        record.mkdir(parents=True)
+        (record / 'installed_plugins.json').write_text(json.dumps({'version': 2, 'plugins': {
+            'agent-runway@agent-runway': [{'scope': 'user', 'version': '0.0.1', 'installPath': '/x/0.0.1'}]}}))
+        skills = json.loads(self.runway('doctor', '--json').stdout)['skills']
+        self.assertEqual((skills['claude_version'], skills['outdated']), ('0.0.1', True))
+
+    def test_update_only_updates_whats_older_and_adds_nothing(self):
+        (self.home / 'claude-version').write_text('0.0.1')                     # Claude Code has an old one
+        self.calls()                                                            # Codex has none
+        res = self.runway('install-skills', '--update-only')
+        self.assertEqual(res.returncode, 0, res.stderr)
+        made = self.calls()
+        self.assertIn('claude plugin update agent-runway@agent-runway', made)
+        self.assertFalse(any(c.startswith('codex plugin add') for c in made))  # never added to a new engine
+        self.assertIn('codex: agent-runway not installed, left alone', res.stdout)
+        res = self.runway('install-skills', '--update-only')                     # now current: nothing to do
+        self.assertIn(f'claude: agent-runway {setup.bundled_version()} is current', res.stdout)
+        self.assertNotIn('claude plugin update agent-runway@agent-runway', self.calls())
+
     def test_a_fresh_install_installs_and_a_current_one_is_left_alone(self):
         self.assertFalse(json.loads(self.runway('doctor', '--json').stdout)['skills']['installed'])
         self.calls()

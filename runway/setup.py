@@ -269,12 +269,31 @@ def installed_in(agent):
     return f'{PLUGIN}@{PLUGIN}' in plugin_list(agent)
 
 
+def claude_installed_record():
+    """Claude Code's own record of the agent-runway it installed (installed_plugins.json), or None. Its `plugin list`
+    reads the version from the marketplace folder (inside Runway.app), so after an app update it shows the new
+    version while Claude Code still runs its cached copy of the old one: this is the version actually in use."""
+    base = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
+    try:
+        data = json.loads((base / 'plugins' / 'installed_plugins.json').read_text())
+    except (OSError, ValueError):
+        return None
+    entries = (data.get('plugins') or {}).get(f'{PLUGIN}@{PLUGIN}') if isinstance(data, dict) else None
+    if isinstance(entries, list) and entries:
+        return entries[0].get('version')
+    return None
+
+
 def installed_version(agent, listing=None):
     """The agent-runway version Claude Code or Codex has installed, from its plugin list; None if not installed.
 
     Claude Code prints a block per plugin ("❯ agent-runway@agent-runway" then "Version: 0.2.0"); Codex prints a table
     row ("agent-runway@agent-runway  installed, enabled  0.2.0  <source>")."""
     import re
+    if agent == 'claude' and listing is None:
+        recorded = claude_installed_record()
+        if recorded:
+            return recorded
     text = plugin_list(agent) if listing is None else listing
     lines = text.splitlines()
     for i, line in enumerate(lines):
@@ -345,7 +364,7 @@ def skills_status():
             'outdated': bool(stale)}
 
 
-def install_skills(agents=('claude', 'codex')):
+def install_skills(agents=('claude', 'codex'), update_only=False):
     """Adds Runway's marketplace (the folder shipped with this copy) to each agent and installs the plugin from it,
     through the agent's own plugin commands. When an older version is installed (an app update brought newer skills),
     it updates it instead. Safe to run again."""
@@ -360,6 +379,10 @@ def install_skills(agents=('claude', 'codex')):
         q = shlex_quote(str(src))
         had = installed_version(agent)
         stale = older(had, bundled_version())
+        if update_only and not stale:
+            # The app's own update after an app update: only what's already installed and older, never a new engine.
+            done.append(f'{agent}: ' + (f'{PLUGIN} {had} is current' if had else f'{PLUGIN} not installed, left alone'))
+            continue
         if agent == 'claude':
             steps = [f'claude plugin marketplace add {q}']
             steps += ([f'claude plugin marketplace update {PLUGIN}', f'claude plugin update {PLUGIN}@{PLUGIN}']

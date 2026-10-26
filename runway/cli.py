@@ -448,7 +448,7 @@ def cmd_init(con, a):
 def cmd_install_skills(con, a):
     from . import setup
     agents = [x for x in ('claude', 'codex') if getattr(a, x)] or ['claude', 'codex']
-    print(setup.install_skills(agents))
+    print(setup.install_skills(agents, update_only=a.update_only))
 
 
 def cmd_repo_which(con, a):
@@ -581,6 +581,8 @@ def parser():
     x = sub.add_parser('install-skills', help="add Runway's skills to Claude Code and Codex (their plugin commands)")
     x.add_argument('--claude', action='store_true', help='only Claude Code')
     x.add_argument('--codex', action='store_true', help='only Codex')
+    x.add_argument('--update-only', action='store_true',
+                   help='only update an install that is older than this Runway (the app runs this after an update)')
     x.set_defaults(fn=cmd_install_skills)
     x = sub.add_parser('install-command', help='link runway into ~/.local/bin so Terminal finds it')
     x.add_argument('--to', help='another folder for the link')

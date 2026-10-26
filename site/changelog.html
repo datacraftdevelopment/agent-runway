@@ -204,16 +204,41 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow log">
+<article class="release" id="v0.1.9">
+  <div class="ver"><h2>0.1.9</h2><span class="when">2026-10-26</span></div>
+  <div class="body">
+<h3>Do this after updating</h3>
+<ul>
+<li>Nothing to click: Runway updates the Agent Runway skills in Claude Code and Codex by itself after this update. What's New says when it's done.</li>
+<li>Restart your Claude Code or Codex sessions so they load the new skills.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Skills now update themselves after every app update, only where they're already installed. If that fails, What's New says why and "Update the skills" is there to try again.</li>
+<li>Claude Code could keep running an old copy of the skills while showing the new version number. Runway now reads the version Claude Code actually uses.</li>
+</ul>
+<p class="gh"><a href="https://github.com/datacraftdevelopment/agent-runway/releases/tag/v0.1.9">Release on GitHub</a></p>
+  </div>
+</article>
 <article class="release" id="v0.1.8">
   <div class="ver"><h2>0.1.8</h2><span class="when">2026-10-26</span></div>
   <div class="body">
+<h3>Do this after updating</h3>
 <ul>
-<li>A very long question or review in the ticket panel no longer pushes the toolbar and stats off the window. The panel scrolls on its own, and long text shows its first lines with "Show all".</li>
-<li>The function reviewer may now run the experiments an Acceptance line asks for, such as changing a threshold to see a test fail, in its own throwaway copy. It undoes each one and never commits or pushes. The code reviewer still only reads.</li>
-<li>The file-tickets and spec skills now ask for Acceptance lines a reviewer can check on its own, from the repo.</li>
-<li>Swift and iOS builds can run under Codex: each run gets its own temp and module cache, and Codex may write Xcode's and SwiftPM's cache folders, without loosening its sandbox.</li>
-<li>Hands-on tickets: when you file work, the parts that need you (a device, the simulator, how it feels) are marked hands-on. Runway never starts them. On the board they're "Hands-on · yours", with the prompt to copy and Mark done. Tickets that wait on one say so, and a ticket you finished yourself shows "Done by hand".</li>
-<li>The Agent Runway plugin now carries 15 skills, including hands-on, test-driven development, systematic debugging, writing and running plans, and checking work before calling it done. What's New offers "Update the skills" so Claude Code and Codex get them.</li>
+<li>In What's New, click <strong>Update the skills</strong>. It asks first, then updates Agent Runway in Claude Code and Codex.</li>
+<li>Restart any Claude Code or Codex sessions you have open, so they pick up the new skills.</li>
+</ul>
+<h3>New</h3>
+<ul>
+<li>Hands-on tickets. When you file work, the parts that need you (a device, the simulator, how it feels) become hands-on tickets. Runway never starts them. They show as "Hands-on · yours", with Copy prompt and Mark done.</li>
+<li>The Agent Runway plugin goes to 0.3.0, with 15 skills: the new <code>hands-on</code> skill, and six build skills from Superpowers (writing-plans, executing-plans, subagent-driven-development, test-driven-development, systematic-debugging, verification-before-completion).</li>
+<li><code>file-tickets</code> sorts work into Runway tickets and hands-on ones, and asks for checks a reviewer can run.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>A long question or review no longer pushes the toolbar off the window. The ticket panel scrolls.</li>
+<li>The function reviewer can now run the experiment a check asks for (change a value, see a test fail), in a throwaway copy.</li>
+<li>Swift and iOS builds run under Codex: it may write Xcode's and SwiftPM's caches, without a looser sandbox.</li>
 </ul>
 <p class="gh"><a href="https://github.com/datacraftdevelopment/agent-runway/releases/tag/v0.1.8">Release on GitHub</a></p>
   </div>
