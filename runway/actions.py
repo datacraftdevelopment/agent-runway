@@ -39,10 +39,20 @@ def answer(con, tid, verdict, note=None, github=None):
             requeue(con, tid, f'The person sent this back from review: {note}', fix=True)
             db.event(con, 'answer', f'{tid}: sent back for a fix pass ({note})', repo=t['repo'], ticket=tid)
             return f'{tid}: back to Up next for a fix pass'
+        # No, with nothing to change: like runway drop, the PR is closed (its branch stays on GitHub).
+        r = db.repo(con, t['repo'])
+        closed = False
+        if t['pr']:
+            try:
+                (github or GitHub()).close(r['path'], t['pr'], 'Not merged: the person said no in Runway.')
+                closed = True
+            except Exception:
+                pass
         db.update_ticket(con, tid, state='dropped', stage='dropped', question=None,
-                         note=f'You said no; PR #{t["pr"]} is left open.')
-        db.event(con, 'answer', f'{tid}: dropped by you; PR #{t["pr"]} left open', repo=t['repo'], ticket=tid)
-        return f'{tid}: dropped (PR #{t["pr"]} left open)'
+                         note=f'You said no; PR #{t["pr"]} ' + ('closed.' if closed else 'could not be closed.'))
+        db.event(con, 'answer', f'{tid}: dropped by you; PR #{t["pr"]} ' + ('closed' if closed else 'left open'),
+                 repo=t['repo'], ticket=tid)
+        return f'{tid}: dropped, PR #{t["pr"]} ' + ('closed' if closed else 'left open (closing it failed)')
     if kind == 'question':
         if verdict == 'no' and not note:
             raise db.RunwayError('answering differently needs the answer: --note "..."')

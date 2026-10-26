@@ -156,6 +156,20 @@ public struct ArchivedRepo: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// "45 s", "12 min", "1 h 5 min", "1 d 3 h": the same words `runway show` uses.
+public enum Duration {
+    public static func words(_ seconds: Double) -> String {
+        let s = max(0, Int(seconds))
+        if s < 60 { return "\(s) s" }
+        let m = s / 60
+        if m < 60 { return "\(m) min" }
+        let (h, mm) = (m / 60, m % 60)
+        if h < 24 { return mm > 0 ? "\(h) h \(mm) min" : "\(h) h" }
+        let (d, hh) = (h / 24, h % 24)
+        return hh > 0 ? "\(d) d \(hh) h" : "\(d) d"
+    }
+}
+
 public enum AgentKind: String, Codable, Sendable, CaseIterable { case claude, codex }
 
 public struct Agent: Codable, Equatable, Identifiable, Sendable {
@@ -242,6 +256,48 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var blockedBy: [Blocker]? = nil
     public var blocks: [String]? = nil
     public var hold: String? = nil
+    /// When it started, finished, entered its current stage or began waiting, and seconds per part. Nil from an
+    /// older runway.
+    public var timing: Timing? = nil
+
+    public struct Timing: Codable, Equatable, Sendable {
+        public var startedAt: Date?
+        public var finishedAt: Date?
+        public var stage: String?
+        public var stageStartedAt: Date?
+        public var waitingSince: Date?
+        public var totalSeconds: Int?
+        public var parts: [String: Int]?
+        public var runs: [RunTime]?
+
+        public struct RunTime: Codable, Equatable, Sendable {
+            public var kind: String
+            public var role: String?
+            public var agent: String
+            public var seconds: Int
+        }
+    }
+
+    /// The card's timer line at `now`: "Building · 12 min · 38 min in all", "Waiting 1 h", "Waiting for you 20 min",
+    /// "Took 1 h 12 min". Nil when there's nothing to time.
+    public func timerLine(now: Date) -> String? {
+        guard let t = timing else { return nil }
+        switch column {
+        case .running:
+            guard let start = t.startedAt else { return nil }
+            let stage = (t.stage ?? "running").replacingOccurrences(of: "_", with: " ")
+            let label = stage.prefix(1).uppercased() + stage.dropFirst()
+            let inStage = t.stageStartedAt.map { Duration.words(now.timeIntervalSince($0)) }
+            return [inStage.map { "\(label) · \($0)" } ?? String(label),
+                    "\(Duration.words(now.timeIntervalSince(start))) in all"].joined(separator: " · ")
+        case .upNext:
+            return t.waitingSince.map { "Waiting \(Duration.words(now.timeIntervalSince($0)))" }
+        case .needsYou:
+            return t.waitingSince.map { "Waiting for you \(Duration.words(now.timeIntervalSince($0)))" }
+        case .done:
+            return t.totalSeconds.map { "Took \(Duration.words(Double($0)))" }
+        }
+    }
 
     /// Held only because its Mac is short of memory, CPU or disk: "Start anyway" can skip that check once.
     public var heldForCapacity: Bool { column == .upNext && (hold?.contains(" is busy (") ?? false) }

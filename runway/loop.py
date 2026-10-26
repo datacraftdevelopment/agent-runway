@@ -199,7 +199,7 @@ class Loop:
                          (db.now(), outcome, sha, tin, tout, cost, session, transcript, run['id']))
 
     def stage(self, run, stage):
-        self.con.execute('UPDATE runs SET stage=? WHERE id=?', (stage, run['id']))
+        self.con.execute('UPDATE runs SET stage=?, stage_at=? WHERE id=?', (stage, db.now(), run['id']))
 
     def failed(self, t, why, reason='build'):
         """A fix pass if one is left, else the person. `reason` is why it stopped, for the stats."""

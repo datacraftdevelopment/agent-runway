@@ -38,8 +38,11 @@ class LocalRunner:
     def worktree(self, repo, ticket, run_id, ref, branch=None):
         """A clean checkout of `ref` (on `branch` when building, detached when reviewing)."""
         path = Path(repo['path'])
-        fetch = [repo['base']] + ([f'+refs/heads/{branch}:refs/remotes/origin/{branch}'] if branch else [])
-        git('fetch', '--quiet', 'origin', *fetch, cwd=path, check=False)
+        # The base and the ticket's branch in two fetches: on a first build the branch isn't on GitHub yet, and one
+        # fetch naming both fails whole, which left the worktree on a stale copy of the base.
+        git('fetch', '--quiet', 'origin', repo['base'], cwd=path, check=False)
+        if branch:
+            git('fetch', '--quiet', 'origin', f'+refs/heads/{branch}:refs/remotes/origin/{branch}', cwd=path, check=False)
         wt = db.home() / 'worktrees' / repo['name'] / f'{ticket}-{run_id}'
         wt.parent.mkdir(parents=True, exist_ok=True)
         if branch:

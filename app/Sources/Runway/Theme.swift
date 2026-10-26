@@ -259,6 +259,7 @@ struct Segmented<Value: Hashable>: View {
             ForEach(options, id: \.0) { value, title in
                 Button { selection = value } label: {
                     Text(title).font(.system(size: 12)).foregroundStyle(Palette.text)
+                        .lineLimit(1).fixedSize()           // a tab label never wraps ("Boar d")
                         .padding(.horizontal, stretch ? 5 : 14).padding(.vertical, 5)
                         .frame(maxWidth: stretch ? .infinity : nil)
                         .background(selection == value ? Palette.segmentOn : .clear, in: RoundedRectangle(cornerRadius: 5))
