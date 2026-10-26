@@ -11,6 +11,7 @@ struct BoardView: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 if let repo = model.repo, let why = repo.idleReason { idleBanner(why, repo.idleTicket) }
+                if let repo = model.repo, repo.checkCmd == nil, model.source == .live { noCheckBanner(repo.name) }
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(Ticket.Column.allCases, id: \.self) { column in
                         columnView(column)
@@ -22,6 +23,20 @@ struct BoardView: View {
             Rectangle().fill(Palette.border).frame(width: 1)
             Inspector(model: model, status: status)
         }
+    }
+
+    /// A repo with no check command: Runway's sessions can't run its tests or builds, so reviews can't pass.
+    private func noCheckBanner(_ repo: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(Palette.needsYouText)
+            Text("No check command set: Runway's sessions can't run \(repo)'s tests or builds.")
+            Spacer(minLength: 0)
+            Button("Set check command…") { model.openCheck(repo) }.buttonStyle(PlainBoxButtonStyle(small: true))
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Palette.needsYouFill, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.needsYouBorder))
     }
 
     /// Why nothing in Up next is starting, with the ticket to look at (or the loop to start).

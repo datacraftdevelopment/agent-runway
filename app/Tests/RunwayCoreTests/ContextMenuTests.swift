@@ -125,6 +125,17 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertNil(try status().repos[0].idleReason)
     }
 
+    func testCheckCommandMenuAndSuggestion() throws {
+        var repo = try status().repos[0]
+        XCTAssertEqual(repo.checkCmd, "npm test")
+        XCTAssertTrue(ContextMenus.repo(repo, runners: [], hasDone: false).contains { $0.title == "Check command…" })
+        repo.checkCmd = nil
+        XCTAssertTrue(ContextMenus.repo(repo, runners: [], hasDone: false).contains { $0.action == .setCheck
+            && $0.title == "Set check command…" })
+        let s = try RepoSuggestion.decode(Data(#"{"path":"/x","name":"x","git":true,"slug":"a/x","check":"swift test --package-path Core","commands":["swift build --package-path Core"]}"#.utf8))
+        XCTAssertEqual(s.commands, ["swift build --package-path Core"])
+    }
+
     func testArchivedAndRunnerMenus() throws {
         let s = try status()
         XCTAssertEqual(actions(ContextMenus.archived(ArchivedRepo(name: "x", tickets: 1))), [.unarchive, .removeRepo])

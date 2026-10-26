@@ -209,6 +209,22 @@ def why_idle(con, r, mine, pause, running_loop):
     return None, None
 
 
+def repo_check(r):
+    """The check command that applies and where it's set: runway.json on the base branch wins, else Runway's own."""
+    import subprocess
+    try:
+        res = subprocess.run(['git', '-C', r['path'], 'show', f'origin/{r["base"]}:runway.json'], capture_output=True,
+                             text=True, timeout=5)
+        cmd = json.loads(res.stdout).get('check_cmd') if res.returncode == 0 and res.stdout.strip() else None
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        cmd = None
+    if cmd:
+        return cmd, 'runway.json'
+    if r['check_cmd']:
+        return r['check_cmd'], 'runway'
+    return None, None
+
+
 def repo_json(con, r, tickets, pause, running_loop=True):
     mine = [t for t in tickets if t['repo'] == r['name']]
     running = [t for t in mine if t['column'] == 'running']
@@ -226,8 +242,10 @@ def repo_json(con, r, tickets, pause, running_loop=True):
     else:
         state, line = 'idle', f'Idle · {len(up)} up next' if up else 'Idle · nothing queued'
     idle, look = why_idle(con, r, mine, until, running_loop)
+    check, source = repo_check(r)
     return {'name': r['name'], 'state': state, 'status_line': line, 'main_computer': r['main_computer'],
-            'runs_on': r['runs_on'], 'slug': r['slug'], 'path': r['path'], 'idle_reason': idle, 'idle_ticket': look}
+            'runs_on': r['runs_on'], 'slug': r['slug'], 'path': r['path'], 'idle_reason': idle, 'idle_ticket': look,
+            'check_cmd': check, 'check_from': source}
 
 
 def repo_prompt(con, name):

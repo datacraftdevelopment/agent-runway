@@ -268,6 +268,8 @@ final class AppModel {
         var args = ["repo", "add", repo.path]
         let check = pendingCheck.trimmingCharacters(in: .whitespaces)
         if !check.isEmpty { args += ["--check", check] }
+        // What else sessions may run, as found in the clone and shown under the check field.
+        for command in repo.commands ?? [] where command != check { args += ["--allow", command] }
         Task {
             let result = await cli.run(args)
             setupMessage = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -290,6 +292,8 @@ final class AppModel {
     var toast: Toast?
     /// A confirm sheet for a step that deletes: what goes and what stays.
     var confirm: Confirm?
+    /// The check-command sheet, while it's open.
+    var checkEdit: CheckEdit?
 
     /// Take-back prompts copied this session, by ticket, shown in the inspector.
     private(set) var takePrompts: [String: String] = [:]

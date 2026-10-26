@@ -4,9 +4,9 @@
   "paused_until": null,
   "loop_running": true,
   "repos": [
-    { "name": "recipe-app", "state": "running", "status_line": "Running · 2 need you", "main_computer": "This Mac", "runs_on": "any", "slug": "someone/recipe-app", "path": "/Users/someone/code/recipe-app", "idle_reason": null, "idle_ticket": null },
-    { "name": "my-website", "state": "idle", "status_line": "Idle · nothing queued", "main_computer": "Mac mini", "runs_on": "any", "slug": "someone/my-website", "path": "/Users/someone/code/my-website", "idle_reason": null, "idle_ticket": null },
-    { "name": "invoice-tool", "state": "paused", "status_line": "Paused until tomorrow", "main_computer": "Work Mac", "runs_on": "main", "slug": "someone/invoice-tool", "path": "/Users/someone/code/invoice-tool", "idle_reason": null, "idle_ticket": null }
+    { "name": "recipe-app", "state": "running", "status_line": "Running · 2 need you", "main_computer": "This Mac", "runs_on": "any", "slug": "someone/recipe-app", "path": "/Users/someone/code/recipe-app", "idle_reason": null, "idle_ticket": null, "check_cmd": "npm test", "check_from": "runway.json" },
+    { "name": "my-website", "state": "idle", "status_line": "Idle · nothing queued", "main_computer": "Mac mini", "runs_on": "any", "slug": "someone/my-website", "path": "/Users/someone/code/my-website", "idle_reason": null, "idle_ticket": null, "check_cmd": "npm test", "check_from": "runway.json" },
+    { "name": "invoice-tool", "state": "paused", "status_line": "Paused until tomorrow", "main_computer": "Work Mac", "runs_on": "main", "slug": "someone/invoice-tool", "path": "/Users/someone/code/invoice-tool", "idle_reason": null, "idle_ticket": null, "check_cmd": "npm test", "check_from": "runway.json" }
   ],
   "archived": [
     {"name": "old-site", "tickets": 4}

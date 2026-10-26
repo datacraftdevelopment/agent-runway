@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 MIGRATIONS = {
     1: """
@@ -194,6 +194,11 @@ MIGRATIONS = {
     10: """
     ALTER TABLE runners ADD COLUMN min_cpu_idle_pct REAL;
     ALTER TABLE tickets ADD COLUMN ignore_capacity INTEGER NOT NULL DEFAULT 0;
+    """,
+    # Check and work commands kept in Runway (Joe, 2026-10-26): a repo without runway.json on its base branch can
+    # still run its tests and builds. runway.json, when present, wins.
+    11: """
+    ALTER TABLE repos ADD COLUMN worker_commands TEXT;
     """,
 }
 

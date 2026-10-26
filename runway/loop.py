@@ -443,7 +443,7 @@ class Loop:
                          (str(run_dir), 'build' if kind == 'build' else f'{role or "code"} review', run_id))
         cfg = self.runner.config(repo)
         check = check_command(repo, cfg)
-        commands = [check] + list(cfg.get('worker_commands', []))
+        commands = [check] + allowed_commands(repo, cfg)
         branch = t['branch'] or f'rw/{t["id"]}'
         try:
             if kind == 'build':
@@ -495,6 +495,15 @@ def touches_overlap(a, b):
             if x == y or x.startswith(y + '/') or y.startswith(x + '/') or fnmatch(x, y) or fnmatch(y, x):
                 return True
     return False
+
+
+def allowed_commands(repo, cfg):
+    """What sessions may run besides the check: runway.json's worker_commands when it says, else what was set in
+    Runway for the repo (runway repo check)."""
+    if cfg.get('worker_commands'):
+        return list(cfg['worker_commands'])
+    kept = repo['worker_commands'] if 'worker_commands' in repo.keys() else None
+    return json.loads(kept) if kept else []
 
 
 def check_command(repo, cfg):

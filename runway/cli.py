@@ -25,6 +25,14 @@ def git_slug(path):
     return tail[:-4] if tail.endswith('.git') else tail
 
 
+def base_ref(path, base):
+    """origin/<base> after a quick fetch, what Runway builds from; None when the clone has no such branch."""
+    subprocess.run(['git', '-C', str(path), 'fetch', '--quiet', 'origin', base], capture_output=True, timeout=60)
+    ref = f'origin/{base}'
+    ok = subprocess.run(['git', '-C', str(path), 'rev-parse', '--verify', '--quiet', ref], capture_output=True)
+    return ref if ok.returncode == 0 else None
+
+
 def cmd_repo_add(con, a):
     from . import setup
     path = Path(a.path).expanduser().resolve()
@@ -34,18 +42,47 @@ def cmd_repo_add(con, a):
     if not slug:
         raise db.RunwayError(f'{path} has no GitHub origin; Runway opens and merges pull requests on GitHub')
     name = a.name or path.name
-    check = a.check or setup.suggest_check(path)
-    con.execute('INSERT OR REPLACE INTO repos(name, path, slug, base, main_computer, runs_on, check_cmd) '
-                'VALUES (?, ?, ?, ?, ?, ?, ?)', (name, str(path), slug, a.base, a.main, a.runs_on, check))
+    found = setup.suggest_commands(path, base_ref(path, a.base))
+    check = a.check or found['check']
+    allow = a.allow if a.allow else found['commands']
+    con.execute('INSERT OR REPLACE INTO repos(name, path, slug, base, main_computer, runs_on, check_cmd, worker_commands) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?)', (name, str(path), slug, a.base, a.main, a.runs_on, check,
+                                                    json.dumps(allow)))
     db.event(con, 'setup', f'watching {name} ({slug})', repo=name)
-    print(f'watching {name}: {path} (base {a.base}, main computer {a.main}, check: {check or "none"})')
+    print(f'watching {name}: {path} (base {a.base}, main computer {a.main}, check: {check or "none"}'
+          + (f'; sessions may also run: {", ".join(allow)}' if allow else '') + ')')
+
+
+def cmd_repo_check(con, a):
+    """The repo's check command and the other commands Runway's sessions may run, kept in Runway (no commit
+    needed). runway.json on the base branch, when it says, still wins. --suggest shows what the clone suggests."""
+    from . import setup
+    r = db.repo(con, a.name)
+    if a.suggest:
+        found = setup.suggest_commands(r['path'], base_ref(r['path'], r['base']))
+        return out(found) if a.json else print(f'check: {found["check"] or "none found"}\nalso: '
+                                               + (', '.join(found['commands']) or 'nothing else'))
+    if a.check is not None or a.allow is not None:
+        if a.check is not None:
+            con.execute('UPDATE repos SET check_cmd=? WHERE name=?', (a.check.strip() or None, a.name))
+        if a.allow is not None:
+            con.execute('UPDATE repos SET worker_commands=? WHERE name=?',
+                        (json.dumps([c for c in a.allow if c.strip()]), a.name))
+        db.event(con, 'setup', f'{a.name}: check and session commands set in Runway', repo=a.name)
+        r = db.repo(con, a.name)
+    allow = json.loads(r['worker_commands'] or '[]')
+    if a.json:
+        return out({'repo': a.name, 'check': r['check_cmd'], 'commands': allow})
+    print(f'{a.name}: check {r["check_cmd"] or "none"}' + (f'; sessions may also run: {", ".join(allow)}' if allow
+                                                            else '') + ' (runway.json on the base branch wins)')
 
 
 def cmd_repo_suggest(con, a):
     from . import setup
     path = Path(a.path).expanduser().resolve()
+    found = setup.suggest_commands(path, base_ref(path, 'main'))
     out({'path': str(path), 'name': path.name, 'git': (path / '.git').exists(), 'slug': git_slug(path),
-         'check': setup.suggest_check(path)})
+         'check': found['check'], 'commands': found['commands']})
 
 
 def cmd_repo_list(con, a):
@@ -419,7 +456,16 @@ def parser():
     x.add_argument('--main', default='This Mac', help='the runner where this clone lives')
     x.add_argument('--runs-on', default='any', choices=['any', 'main'])
     x.add_argument('--check', help="the repo's test command, used when it has no runway.json (default: a guess)")
+    x.add_argument('--allow', action='append', help='a command sessions may run (repeat; default: what the clone '
+                   'suggests)')
     x.set_defaults(fn=cmd_repo_add)
+    x = r.add_parser('check', help="the check and session commands kept in Runway for a repo (show, set or suggest)")
+    x.add_argument('name')
+    x.add_argument('--check', help='the test command (empty: none)')
+    x.add_argument('--allow', action='append', help='a command sessions may run (repeat; replaces the list)')
+    x.add_argument('--suggest', action='store_true', help="what the clone's files suggest")
+    x.add_argument('--json', action='store_true')
+    x.set_defaults(fn=cmd_repo_check)
     x = r.add_parser('which', help='the name Runway knows this clone by')
     x.add_argument('path', nargs='?', default='.')
     x.set_defaults(fn=cmd_repo_which)

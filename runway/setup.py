@@ -135,6 +135,91 @@ def install_command(where=None):
 
 # ---- a first repo ----------------------------------------------------------------------------------------------
 
+def tree(path, ref=None):
+    """The clone's files (to two levels) and a reader for them: from `ref` in git (origin's base, what Runway
+    builds from) when it exists, else the folder on disk."""
+    p = Path(path)
+    if ref:
+        res = subprocess.run(['git', '-C', str(p), 'ls-tree', '-r', '--name-only', ref], capture_output=True, text=True)
+        if res.returncode == 0:
+            names = {n for n in res.stdout.splitlines() if n.count('/') <= 1}
+
+            def read(rel):
+                out = subprocess.run(['git', '-C', str(p), 'show', f'{ref}:{rel}'], capture_output=True, text=True)
+                return out.stdout if out.returncode == 0 else ''
+            return names, read
+    names = set()
+    for f in p.iterdir() if p.is_dir() else []:
+        if f.name.startswith('.') and f.name != '.gitignore':
+            continue
+        names.add(f.name)
+        if f.is_dir() and f.name not in ('node_modules', 'build', 'dist', 'vendor'):
+            names.update(f'{f.name}/{g.name}' for g in f.iterdir())
+    return names, lambda rel: (p / rel).read_text(errors='replace') if (p / rel).is_file() else ''
+
+
+def suggest_commands(path, ref=None):
+    """What Runway's sessions should be allowed to run in a clone: the check (tests) first, then the build and run
+    commands the work needs. Looks at the top and one folder down (a Swift package in a subfolder, say), on `ref`
+    (origin's base branch) when given. runway.json's own lists, when it has one, come first."""
+    names, read = tree(path, ref)
+    check, allow = None, []
+
+    def add(cmd):
+        if cmd and cmd not in allow:
+            allow.append(cmd)
+    if 'runway.json' in names:
+        try:
+            data = json.loads(read('runway.json') or '{}')
+            check = data.get('check_cmd') or None
+            for c in data.get('worker_commands', []):
+                add(c)
+        except json.JSONDecodeError:
+            pass
+    dirs = [''] + sorted({n.split('/')[0] for n in names if '/' in n and not n.startswith('.')
+                          and n.split('/')[0] not in ('node_modules', 'build', 'dist', 'vendor')})
+    has = lambda d, f: (f'{d}/{f}' if d else f) in names
+    for d in dirs:
+        if has(d, 'Package.swift'):
+            flag = f' --package-path {d}' if d else ''
+            check = check or f'swift test{flag}'
+            for c in (f'swift test{flag}', f'swift build{flag}', f'swift run{flag}'):
+                add(c)
+        if has(d, 'package.json'):
+            try:
+                scripts = json.loads(read(f'{d}/package.json' if d else 'package.json') or '{}').get('scripts', {})
+            except json.JSONDecodeError:
+                scripts = {}
+            pre = f'npm --prefix {d} ' if d else 'npm '
+            if 'test' in scripts:
+                check = check or f'{pre}test'
+                add(f'{pre}test')
+            if 'build' in scripts:
+                add(f'{pre}run build')
+        if has(d, 'uv.lock') or (has(d, 'pyproject.toml') and shutil.which('uv')):
+            check = check or ('uv run pytest' if not d else f'uv run --project {d} pytest')
+            add('uv run')
+        elif has(d, 'pyproject.toml') and shutil.which('pytest'):
+            check = check or 'pytest -q'
+            add('pytest')
+        if has(d, 'Cargo.toml'):
+            check = check or 'cargo test'
+            add('cargo test')
+            add('cargo build')
+        if has(d, 'go.mod'):
+            check = check or 'go test ./...'
+            add('go test')
+            add('go build')
+        if has(d, 'Makefile') and 'test:' in read(f'{d}/Makefile' if d else 'Makefile'):
+            check = check or ('make test' if not d else f'make -C {d} test')
+            add('make')
+    if not check and any(n.startswith('tests/') and n.endswith('.py') for n in names):
+        check = 'python3 -m unittest -q'
+    if check:
+        add(check)
+    return {'check': check, 'commands': [c for c in allow if c != check]}
+
+
 def suggest_check(path):
     """A likely test command for a clone, from what is in it; None when nothing says."""
     p = Path(path)

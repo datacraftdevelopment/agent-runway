@@ -10,6 +10,21 @@ struct Toast: Equatable, Identifiable {
     var error = false
 }
 
+/// `runway repo check --json` and `--suggest --json`.
+struct CheckSettings: Decodable, Equatable {
+    var check: String?
+    var commands: [String]
+}
+
+/// The check sheet's fields: the test command and, one per line, what else sessions may run.
+struct CheckEdit: Identifiable {
+    let id = UUID()
+    var repo: String
+    var check: String
+    var commands: String
+    var suggested: CheckSettings?
+}
+
 /// A confirm sheet for a step that deletes something for good: what goes, what stays, and the command it runs.
 struct Confirm: Identifiable {
     let id = UUID()
@@ -93,6 +108,7 @@ extension AppModel {
         case .archive: step(["repo", "archive", name], undo: ["repo", "unarchive", name], ok: "Archived \(name)")
         case .unarchive: step(["repo", "unarchive", name], ok: "\(name) is back on the board")
         case .removeRepo: confirmRemove(name)
+        case .setCheck: openCheck(name)
         default: break
         }
     }
@@ -104,6 +120,31 @@ extension AppModel {
         case .maxSessions(let n): step(["runner", "slots", name, String(n)])
         default: break
         }
+    }
+
+    // MARK: Check command
+
+    /// Opens the check sheet with what's set now and what the clone suggests (`runway repo check`).
+    func openCheck(_ repo: String) {
+        Task {
+            guard let now = await runway(["repo", "check", repo, "--json"]),
+                  let current = try? Self.snake.decode(CheckSettings.self, from: Data(now.output.utf8)) else { return }
+            let found = await runway(["repo", "check", repo, "--suggest", "--json"])
+            let suggestion = found.flatMap { try? Self.snake.decode(CheckSettings.self, from: Data($0.output.utf8)) }
+            checkEdit = CheckEdit(repo: repo, check: current.check ?? suggestion?.check ?? "",
+                                  commands: (current.commands.isEmpty ? suggestion?.commands ?? [] : current.commands)
+                                    .joined(separator: "\n"),
+                                  suggested: suggestion)
+        }
+    }
+
+    func saveCheck(_ edit: CheckEdit) {
+        checkEdit = nil
+        let allow = edit.commands.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        step(["repo", "check", edit.repo, "--check", edit.check.trimmingCharacters(in: .whitespaces)]
+             + (allow.isEmpty ? ["--allow", ""] : allow.flatMap { ["--allow", $0] }),
+             ok: "Saved \(edit.repo)'s check command")
     }
 
     // MARK: The steps
@@ -120,7 +161,7 @@ extension AppModel {
         }
     }
 
-    private static let snake: JSONDecoder = {
+    static let snake: JSONDecoder = {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
         return d

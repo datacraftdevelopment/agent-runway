@@ -243,6 +243,10 @@ struct SetupGuideView: View {
                     .textFieldStyle(.plain).font(.system(size: 12, design: .monospaced))
                     .padding(.horizontal, 8).padding(.vertical, 7)
                     .background(Palette.code, in: RoundedRectangle(cornerRadius: 6))
+                if let more = repo.commands, !more.isEmpty {
+                    Text("Sessions may also run: " + more.joined(separator: " · "))
+                        .font(.system(size: 11)).foregroundStyle(Palette.textMuted).fixedSize(horizontal: false, vertical: true)
+                }
             }
             Button { model.addPendingRepo() } label: { Text("Watch \(repo.name)").frame(maxWidth: .infinity) }
                 .buttonStyle(PrimaryButtonStyle()).disabled(repo.slug == nil)
