@@ -127,13 +127,15 @@ def cmd_runner_limits(con, a):
     from . import capacity
     if not con.execute('SELECT 1 FROM runners WHERE name=?', (a.name,)).fetchone():
         raise db.RunwayError(f'no runner called {a.name!r}')
-    for col, val in (('per_session_mb', a.per_session_mb), ('max_load', a.max_load), ('min_disk_gb', a.min_disk_gb)):
+    for col, val in (('per_session_mb', a.per_session_mb), ('min_cpu_idle_pct', a.min_cpu_idle_pct),
+                     ('min_disk_gb', a.min_disk_gb)):
         if val is not None:
             con.execute(f'UPDATE runners SET {col}=? WHERE name=?', (val, a.name))
     row = con.execute('SELECT * FROM runners WHERE name=?', (a.name,)).fetchone()
     lim = capacity.limits(row)
     print(f'{a.name}: up to {row["slots"]} sessions; each needs {lim["per_session_mb"]} MB free, load under '
-          f'{lim["max_load"]:.2f} per core, {lim["min_disk_gb"]:g} GB free disk')
+          f'CPU at least {lim["min_cpu_idle_pct"]:g}% idle, {lim["min_disk_gb"]:g} GB free disk '
+          '(the first session only waits for a full disk or critical memory pressure)')
 
 
 def cmd_runner_set(con, a):
@@ -306,6 +308,14 @@ def cmd_resume(con, a):
 
 def cmd_start(con, a):
     from . import actions
+    if a.ignore_capacity:
+        # "Start anyway": this ticket skips the capacity check once (blockers, overlap and slots still apply).
+        t = db.ticket(con, a.repo)
+        if t['state'] != 'queued':
+            raise db.RunwayError(f'{t["id"]} is {t["state"]}; only a ticket waiting in Up next can start anyway')
+        con.execute('UPDATE tickets SET ignore_capacity=1 WHERE id=?', (t['id'],))
+        db.event(con, 'answer', f'{t["id"]}: start anyway (capacity check skipped once)', repo=t['repo'], ticket=t['id'])
+        return print(f'{t["id"]} starts on the next tick, without the capacity check')
     print(actions.start_stop(con, a.repo, True))
 
 
@@ -361,7 +371,7 @@ def cmd_init(con, a):
     from . import capacity
     print(f'Runway keeps its tickets and runs in {db.db_path()}')
     if db.meta(con, 'sessions_sized') is None:
-        r = capacity.read(db.home())
+        r = capacity.read(db.home(), cpu=False)
         if r:
             n = capacity.suggest_sessions(r['memory_mb'], r['ncpu'])
             con.execute("UPDATE runners SET slots=? WHERE name='This Mac'", (n,))
@@ -438,7 +448,7 @@ def parser():
     x = r.add_parser('limits', help='what a runner needs free before it starts another session')
     x.add_argument('name')
     x.add_argument('--per-session-mb', type=int, help='memory each session needs (default 3072)')
-    x.add_argument('--max-load', type=float, help='1-minute load per core to stay under (default 0.85)')
+    x.add_argument('--min-cpu-idle-pct', type=float, help='CPU idle %% to keep before another session (default 15)')
     x.add_argument('--min-disk-gb', type=float, help='free disk to keep (default 5)')
     x.set_defaults(fn=cmd_runner_limits)
     x = r.add_parser('slots', help='how many tickets a runner takes at once')
@@ -471,8 +481,13 @@ def parser():
             x.add_argument('--for', help='30m, 1h, 2d; default: until you resume')
         x.set_defaults(fn=fn)
     for name, fn in (('start', cmd_start), ('stop', cmd_stop)):
-        x = sub.add_parser(name, help=f'{name} picking up new tickets for a repo')
-        x.add_argument('repo')
+        x = sub.add_parser(name, help=f'{name} picking up new tickets for a repo' + (
+            '; or, with --ignore-capacity, start one waiting ticket without the capacity check' if name == 'start' else ''))
+        x.add_argument('repo', help='a repo (or a ticket, with --ignore-capacity)')
+        if name == 'start':
+            x.add_argument('--ignore-capacity', action='store_true', help='this ticket skips the capacity check once')
+        else:
+            x.set_defaults(ignore_capacity=False)
         x.set_defaults(fn=fn)
     x = sub.add_parser('runs-on', help='where a repo (any|main) or a ticket (any|<runner>) runs')
     x.add_argument('target')

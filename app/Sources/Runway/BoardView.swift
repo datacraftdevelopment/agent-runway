@@ -167,6 +167,13 @@ private struct Inspector: View {
             if let hold = ticket.hold, ticket.column == .upNext { row("Waiting", hold.replacingOccurrences(of: "waiting: ", with: "")) }
         }
         .font(.system(size: 12))
+        if ticket.heldForCapacity {
+            Button { model.run(["start", ticket.id, "--ignore-capacity"]) } label: {
+                Text("Start anyway").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PlainBoxButtonStyle())
+            .help("Starts this ticket on the next tick without the memory and CPU check, this once")
+        }
         if let blockers = ticket.blockedBy, !blockers.isEmpty { waitsOn(blockers) }
         if ticket.column == .needsYou, ticket.taken != true, let question = ticket.question { needsYou(ticket, question) }
         if ticket.takenLong {

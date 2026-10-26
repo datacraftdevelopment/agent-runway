@@ -266,7 +266,10 @@ class Loop:
         if pause and float(pause) > db.now():
             return
         free = self.free_slots()
-        readings, busy = {}, {}             # this tick's reading per runner, and why a runner is too busy
+        readings, busy = {}, {}             # this tick's reading per runner (counted down as sessions start), and
+        self.measured = {}                  # why a runner is too busy; `measured` keeps what was really read
+        running = {r['runner']: r['n'] for r in self.con.execute(
+            'SELECT runner, COUNT(*) n FROM runs WHERE ended_at IS NULL GROUP BY runner')}
         self.con.execute("UPDATE tickets SET hold=NULL WHERE state IN ('queued', 'reviewing') AND hold IS NOT NULL")
         ready = self.con.execute(
             "SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo "
@@ -285,15 +288,16 @@ class Loop:
                 jobs = [None]
             else:
                 jobs = self.reviews_due(t)
+            anyway = bool(t['ignore_capacity'])     # "Start anyway": this once, no capacity check
             for role in jobs:
-                runner = self.pick_runner(t, free)
-                while runner and not self.has_room(runner, readings, busy):
-                    free[runner] = 0                # busy: nothing more starts there this tick
-                    runner = self.pick_runner(t, free)
+                open_ = lambda: {n: s for n, s in free.items() if anyway or n not in busy}
+                runner = self.pick_runner(t, open_())
+                while runner and not anyway and not self.has_room(runner, readings, busy, running.get(runner, 0)):
+                    runner = self.pick_runner(t, open_())   # busy: nothing more starts there this tick
                 if not runner:
                     wanted = [n for n in busy if n in self.wanted_runners(t, free)]
                     if wanted:
-                        self.hold(t, f'waiting: {wanted[0]} is busy ({busy[wanted[0]]})')
+                        self.hold(t, f'waiting: {wanted[0]} is busy ({busy[wanted[0]][1]})')
                     break
                 agent = self.pick_agent(t, role)
                 if not agent:
@@ -304,6 +308,9 @@ class Loop:
                     self.failed(t, f'could not start: {e}')
                     break
                 free[runner] -= 1
+                running[runner] = running.get(runner, 0) + 1
+                if anyway:
+                    self.con.execute('UPDATE tickets SET ignore_capacity=0 WHERE id=?', (t['id'],))
                 if runner in readings:
                     readings[runner] = capacity.started(readings[runner], self.limits(runner))
         self.record_runners(readings, busy)
@@ -333,19 +340,23 @@ class Loop:
         row = self.con.execute('SELECT * FROM runners WHERE name=?', (runner,)).fetchone()
         return capacity.limits(row) if row else dict(capacity.DEFAULTS)
 
-    def has_room(self, runner, readings, busy):
+    def has_room(self, runner, readings, busy, running=1):
         """Whether the runner has memory, CPU and disk for one more session, read once a tick (then counted down
-        as sessions start). A runner that can't be read, or a runner object with no reading, is never held back."""
+        as sessions start). With nothing running there yet, only a full disk or critical memory pressure holds it.
+        A runner that can't be read, or a runner object with no reading, is never held back."""
         if runner in busy:
             return False
         read = getattr(self.runner, 'capacity', None)
         if read is None:
             return True
         if runner not in readings:
-            readings[runner] = read()
-        why = capacity.check(readings[runner], self.limits(runner))
+            readings[runner] = self.measured[runner] = read()
+        lim = self.limits(runner)
+        why = capacity.check(readings[runner], lim, running)
         if why:
-            busy[runner] = why[0]
+            # Say what was measured when that alone is short; else it's the sessions this tick just started.
+            real = [w for w in capacity.check(self.measured.get(runner), lim, running) if w[0] == why[0][0]]
+            busy[runner] = real[0] if real else (why[0][0], f'{why[0][1]} counting the sessions just started')
             return False
         return True
 
@@ -358,10 +369,10 @@ class Loop:
         return list(free)
 
     def record_runners(self, readings, busy):
-        for name, reading in readings.items():
+        for name, reading in getattr(self, 'measured', readings).items():
             self.con.execute('UPDATE runners SET reading=?, hold=? WHERE name=?',
                              (json.dumps(reading) if reading else None,
-                              f'busy ({busy[name]})' if name in busy else None, name))
+                              f'busy ({busy[name][0]})' if name in busy else None, name))
 
     def reviews_due(self, t):
         """The review roles a built ticket still needs: no verdict on its head commit yet and none running."""
