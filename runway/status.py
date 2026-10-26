@@ -52,9 +52,40 @@ def ticket_json(con, t, run, slugs=None):
         'pr_url': f'https://github.com/{slugs[t["repo"]]}/pull/{t["pr"]}' if t['pr'] and (slugs or {}).get(t['repo'])
         else None, 'question': question if column == 'needs_you' else None,
         'filed_from': t['filed_from'], 'filed_at': iso(t['filed_at']), 'waits_on': open_blockers,
+        # What holds it: each open blocker with where it is (and what holds that one), what it blocks, and why the
+        # loop isn't starting it (its touches overlap a running ticket, or its Mac is busy).
+        'blocked_by': [blocker_json(con, b) for b in open_blockers],
+        'blocks': [r['ticket'] for r in con.execute(
+            "SELECT b.ticket FROM blockers b JOIN tickets x ON x.id = b.ticket WHERE b.blocked_by=? "
+            "AND x.state NOT IN ('done', 'dropped') ORDER BY CAST(SUBSTR(b.ticket, 3) AS INTEGER)", (t['id'],))],
+        'hold': t['hold'] if 'hold' in t.keys() else None,
         'elapsed': int(db.now() - run['started_at']) if run else None,
         'summary': summary(t, run, open_blockers),
     }
+
+
+def blocker_json(con, tid):
+    b = con.execute('SELECT * FROM tickets WHERE id=?', (tid,)).fetchone()
+    if not b:
+        return {'id': tid, 'column': None, 'title': None, 'waits_on': []}
+    theirs = [x for x in db.blockers(con, tid)
+              if con.execute("SELECT 1 FROM tickets WHERE id=? AND state NOT IN ('done', 'dropped')", (x,)).fetchone()]
+    return {'id': tid, 'title': b['title'], 'column': db.STATES.get(b['state'], ('up_next', None))[0],
+            'waits_on': theirs}
+
+
+def runner_load(r, used):
+    """The runner's last reading as the board shows it: sessions running of its max, memory, load and disk, and
+    why it's holding work back if it is."""
+    from . import capacity
+    reading = json.loads(r['reading']) if 'reading' in r.keys() and r['reading'] else None
+    lim = capacity.limits(r)
+    return {'sessions_running': used, 'sessions_max': r['slots'], 'hold': r['hold'] if 'hold' in r.keys() else None,
+            'summary': capacity.summary(reading, lim),
+            'available_mb': reading['available_mb'] if reading else None,
+            'memory_level': reading.get('memory_level') if reading else None,
+            'load_ratio': round(reading['load1'] / max(reading['ncpu'], 1), 2) if reading else None,
+            'disk_free_gb': reading['disk_free_gb'] if reading else None}
 
 
 def taken_hours(con, t):
@@ -185,7 +216,7 @@ def snapshot(con):
         'runners': [{'name': r['name'], 'kind': r['kind'], 'slots_used': used.get(r['name'], 0),
                      'slots_total': r['slots'], 'state': r['state'],
                      'paused_until': iso(r['paused_until']) if r['paused_until'] and r['paused_until'] > db.now()
-                     else None}
+                     else None, 'load': runner_load(r, used.get(r['name'], 0))}
                     for r in con.execute("SELECT * FROM runners ORDER BY kind != 'this_mac', name")],
         # Only the engines this Mac has: one is enough, and the board never shows one you don't use.
         'agents': [{'kind': a['kind'],

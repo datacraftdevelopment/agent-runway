@@ -25,6 +25,11 @@ class LocalRunner:
     def __init__(self, tmux='tmux'):
         self.tmux = tmux
 
+    def capacity(self):
+        """Memory, CPU and disk on this Mac right now (runway/capacity.py)."""
+        from . import capacity
+        return capacity.read(db.home())
+
     def run_dir(self, run_id):
         d = db.home() / 'runs' / str(run_id)
         d.mkdir(parents=True, exist_ok=True)

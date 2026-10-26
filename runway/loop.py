@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import db, gate, limits, retro, worker
+from . import capacity, db, gate, limits, retro, worker
 from .github import GitHub
 from .runner import LocalRunner
 
@@ -266,6 +266,8 @@ class Loop:
         if pause and float(pause) > db.now():
             return
         free = self.free_slots()
+        readings, busy = {}, {}             # this tick's reading per runner, and why a runner is too busy
+        self.con.execute("UPDATE tickets SET hold=NULL WHERE state IN ('queued', 'reviewing') AND hold IS NOT NULL")
         ready = self.con.execute(
             "SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo "
             "WHERE r.active = 1 AND r.archived_at IS NULL AND (r.paused_until IS NULL OR r.paused_until < ?) "
@@ -276,12 +278,22 @@ class Loop:
             if t['state'] == 'queued':
                 if self.blocked(t):
                     continue
+                overlap = self.overlapping(t)
+                if overlap:
+                    self.hold(t, f'waiting: touches the same files as {overlap}')
+                    continue
                 jobs = [None]
             else:
                 jobs = self.reviews_due(t)
             for role in jobs:
                 runner = self.pick_runner(t, free)
+                while runner and not self.has_room(runner, readings, busy):
+                    free[runner] = 0                # busy: nothing more starts there this tick
+                    runner = self.pick_runner(t, free)
                 if not runner:
+                    wanted = [n for n in busy if n in self.wanted_runners(t, free)]
+                    if wanted:
+                        self.hold(t, f'waiting: {wanted[0]} is busy ({busy[wanted[0]]})')
                     break
                 agent = self.pick_agent(t, role)
                 if not agent:
@@ -292,6 +304,64 @@ class Loop:
                     self.failed(t, f'could not start: {e}')
                     break
                 free[runner] -= 1
+                if runner in readings:
+                    readings[runner] = capacity.started(readings[runner], self.limits(runner))
+        self.record_runners(readings, busy)
+
+    # ---- several at once: overlap and capacity -----------------------------------------------------------------
+
+    def hold(self, t, why):
+        self.con.execute('UPDATE tickets SET hold=? WHERE id=?', (why, t['id']))
+
+    def overlapping(self, t):
+        """A running ticket in the same repo whose touches overlap this one's, or None. No touches means it could
+        touch anything, unless the repo's runway.json says parallel_without_touches."""
+        mine = json.loads(t['touches'] or '[]')
+        free_hand = bool(self.runner.config(db.repo(self.con, t['repo'])).get('parallel_without_touches'))
+        for other in self.con.execute(
+                "SELECT id, touches FROM tickets WHERE repo=? AND id != ? AND state IN "
+                "('building', 'checking', 'reviewing', 'merging') ORDER BY CAST(SUBSTR(id, 3) AS INTEGER)",
+                (t['repo'], t['id'])).fetchall():
+            theirs = json.loads(other['touches'] or '[]')
+            if (not mine or not theirs) and not free_hand:
+                return other['id']
+            if mine and theirs and touches_overlap(mine, theirs):
+                return other['id']
+        return None
+
+    def limits(self, runner):
+        row = self.con.execute('SELECT * FROM runners WHERE name=?', (runner,)).fetchone()
+        return capacity.limits(row) if row else dict(capacity.DEFAULTS)
+
+    def has_room(self, runner, readings, busy):
+        """Whether the runner has memory, CPU and disk for one more session, read once a tick (then counted down
+        as sessions start). A runner that can't be read, or a runner object with no reading, is never held back."""
+        if runner in busy:
+            return False
+        read = getattr(self.runner, 'capacity', None)
+        if read is None:
+            return True
+        if runner not in readings:
+            readings[runner] = read()
+        why = capacity.check(readings[runner], self.limits(runner))
+        if why:
+            busy[runner] = why[0]
+            return False
+        return True
+
+    def wanted_runners(self, t, free):
+        repo = db.repo(self.con, t['repo'])
+        if t['runs_on']:
+            return [t['runs_on']]
+        if repo['runs_on'] == 'main':
+            return [repo['main_computer']]
+        return list(free)
+
+    def record_runners(self, readings, busy):
+        for name, reading in readings.items():
+            self.con.execute('UPDATE runners SET reading=?, hold=? WHERE name=?',
+                             (json.dumps(reading) if reading else None,
+                              f'busy ({busy[name]})' if name in busy else None, name))
 
     def reviews_due(self, t):
         """The review roles a built ticket still needs: no verdict on its head commit yet and none running."""
@@ -403,6 +473,17 @@ class Loop:
                 else f'{t["id"]} {where} with {NAMES[agent]}')
         db.event(self.con, 'start' if kind == 'build' else 'review', what, repo=t['repo'], ticket=t['id'])
         self.log(f'started {what}')
+
+
+def touches_overlap(a, b):
+    """Two touches lists share a path: the same file, one inside the other's folder, or a glob that matches."""
+    from fnmatch import fnmatch
+    norm = lambda p: p.strip().lstrip('./').rstrip('/')
+    for x in map(norm, a):
+        for y in map(norm, b):
+            if x == y or x.startswith(y + '/') or y.startswith(x + '/') or fnmatch(x, y) or fnmatch(y, x):
+                return True
+    return False
 
 
 def check_command(repo, cfg):

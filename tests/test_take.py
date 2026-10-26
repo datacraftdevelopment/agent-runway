@@ -24,6 +24,9 @@ class NoTmuxRunner(LocalRunner):
     def start(self, name, workdir, line):
         self.started.append((name, workdir))
 
+    def capacity(self):
+        return None                         # never this Mac's real load: tests don't depend on it
+
     def alive(self, name):
         return name in [n for n, _ in self.started] and name not in self.stopped
 

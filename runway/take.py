@@ -77,6 +77,12 @@ def prompt(con, tid):
                      f'(transcript.jsonl, outcome.json, reviews/). Read them first to see what it tried.')
     else:
         last_line = 'It has not run yet.'
+    frees = [r['ticket'] for r in con.execute(
+        "SELECT b.ticket FROM blockers b JOIN tickets x ON x.id = b.ticket WHERE b.blocked_by=? "
+        "AND x.state NOT IN ('done', 'dropped')", (tid,))]
+    if frees:
+        last_line += (f' It blocks {", ".join(frees)}: finishing it (runway give {tid} or runway done {tid}) '
+                      'lets Runway start them.')
     return (f'Use the runway take-back skill on ticket {tid} in {t["repo"]}.\n'
             f'\n'
             f'Without the plugin: {tid} is "{t["title"]}", on branch {branch}. Run runway take {tid} (prints the '
