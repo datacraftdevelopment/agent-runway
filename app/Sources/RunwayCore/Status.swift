@@ -14,6 +14,8 @@ public struct Status: Codable, Equatable, Sendable {
     public var activity: [ActivityLine]
     /// What setup has found per runner, for the first-run table.
     public var setup: [SetupRow]
+    /// Archived repos: off the board, restorable. Nil from a runway too old to archive.
+    public var archived: [ArchivedRepo]? = nil
 
     public init(version: Int = 1, generatedAt: Date, pausedUntil: Date? = nil, repos: [Repo], runners: [Runner],
                 agents: [Agent], tickets: [Ticket], activity: [ActivityLine], setup: [SetupRow]) {
@@ -64,6 +66,9 @@ public struct Repo: Codable, Equatable, Identifiable, Sendable {
     /// The runner where the repo's local folder lives.
     public var mainComputer: String
     public var runsOn: RunsOn
+    /// owner/name on GitHub, and the local clone (nil from an older runway).
+    public var slug: String? = nil
+    public var path: String? = nil
 
     public var id: String { name }
 
@@ -85,6 +90,8 @@ public struct Runner: Codable, Equatable, Identifiable, Sendable {
     public var slotsUsed: Int
     public var slotsTotal: Int
     public var state: State
+    /// Paused by the person until then (nil: not paused, or an older runway).
+    public var pausedUntil: Date? = nil
 
     public var id: String { name }
 
@@ -98,6 +105,18 @@ public struct Runner: Codable, Equatable, Identifiable, Sendable {
 
     /// "1 of 2", or the state when the runner can't take work.
     public var load: String { state == .online ? "\(slotsUsed) of \(slotsTotal)" : state.rawValue }
+}
+
+/// A repo taken off the board with `runway repo archive`, and how many tickets it keeps.
+public struct ArchivedRepo: Codable, Equatable, Identifiable, Sendable {
+    public var name: String
+    public var tickets: Int
+    public var id: String { name }
+
+    public init(name: String, tickets: Int) {
+        self.name = name
+        self.tickets = tickets
+    }
 }
 
 public enum AgentKind: String, Codable, Sendable, CaseIterable { case claude, codex }

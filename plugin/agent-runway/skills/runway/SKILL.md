@@ -38,6 +38,19 @@ runway runs-on T-19 "Mac mini"         # pin a ticket to one runner; runway runs
 
 Then say what Runway printed.
 
+## Clearing things away: only on the person's own words
+
+Archive and clear-done hide and keep (both undo). Remove and delete are for good, so run them only when the person
+asked for exactly that repo or ticket; run the command without `--yes` first and tell them what it says will go. None
+of them touches the repo's folder, branches or pull requests, and all refuse while a ticket is running.
+
+```bash
+runway clear-done [<repo>] [--older-than 7d]   # Done tickets off the board, still in stats; --undo T-1 T-2 puts them back
+runway repo archive <repo>                     # the repo and its tickets off the board; runway repo unarchive <repo>
+runway repo remove <repo>                      # says what would go; add --yes only on the person's go
+runway delete T-15                             # one ticket and its run history; add --yes only on the person's go
+```
+
 ## Looking into one ticket
 
 ```bash

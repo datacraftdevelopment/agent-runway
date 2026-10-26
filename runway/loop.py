@@ -268,7 +268,7 @@ class Loop:
         free = self.free_slots()
         ready = self.con.execute(
             "SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo "
-            "WHERE r.active = 1 AND (r.paused_until IS NULL OR r.paused_until < ?) "
+            "WHERE r.active = 1 AND r.archived_at IS NULL AND (r.paused_until IS NULL OR r.paused_until < ?) "
             "AND t.state IN ('queued', 'reviewing') "
             "ORDER BY t.state = 'reviewing' DESC, t.filed_at, CAST(SUBSTR(t.id, 3) AS INTEGER)",
             (db.now(),)).fetchall()

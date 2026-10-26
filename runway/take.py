@@ -86,6 +86,22 @@ def prompt(con, tid):
             f'runway drop {tid} --reason "..." (closes the PR). Never leave it taken back.')
 
 
+def discuss_prompt(con, tid):
+    """What the person pastes to talk a ticket over in Claude Code or Codex, without taking it back: the runway skill
+    first, then a short summary for a session without the plugin."""
+    t = db.ticket(con, tid)
+    pr = f'PR #{t["pr"]}' if t['pr'] else 'no PR yet'
+    last = con.execute('SELECT * FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (tid,)).fetchone()
+    record = (f'Its last run ({last["kind"]}, {last["outcome"] or "still going"}) keeps its record in '
+              f'{short_home(db.run_dir(con, last))}/.' if last else 'It has not run yet.')
+    return (f'Use the runway skill to look at ticket {tid} in {t["repo"]} with me. Don\'t take it back or change '
+            f'anything unless I ask.\n'
+            f'\n'
+            f'Without the plugin: {tid} is "{t["title"]}", {t["state"].replace("_", " ")}, on branch '
+            f'{t["branch"] or "rw/" + tid}, {pr}. Code review: {verdict_line(t["review"])}; function review: '
+            f'{verdict_line(t["function_review"])}. {record} runway show {tid} prints the rest.')
+
+
 def take(con, tid, runner=None):
     """Stop the worker, keep the branch and worktree, mark it taken back. Running it twice changes nothing more."""
     runner = runner or LocalRunner()
