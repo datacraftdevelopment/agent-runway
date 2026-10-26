@@ -58,17 +58,26 @@ Never mark a line checked that the person didn't confirm. If a line fails, fix i
 
 ## 5. Close it, on the person's go
 
-Commit everything, then say what you're about to run and why, and ask. Only on their typed go:
+Commit everything in the worktree, then say what you're about to run and why, and ask. Only on their typed go:
 
 ```bash
 runway done T-4 --note "preview fills the frame on the phone"
 ```
 
-- **With commits:** Runway pushes the branch, opens the PR and records the person's go as the function review of that
-  commit. A fresh code review and the usual gate still run: low risk merges on its own, anything else waits for the
-  person. Nothing reaches the base branch unreviewed.
-- **No code change** (a check on a device, a look at how something feels): it just closes, done by hand.
-- The note goes on the record: say what was checked, in the person's words.
+Runway runs the repo's check on the commits, pushes the branch, opens the PR and records the person's go as the
+function review of that commit. A fresh code review and the usual gate still run, so nothing reaches the base branch
+unreviewed. Most hands-on tickets aren't low risk, so the gate will ask the person to merge once more after the code
+review passes: tell them that second ask is coming. The note goes on the record: say what was checked, in the
+person's words.
+
+**No code change at all** (a check on a device, a look at how something feels):
+
+```bash
+runway done T-4 --no-code --note "checked the colours on the phone in daylight"
+```
+
+`runway done` refuses anything in between: work with no worktree, or commits already merged into the base branch by
+hand. Never merge hands-on code yourself; it would skip the review.
 
 If the code review fails, the ticket comes back to Up next as hands-on with the findings. Take it again, fix them, and
 run `runway done` again on a new go: it reuses the PR.
@@ -86,5 +95,7 @@ Only on the person's say-so. Tickets that waited on it are released.
 ## Never
 
 - Run `runway done` without the person's typed go, or claim an Acceptance line they didn't check.
-- Push, merge or close the PR by hand: `runway done` and the gate do it, and Runway records it.
+- Push, merge or close the PR by hand, or merge the work into the base branch yourself: `runway done` and the gate do
+  it, and Runway records it.
+- Use `--no-code` for a ticket that changed code.
 - Leave uncommitted work in a worktree at the end of the session.

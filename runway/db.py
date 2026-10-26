@@ -204,9 +204,9 @@ MIGRATIONS = {
     12: """
     ALTER TABLE runs ADD COLUMN stage_at REAL;
     """,
-    # Hands-on tickets (Joe, 2026-10-26): work an unattended agent can't prove (a device, the simulator, how the UI
-    # feels, an experiment) is filed beside the Runway batch, done by the person in their own session, never started
-    # by the loop, and kept on the board and in the history as done locally.
+    # Hands-on tickets (Joe, 2026-10-26): work an unattended agent can't prove (a real device or camera, the person's
+    # eye on how it looks and feels) is filed beside the Runway batch, done by the person in their own session, never
+    # built by the loop, and kept on the board and in the history as done by hand.
     13: """
     ALTER TABLE tickets ADD COLUMN hands_on INTEGER NOT NULL DEFAULT 0;
     """,

@@ -78,7 +78,9 @@ def answer(con, tid, verdict, note=None, github=None):
 
 
 def requeue(con, tid, note=None, fix=False):
-    fields = {'state': 'queued', 'stage': None, 'question': None, 'note': note}
+    # A hands-on ticket goes back to the person, never to a Runway build.
+    hands_on = db.ticket(con, tid)['hands_on']
+    fields = {'state': 'hands_on' if hands_on else 'queued', 'stage': None, 'question': None, 'note': note}
     if not fix:
         fields['fix_passes'] = 0
     db.update_ticket(con, tid, **fields)

@@ -68,6 +68,14 @@ class FilingTest(unittest.TestCase):
         self.assertEqual(1, len(runner.started))
         self.assertEqual(db.ticket(self.con, b)['state'], 'building')
 
+    def test_a_hands_on_only_batch_files_with_no_engine(self):
+        self.con.execute('UPDATE agents SET signed_in = 0')
+        tid = tickets.file_batch(self.con, 'app', [{'title': 'Look at it on the phone', 'hands_on': True,
+                                                     'acceptance': ['A1: it reads at arm\'s length']}])[0]
+        self.assertEqual(db.ticket(self.con, tid)['state'], 'hands_on')
+        with self.assertRaisesRegex(db.RunwayError, 'no engine'):
+            tickets.file_batch(self.con, 'app', [{'title': 'Store it', 'acceptance': ['A1: it round-trips']}])
+
     def test_the_board_says_why_nothing_is_running(self):
         a, b = self.file_batch()
         db.set_meta(self.con, 'loop_pid', str(os.getpid()))             # as if the loop were running
@@ -141,6 +149,7 @@ class DoneByHandTest(unittest.TestCase):
 
         said = take.done(self.con, self.a, note='settles on the phone', runner=self.runner, github=gh)
         self.assertIn('code review and the gate run next', said)
+        self.assertIn('the code review and the gate are next', status.summary(db.ticket(self.con, self.a), None, []))
         t = db.ticket(self.con, self.a)
         self.assertEqual((t['state'], t['pr'], t['sha'], t['take_dir']), ('reviewing', 7, mine, None))
         self.assertEqual(t['function_review'], 'You, by hand: pass (settles on the phone)')
@@ -174,14 +183,46 @@ class DoneByHandTest(unittest.TestCase):
 
     def test_a_hands_on_ticket_with_nothing_to_merge_closes(self):
         """Work that changed no code at all: a check on a device, a look at how something feels."""
-        said = take.done(self.con, self.a, note='looked at it on the phone', runner=self.runner, github=FakeGitHub())
+        # Without a worktree and without --no-code, Runway can't tell no code from code it can't see: refused.
+        with self.assertRaisesRegex(db.RunwayError, 'no worktree'):
+            take.done(self.con, self.a, runner=self.runner, github=FakeGitHub())
+        self.assertEqual(db.ticket(self.con, self.a)['state'], 'hands_on')
+        said = take.done(self.con, self.a, note='looked at it on the phone', runner=self.runner, github=FakeGitHub(),
+                         no_code=True)
         self.assertIn('no code to merge', said)
         self.assertIn(self.b, said)                                     # it says what can start now
         t = db.ticket(self.con, self.a)
         self.assertEqual((t['state'], t['merged_by']), ('done', 'you_local'))
         self.assertTrue(status.ticket_json(self.con, t, None)['done_locally'])
-        self.assertEqual(take.done(self.con, self.a, runner=self.runner, github=FakeGitHub()),
+        self.assertEqual(take.done(self.con, self.a, runner=self.runner, github=FakeGitHub(), no_code=True),
                          f'{self.a} is already done')                   # twice is harmless
+
+    def test_work_merged_into_the_base_by_hand_is_refused_not_closed(self):
+        wt, branch = take.take(self.con, self.a, runner=self.runner)
+        self.commit(wt, 'sheet.swift', '// settled\n', 'by hand', branch='main')      # straight into main
+        with self.assertRaisesRegex(db.RunwayError, 'no commits that aren.t already in main'):
+            take.done(self.con, self.a, runner=self.runner, github=FakeGitHub())
+        self.assertEqual(db.ticket(self.con, self.a)['state'], 'hands_on')
+
+    def test_a_hands_on_ticket_is_never_built_even_if_requeued(self):
+        from runway import actions
+        db.update_ticket(self.con, self.a, state='needs_you', question={'kind': 'failed', 'text': 'x'})
+        actions.answer(self.con, self.a, 'go')
+        self.assertEqual(db.ticket(self.con, self.a)['state'], 'hands_on')
+        db.update_ticket(self.con, self.a, state='queued')               # however it got there
+        runner = FakeRunner(self.tmp.name)
+        Loop(self.con, runner=runner, github=FakeGitHub(), log=lambda *_: None).tick()
+        self.assertEqual(db.ticket(self.con, self.a)['state'], 'queued')
+        self.assertEqual(self.con.execute('SELECT COUNT(*) FROM runs WHERE ticket=?', (self.a,)).fetchone()[0], 0)
+
+    def test_a_runway_ticket_waits_while_the_person_works_the_same_files(self):
+        db.update_ticket(self.con, self.a, touches='["Sheet/"]')
+        c = tickets.file_batch(self.con, 'app', [{'title': 'Sheet colours', 'risk': 'low', 'risk_reason': 'copy',
+                                                   'acceptance': ['A1: it reads'], 'touches': ['Sheet/']}])[0]
+        loop = Loop(self.con, runner=FakeRunner(self.tmp.name), github=FakeGitHub(), log=lambda *_: None)
+        self.assertIsNone(loop.overlapping(db.ticket(self.con, c)))     # filed, not being worked: no hold
+        take.take(self.con, self.a, runner=self.runner)
+        self.assertEqual(loop.overlapping(db.ticket(self.con, c)), self.a)
 
     def test_a_dropped_hands_on_ticket_releases_what_waited_on_it(self):
         take.drop(self.con, self.a, reason='not needed after all', runner=self.runner, github=FakeGitHub())

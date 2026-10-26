@@ -238,8 +238,9 @@ class Loop:
         repo = db.repo(self.con, t['repo'])
         pr = self.github.pr(repo['path'], t['pr'])
         checks = self.github.checks(repo['path'], t['pr'])
-        last = self.con.execute("SELECT ended_at FROM runs WHERE ticket=? AND kind='build' ORDER BY id DESC LIMIT 1",
-                                (t['id'],)).fetchone()
+        # The last push: a build, or for a hands-on ticket the person's own submission (recorded as their review).
+        last = self.con.execute("SELECT ended_at FROM runs WHERE ticket=? AND (kind='build' OR agent='you') "
+                                "ORDER BY id DESC LIMIT 1", (t['id'],)).fetchone()
         fresh = bool(last and last['ended_at'] and db.now() - last['ended_at'] < CHECK_GRACE)
         verdict, reasons = gate.evaluate(t, pr, checks, self.runner.config(repo), fresh=fresh)
         if verdict == 'wait':
@@ -282,7 +283,7 @@ class Loop:
         ready = self.con.execute(
             "SELECT t.* FROM tickets t JOIN repos r ON r.name = t.repo "
             "WHERE r.active = 1 AND r.archived_at IS NULL AND (r.paused_until IS NULL OR r.paused_until < ?) "
-            "AND t.state IN ('queued', 'reviewing') "
+            "AND t.state IN ('queued', 'reviewing') AND NOT (t.state = 'queued' AND t.hands_on = 1) "
             "ORDER BY t.state = 'reviewing' DESC, t.filed_at, CAST(SUBSTR(t.id, 3) AS INTEGER)",
             (db.now(),)).fetchall()
         for t in ready:
@@ -334,8 +335,10 @@ class Loop:
         mine = json.loads(t['touches'] or '[]')
         free_hand = bool(self.runner.config(db.repo(self.con, t['repo'])).get('parallel_without_touches'))
         for other in self.con.execute(
-                "SELECT id, touches FROM tickets WHERE repo=? AND id != ? AND state IN "
-                "('building', 'checking', 'reviewing', 'merging') ORDER BY CAST(SUBSTR(id, 3) AS INTEGER)",
+                "SELECT id, touches FROM tickets WHERE repo=? AND id != ? AND (state IN "
+                "('building', 'checking', 'reviewing', 'merging') "
+                # The person working a hands-on ticket in its worktree is as busy in those files as a worker.
+                "OR (state = 'hands_on' AND take_dir IS NOT NULL)) ORDER BY CAST(SUBSTR(id, 3) AS INTEGER)",
                 (t['repo'], t['id'])).fetchall():
             theirs = json.loads(other['touches'] or '[]')
             if (not mine or not theirs) and not free_hand:
