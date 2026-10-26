@@ -9,9 +9,12 @@ struct BoardView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(Ticket.Column.allCases, id: \.self) { column in
-                    columnView(column)
+            VStack(alignment: .leading, spacing: 12) {
+                if let repo = model.repo, let why = repo.idleReason { idleBanner(why, repo.idleTicket) }
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(Ticket.Column.allCases, id: \.self) { column in
+                        columnView(column)
+                    }
                 }
             }
             .padding(16)
@@ -19,6 +22,24 @@ struct BoardView: View {
             Rectangle().fill(Palette.border).frame(width: 1)
             Inspector(model: model, status: status)
         }
+    }
+
+    /// Why nothing in Up next is starting, with the ticket to look at (or the loop to start).
+    private func idleBanner(_ why: String, _ ticket: String?) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "pause.circle").foregroundStyle(Palette.needsYouText)
+            Text(why).foregroundStyle(Palette.text)
+            Spacer(minLength: 0)
+            if let ticket {
+                Button("Show \(ticket)") { model.selectedTicket = ticket }.buttonStyle(PlainBoxButtonStyle(small: true))
+            } else if status.loopRunning == false {
+                Button("Start the loop") { model.restartLoop() }.buttonStyle(PlainBoxButtonStyle(small: true))
+            }
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Palette.needsYouFill, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.needsYouBorder))
     }
 
     private func columnView(_ column: Ticket.Column) -> some View {

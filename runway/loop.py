@@ -524,14 +524,21 @@ def shorten(text, n=60):
 
 # ---- running it ----------------------------------------------------------------------------------------------------
 
-def run_forever(every=15, once=False, parent=None, log=print):
-    """`runway loop`. One loop at a time (a lock file); with --parent-pid it stops when the app that started it goes."""
+def run_forever(every=15, once=False, parent=None, log=print, wait=30):
+    """`runway loop`. One loop at a time (a lock file); with --parent-pid it stops when the app that started it goes.
+    A loop started while another still holds the lock (an app update: the old app's loop takes a moment to stop)
+    waits up to `wait` seconds for it before giving up."""
     lock = open(db.home() / 'loop.lock', 'w')
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        log('another runway loop is already running')
-        return 1
+    deadline = time.time() + wait
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.time() >= deadline:
+                log('another runway loop is already running')
+                return 1
+            time.sleep(1)
     lock.write(str(os.getpid()))
     lock.flush()
     stop = []

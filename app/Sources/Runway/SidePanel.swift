@@ -87,6 +87,10 @@ struct SidePanel: View {
             if running.isEmpty {
                 Text(upNext > 0 ? "\(repo.statusLine) · \(upNext) up next" : repo.statusLine)
                     .font(.system(size: 12)).foregroundStyle(Palette.textMuted)
+                if let why = repo.idleShort {
+                    Text(why).font(.system(size: 11)).foregroundStyle(Palette.needsYouText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(running) { ticket in runningLine(ticket) }

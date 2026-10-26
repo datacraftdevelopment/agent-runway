@@ -16,6 +16,8 @@ public struct Status: Codable, Equatable, Sendable {
     public var setup: [SetupRow]
     /// Archived repos: off the board, restorable. Nil from a runway too old to archive.
     public var archived: [ArchivedRepo]? = nil
+    /// Whether Runway's loop (the thing that starts tickets) is alive. Nil from an older runway.
+    public var loopRunning: Bool? = nil
 
     public init(version: Int = 1, generatedAt: Date, pausedUntil: Date? = nil, repos: [Repo], runners: [Runner],
                 agents: [Agent], tickets: [Ticket], activity: [ActivityLine], setup: [SetupRow]) {
@@ -69,6 +71,13 @@ public struct Repo: Codable, Equatable, Identifiable, Sendable {
     /// owner/name on GitHub, and the local clone (nil from an older runway).
     public var slug: String? = nil
     public var path: String? = nil
+    /// With tickets up next and none running: why nothing starts ("Nothing can run: 4 tickets wait on T-4, which
+    /// needs you"), and the ticket to look at. Nil while something runs or the next tick will start one.
+    public var idleReason: String? = nil
+    public var idleTicket: String? = nil
+
+    /// The reason without its "Nothing can run: " lead, for the menu and the side panel.
+    public var idleShort: String? { idleReason?.replacingOccurrences(of: "Nothing can run: ", with: "") }
 
     public var id: String { name }
 
