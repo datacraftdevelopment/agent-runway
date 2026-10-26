@@ -224,6 +224,13 @@ if [ "$RELEASE" = 1 ]; then
   SIG="$(printf '%s' "$SIG" | tr -d '\n')"
 
   # The feed holds only the newest version: Sparkle needs nothing more.
+  # Sparkle's update window shows the version's own notes, written into the feed (the same file as What's New and
+  # the release page), not the whole GitHub page. With no notes file it falls back to linking the release page.
+  if [ -f "release-notes/$VERSION.md" ]; then
+    NOTES_ITEM="<description><![CDATA[$(python3 notes-html.py "release-notes/$VERSION.md" "$VERSION")]]></description>"
+  else
+    NOTES_ITEM="<sparkle:releaseNotesLink>https://github.com/$GH_REPO/releases/tag/$TAG</sparkle:releaseNotesLink>"
+  fi
   cat > "$REL_DIR/appcast.xml" <<APPCAST
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
@@ -232,7 +239,7 @@ if [ "$RELEASE" = 1 ]; then
     <item>
       <title>Runway $VERSION</title>
       <link>https://github.com/$GH_REPO/releases/tag/$TAG</link>
-      <sparkle:releaseNotesLink>https://github.com/$GH_REPO/releases/tag/$TAG</sparkle:releaseNotesLink>
+      $NOTES_ITEM
       <pubDate>$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")</pubDate>
       <sparkle:version>$BUILD</sparkle:version>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
