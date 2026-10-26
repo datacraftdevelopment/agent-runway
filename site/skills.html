@@ -222,7 +222,22 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <div><span class="who">You type go</span><h3>4 · Tickets</h3></div>
       <div>
         <p>This is the hand-off point. After your go, nobody needs to watch.</p>
-        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It files only after you type go, and a changed batch needs a fresh go.</p></div>
+        <div class="skill"><header><code>file-tickets</code><span class="src">Agent Runway</span></header><p>Proposes a short batch of tickets from the spec or the session, as one table. Each ticket has its title, its risk with a one-line reason, which agent should take it, what it waits on, where it runs, and one to three acceptance checks. Anything touching auth, payments, migrations, CI or secrets is never low risk. It files only after you type go, and a changed batch needs a fresh go.</p><p>It also sorts the work. Anything an unattended agent can't prove, like a check on a real phone or a camera, or you judging how it looks and feels, becomes a hands-on ticket. That one's yours, and Runway never starts it.</p></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div><span class="who">You + your agent, alongside</span><h3>Hands-on</h3></div>
+      <div>
+        <p>While Runway runs the rest, you do the hands-on tickets in your own session. Tickets that need one of them wait on it, and say so on the board.</p>
+        <div class="skill"><header><code>hands-on</code><span class="src">Agent Runway</span></header><p>Works through your hands-on tickets with you, the ones other tickets wait on first. It takes each into its own worktree, builds it test-first, and tells you exactly what to try on the phone or what to look at. Then it waits for your answer. On your go, <code>runway done</code> pushes it and opens the PR, and your answer counts as the function review. A fresh code review and the gate still run, so nothing lands unreviewed. A check with no code at all closes with <code>--no-code</code>.</p></div>
+        <p>It builds with six skills from Jesse Vincent's Superpowers, which come in the same plugin:</p>
+        <div class="skill"><header><code>writing-plans</code><span class="src">Superpowers</span></header><p>A short plan before anything with more than a step or two.</p></div>
+        <div class="skill"><header><code>subagent-driven-development</code><span class="src">Superpowers</span></header><p>Runs the plan task by task with fresh subagents, each one reviewed.</p></div>
+        <div class="skill"><header><code>executing-plans</code><span class="src">Superpowers</span></header><p>The same plan, run inline, when the session can't start subagents or you'd rather it didn't.</p></div>
+        <div class="skill"><header><code>test-driven-development</code><span class="src">Superpowers</span></header><p>Every change starts with a failing test.</p></div>
+        <div class="skill"><header><code>systematic-debugging</code><span class="src">Superpowers</span></header><p>Reproduce first, then find the cause, then fix it. No guessing.</p></div>
+        <div class="skill"><header><code>verification-before-completion</code><span class="src">Superpowers</span></header><p>Nothing gets called done without the command and its output to show for it.</p></div>
       </div>
     </div>
 
@@ -267,7 +282,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
       <h3>Why the line sits where it does</h3>
       <p>Everything above step 4 is judgment: what to build, what done means, and how risky it is. Runway leaves that to you, because a wrong spec builds the wrong thing very efficiently. Everything below step 4 is careful repetition, and Runway does it without you.</p>
     </div>
-    <p class="credit">The shaping steps are inspired by Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>), the way of working Runway was built around. Runway's versions are its own, written to hand work to unattended tickets.</p>
+    <p class="credit">The shaping steps are inspired by Matt Pocock's open skills (<a href="https://github.com/mattpocock/skills">mattpocock/skills</a>), the way of working Runway was built around. Runway's versions are its own, written to hand work to unattended tickets. The six build skills in the hands-on step are Jesse Vincent's <a href="https://github.com/obra/superpowers">Superpowers</a> (MIT licensed), included with only their names and paths changed to fit Runway.</p>
   </div>
 </section>
 </main>
