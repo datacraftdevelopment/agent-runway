@@ -10,7 +10,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 MIGRATIONS = {
     1: """
@@ -172,6 +172,12 @@ MIGRATIONS = {
         run_dir TEXT,
         worktree TEXT
     );
+    """,
+    # Clearing things away (Joe, 2026-10-26): an archived repo and its tickets are off the board, out of stats and
+    # never picked by the loop, with nothing deleted; a cleared ticket is off the board but still in stats.
+    8: """
+    ALTER TABLE repos ADD COLUMN archived_at REAL;
+    ALTER TABLE tickets ADD COLUMN cleared_at REAL;
     """,
 }
 

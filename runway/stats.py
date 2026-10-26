@@ -26,6 +26,10 @@ REASONS = {
 }
 
 
+# An archived repo is out of the all-repos numbers (its own tickets stay in the database).
+ARCHIVED_OUT = 'AND repo NOT IN (SELECT name FROM repos WHERE archived_at IS NOT NULL)'
+
+
 def median(xs):
     xs = [x for x in xs if x is not None]
     return statistics.median(xs) if xs else None
@@ -33,7 +37,7 @@ def median(xs):
 
 def window(con, days, repo=None):
     since = db.now() - days * 86400
-    where, args = ('AND repo = ?', (repo,)) if repo else ('', ())
+    where, args = ('AND repo = ?', (repo,)) if repo else (ARCHIVED_OUT, ())
     merged = con.execute(f"SELECT * FROM tickets WHERE merged_at IS NOT NULL AND merged_at >= ? {where} "
                          "ORDER BY merged_at", (since, *args)).fetchall()
     answered = {r['ticket'] for r in con.execute('SELECT DISTINCT ticket FROM answers')}
@@ -87,7 +91,7 @@ def rounded(x, digits=1):
 def waiting(con, repo=None):
     """Tickets waiting for the person right now, with why."""
     import json
-    where, args = ('AND repo = ?', (repo,)) if repo else ('', ())
+    where, args = ('AND repo = ?', (repo,)) if repo else (ARCHIVED_OUT, ())
     out = []
     for t in con.execute(f"SELECT id, repo, title, question, state FROM tickets WHERE state IN ('needs_you', 'taken') "
                          f"{where} ORDER BY filed_at", args):
@@ -103,7 +107,8 @@ def waiting(con, repo=None):
 def snapshot(con, repo=None, days=None):
     """Everything the board's strip shows: all repos and each repo, for 7 and 30 days (or just the asked-for ones)."""
     windows = (days,) if days else WINDOWS
-    repos = [repo] if repo else [r['name'] for r in con.execute('SELECT name FROM repos ORDER BY name')]
+    repos = [repo] if repo else [r['name'] for r in con.execute(
+        'SELECT name FROM repos WHERE archived_at IS NULL ORDER BY name')]
 
     def scope(name):
         return {'repo': name, 'windows': [window(con, d, name) for d in windows], 'waiting': waiting(con, name)}
@@ -112,5 +117,8 @@ def snapshot(con, repo=None, days=None):
     rows = bench.latest(con)
     if repo:
         rows = [r for r in rows if db.ticket(con, r['ticket'])['repo'] == repo]
+    else:
+        archived = {r['name'] for r in con.execute('SELECT name FROM repos WHERE archived_at IS NOT NULL')}
+        rows = [r for r in rows if db.ticket(con, r['ticket'])['repo'] not in archived]
     return {'windows': list(windows), 'all': None if repo else scope(None),
             'by_repo': [scope(name) for name in repos], 'bench': rows}

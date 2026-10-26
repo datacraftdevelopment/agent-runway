@@ -28,6 +28,12 @@ struct BoardView: View {
                 Dot(color: column.dot)
                 Text(column.title).font(.system(size: 12, weight: .bold))
                 Text("\(tickets.count)").font(.system(size: 12)).foregroundStyle(Palette.textMuted)
+                if column == .done, !tickets.isEmpty, let repo = model.selectedRepo {
+                    Spacer()
+                    Button("Clear done") { model.clearDone(repo) }.buttonStyle(.plain)
+                        .font(.system(size: 11)).foregroundStyle(Palette.link)
+                        .help("Takes the done tickets off the board. They still count in stats; Undo puts them back.")
+                }
             }
             .padding(.horizontal, 4).padding(.top, 2).padding(.bottom, 6)
             ScrollView {
@@ -37,6 +43,11 @@ struct BoardView: View {
                             TicketCard(ticket: ticket, selected: model.selectedTicket == ticket.id)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            MenuItemsView(items: ContextMenus.ticket(ticket, runners: status.runners)) {
+                                model.perform($0, ticket: ticket)
+                            }
+                        }
                     }
                 }
             }
@@ -141,6 +152,20 @@ private struct Inspector: View {
         Spacer()
         if let runs = ticket.retroRuns, !runs.isEmpty { runsBehind(runs) }
         if let prompt = model.takePrompts[ticket.id] { takePrompt(prompt) }
+        HStack(spacing: 8) {
+            Button { model.perform(.discussTicket, ticket: ticket) } label: {
+                Text("Chat about this ticket…").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PlainBoxButtonStyle())
+            .help("Copies a prompt for Claude Code or Codex to talk it over. Nothing is taken back.")
+            if ticket.column != .running {
+                Button { model.perform(.deleteTicket, ticket: ticket) } label: {
+                    Image(systemName: "trash").foregroundStyle(Color(hex: 0xFF9A94))
+                }
+                .buttonStyle(PlainBoxButtonStyle())
+                .help("Delete ticket…")
+            }
+        }
         if ticket.column != .done {
             HStack(spacing: 8) {
                 Button { model.takeBack(ticket.id) } label: {

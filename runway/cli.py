@@ -52,6 +52,72 @@ def cmd_repo_list(con, a):
     out([dict(r) for r in con.execute('SELECT * FROM repos ORDER BY name')])
 
 
+def cmd_repo_archive(con, a):
+    from . import tidy
+    print(tidy.archive(con, a.name))
+
+
+def cmd_repo_unarchive(con, a):
+    from . import tidy
+    print(tidy.unarchive(con, a.name))
+
+
+def cmd_repo_remove(con, a):
+    """Without --yes it only says what would go (and what stays); --json gives the same for the app's confirm."""
+    from . import tidy
+    r = db.repo(con, a.name)
+    n = con.execute('SELECT COUNT(*) FROM tickets WHERE repo=?', (a.name,)).fetchone()[0]
+    runs = con.execute('SELECT COUNT(*) FROM runs r JOIN tickets t ON t.id = r.ticket WHERE t.repo=?',
+                       (a.name,)).fetchone()[0]
+    busy = tidy.running(con, repo=a.name)
+    if not a.yes:
+        if a.json:
+            return out({'repo': a.name, 'path': r['path'], 'tickets': n, 'runs': runs, 'running': busy})
+        print(f'runway repo remove {a.name} --yes would delete {n} ticket{"" if n == 1 else "s"} and {runs} '
+              f'run{"" if runs == 1 else "s"} (their logs and Runway\'s worktrees), and leave {r["path"]}, its '
+              'branches and its pull requests as they are.' + (f' Not now: {", ".join(busy)} running.' if busy else ''))
+        return 1
+    print(tidy.remove(con, a.name))
+
+
+def cmd_clear_done(con, a):
+    from . import tidy
+    if a.undo:
+        ids = tidy.unclear(con, a.undo)
+        return out(ids) if a.json else print(f'back on the board: {", ".join(ids)}')
+    ids = tidy.clear_done(con, a.repo, a.older_than)
+    if a.json:
+        return out(ids)
+    print(f'cleared {len(ids)} done ticket{"" if len(ids) == 1 else "s"} off the board' + (f': {", ".join(ids)}'
+          if ids else '') + ('; they still count in stats (undo: runway clear-done --undo ' + ' '.join(ids) + ')'
+                             if ids else ''))
+
+
+def cmd_delete(con, a):
+    from . import tidy
+    t = db.ticket(con, a.ticket)
+    if not a.yes:
+        runs = con.execute('SELECT COUNT(*) FROM runs WHERE ticket=?', (a.ticket,)).fetchone()[0]
+        busy = tidy.running(con, ticket=a.ticket)
+        if a.json:
+            return out({'ticket': a.ticket, 'title': t['title'], 'repo': t['repo'], 'runs': runs, 'pr': t['pr'],
+                        'branch': t['branch'], 'running': bool(busy)})
+        print(f'runway delete {a.ticket} --yes would delete {a.ticket} ({t["title"]}) and its {runs} '
+              f'run{"" if runs == 1 else "s"}; its branch' + (f' and PR #{t["pr"]}' if t['pr'] else '') +
+              ' stay on GitHub.' + (' Not now: it is running.' if busy else ''))
+        return 1
+    print(tidy.delete(con, a.ticket))
+
+
+def cmd_repo_main(con, a):
+    db.repo(con, a.name)
+    if not con.execute('SELECT 1 FROM runners WHERE name=?', (a.runner,)).fetchone():
+        raise db.RunwayError(f'no runner called {a.runner!r}')
+    con.execute('UPDATE repos SET main_computer=? WHERE name=?', (a.runner, a.name))
+    db.event(con, 'setup', f'{a.name}: main computer is {a.runner}', repo=a.name)
+    print(f'{a.name}: main computer is {a.runner}')
+
+
 def cmd_runner_list(con, a):
     out([dict(r) for r in con.execute('SELECT * FROM runners ORDER BY name')])
 
@@ -91,11 +157,15 @@ def cmd_file(con, a):
 
 def cmd_status(con, a):
     from . import status
+    if a.prompt:
+        if not a.repo:
+            raise db.RunwayError('runway status --prompt needs a repo: runway status <repo> --prompt')
+        return print(status.repo_prompt(con, a.repo))
     snap = status.snapshot(con)
     if a.json:
         out(snap)
         return
-    for r in snap['repos']:
+    for r in [r for r in snap['repos'] if not a.repo or r['name'] == a.repo]:
         print(f'{r["name"]}: {r["status_line"]}')
         for t in [t for t in snap['tickets'] if t['repo'] == r['name'] and t['column'] != 'done']:
             where = f' on {t["runs_on"]}' if t['runs_on'] else ''
@@ -108,7 +178,7 @@ def cmd_status(con, a):
 
 def cmd_show(con, a):
     from . import take
-    print(take.show(con, a.ticket))
+    print(take.discuss_prompt(con, a.ticket) if a.prompt else take.show(con, a.ticket))
 
 
 def cmd_take(con, a):
@@ -323,6 +393,21 @@ def parser():
     x.add_argument('path')
     x.set_defaults(fn=cmd_repo_suggest)
     r.add_parser('list').set_defaults(fn=cmd_repo_list)
+    x = r.add_parser('main', help="the runner where a repo's clone lives (runs-on main uses it)")
+    x.add_argument('name')
+    x.add_argument('runner')
+    x.set_defaults(fn=cmd_repo_main)
+    x = r.add_parser('archive', help='take a repo and its tickets off the board (nothing deleted; unarchive undoes)')
+    x.add_argument('name')
+    x.set_defaults(fn=cmd_repo_archive)
+    x = r.add_parser('unarchive', help='put an archived repo back on the board')
+    x.add_argument('name')
+    x.set_defaults(fn=cmd_repo_unarchive)
+    x = r.add_parser('remove', help="forget a repo: its tickets and run history (never its folder, branches or PRs)")
+    x.add_argument('name')
+    x.add_argument('--yes', action='store_true', help='really delete (without it: say what would go)')
+    x.add_argument('--json', action='store_true', help='without --yes: what would go, for the app')
+    x.set_defaults(fn=cmd_repo_remove)
 
     r = sub.add_parser('runner', help='places tickets run').add_subparsers(dest='sub', required=True)
     r.add_parser('list').set_defaults(fn=cmd_runner_list)
@@ -339,7 +424,9 @@ def parser():
     x.set_defaults(fn=cmd_file)
 
     x = sub.add_parser('status', help='what is up next, running, needing you and done')
+    x.add_argument('repo', nargs='?', help='only this repo (the board text, or with --prompt)')
     x.add_argument('--json', action='store_true', help='the snapshot the app reads')
+    x.add_argument('--prompt', action='store_true', help="a prompt to talk this repo's work over in your agent")
     x.set_defaults(fn=cmd_status)
 
     for name, fn, text in (('go', cmd_go, 'go on a needs-you ticket'), ('no', cmd_no, 'no on a needs-you ticket')):
@@ -382,6 +469,7 @@ def parser():
 
     x = sub.add_parser('show', help='a ticket, its Acceptance lines and every run with where its record is')
     x.add_argument('ticket')
+    x.add_argument('--prompt', action='store_true', help='a prompt to talk it over in your agent (takes nothing back)')
     x.set_defaults(fn=cmd_show)
     x = sub.add_parser('take', help='take a ticket back: stop its worker, keep its branch, print a prompt')
     x.add_argument('ticket')
@@ -412,6 +500,18 @@ def parser():
     x.add_argument('--repo')
     x.add_argument('--days', type=int, help='one window instead of 7 and 30')
     x.set_defaults(fn=cmd_stats)
+
+    x = sub.add_parser('clear-done', help='take Done tickets off the board (kept for stats and history)')
+    x.add_argument('repo', nargs='?')
+    x.add_argument('--older-than', help='only those done at least this long ago: 7d, 12h, 30m')
+    x.add_argument('--undo', nargs='+', metavar='TICKET', help='put these cleared tickets back on the board')
+    x.add_argument('--json', action='store_true', help='the ticket ids, for the app')
+    x.set_defaults(fn=cmd_clear_done)
+    x = sub.add_parser('delete', help="delete one ticket and its run history (not its branch or PR)")
+    x.add_argument('ticket')
+    x.add_argument('--yes', action='store_true', help='really delete (without it: say what would go)')
+    x.add_argument('--json', action='store_true', help='without --yes: what would go, for the app')
+    x.set_defaults(fn=cmd_delete)
 
     sub.add_parser('where', help='print the database path').set_defaults(fn=cmd_where)
     return p

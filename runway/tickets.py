@@ -50,7 +50,8 @@ def section(body, name):
 
 def validate(con, repo, tickets):
     """Check a whole batch before anything is written. Returns the cleaned tickets."""
-    db.repo(con, repo)
+    if db.repo(con, repo)['archived_at']:
+        raise db.RunwayError(f'{repo} is archived; runway repo unarchive {repo} first')
     if not tickets:
         raise db.RunwayError('the batch is empty')
     runners = {r['name'] for r in con.execute('SELECT name FROM runners')}
