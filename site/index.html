@@ -153,6 +153,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <div class="links">
       <a class="hide-sm" href="#how">How it works</a>
       <a href="/skills">Skills</a>
+      <a href="/changelog">Changelog</a>
       <a class="hide-sm" href="#faq">FAQ</a>
       <a class="hide-sm" href="#feedback">Feedback</a>
       <a href="https://github.com/datacraftdevelopment/agent-runway">GitHub</a>
@@ -191,11 +192,11 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <h2>You decide what to build. Runway builds it.</h2>
     <p class="lede">The thinking stays with you, in a normal Claude Code or Codex session. Once the work is shaped into tickets and you type go, everything after that runs without you. You only come back for a merge that isn't low risk.</p>
     <ol class="flow">
-      <li><span class="lane">You + your agent</span><h3>Discover</h3><p>Talk the problem through. For big, foggy work, map out the decisions first.</p><code>wayfinder · grill-me</code></li>
+      <li><span class="lane">You + your agent</span><h3>Discover</h3><p>Talk the problem through. For big, foggy work, map out the decisions first.</p><code>map · grill</code></li>
       <li><span class="lane">You + your agent</span><h3>Prototype</h3><p>Answer a design question with a throwaway prototype before anything real is built.</p><code>prototype</code></li>
-      <li><span class="lane">You + your agent</span><h3>Spec</h3><p>Turn the conversation into a spec: what done looks like, and how to check it.</p><code>to-spec</code></li>
+      <li><span class="lane">You + your agent</span><h3>Spec</h3><p>Turn the conversation into a spec: what done looks like, and how to check it.</p><code>spec</code></li>
       <li><span class="lane">You type go</span><h3>Tickets</h3><p>Your agent breaks the spec into small tickets, each with its risk and acceptance checks. Nothing is filed until you say go.</p><code>file-tickets</code></li>
-      <li class="auto"><span class="lane">Runs on its own</span><h3>Build and check</h3><p>Each ticket runs on a free Mac in its own worktree. Then two fresh sessions review it: one reads the code, and one runs every acceptance check.</p><code>Runway app</code></li>
+      <li class="auto"><span class="lane">Runs on its own</span><h3>Build and check</h3><p>Each ticket runs on your Mac in its own worktree, several at once when the Mac has room. Then two fresh sessions review it: one reads the code, and one runs every acceptance check.</p><code>Runway app</code></li>
       <li class="auto"><span class="lane">Runs on its own</span><h3>Merge</h3><p>Low-risk work that passes review and checks merges itself. Anything else waits on your board as one question.</p><code>runway</code></li>
     </ol>
     <p>If a ticket gets stuck, copy its take-back prompt from the board and finish it with your agent. Then give it back to Runway, mark it done, or drop it.</p>
@@ -210,8 +211,9 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <div class="feat"><h3>Nothing hidden</h3><p>The loop runs only while the app is open. No daemons, no launch agents. Close the app and dispatch pauses; runs already started finish.</p></div>
     <div class="feat"><h3>A gate you can read</h3><p>Auto-merge needs low risk, a passing review on the exact commit, green checks, and no sensitive paths such as auth, payments, migrations or CI. A reviewer can raise risk, never lower it.</p></div>
     <div class="feat"><h3><span class="chip claude">Claude</span> <span class="chip codex">Codex</span> <span class="chip any">Any</span></h3><p>Use whichever one you have. With both, pin a ticket to one agent or let whichever is free take it, and when one hits its usage limit the next tickets go to the other.</p></div>
-    <div class="feat"><h3>Many Macs, one board</h3><p>Each repo has a main computer, and a ticket can be pinned to the Mac where its files live. The board shows what runs where.</p></div>
+    <div class="feat"><h3>Tidy when you want it</h3><p>Right-click anything on the board. Archive a repo you're not working on, clear finished tickets off Done (Undo brings them back), pause a runner, or copy a prompt to talk a ticket over with your agent.</p></div>
     <div class="feat"><h3>Know how hands-off it is</h3><p>A strip on the board shows how many tickets merged without you, how long they took, what they cost, and where the others stopped.</p></div>
+    <div class="feat"><h3>Updates look after themselves</h3><p>Runway updates itself, shows what changed, and offers to update the skills in Claude Code and Codex to match. Before it changes its database it saves a backup copy first.</p></div>
     <div class="feat"><h3>It learns from its stops</h3><p>When three tickets stop for the same reason in a week, Runway files a retro ticket to fix the cause. Its pull request links every failed run, and it never merges itself.</p></div>
   </div>
 </section>
@@ -274,8 +276,8 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <h2>Early, and honest about it</h2>
     <p class="lede">Runway is a working preview built in the open. Expect rough edges and say so when you hit one.</p>
     <div class="status">
-      <div class="now"><b>Works</b><span>Filing, running, two fresh reviews, the merge gate, hands-off stats and take back, with Claude Code, Codex or both on one Mac.</span></div>
-      <div class="next"><b>Building</b><span>The Runway skills (written, now in testing), more Macs over SSH, cloud runs, and a signed download.</span></div>
+      <div class="now"><b>Works</b><span>A signed app that updates itself, a guided first run, all eight skills, filing, running, two fresh reviews, the merge gate, hands-off stats, take back and tidying up, with Claude Code, Codex or both on one Mac. <a href="/changelog">What changed lately</a>.</span></div>
+      <div class="next"><b>Building</b><span>More Macs over SSH, then cloud runs.</span></div>
       <div class="later"><b>Later</b><span>Linux and other agents. Tell us which you need.</span></div>
     </div>
   </div>
@@ -286,8 +288,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
     <div class="feedback">
       <p class="eyebrow">Feedback</p>
       <h2>Found a bug? Want something?</h2>
-      <p>Open an issue on GitHub. Once the Runway skills are installed, you can also ask your agent: it drafts the issue with your version and macOS, shows it to you, and files it only when you say so.</p>
-      <pre>/runway:feedback the board froze after I closed the lid</pre>
+      <p>Open an issue on GitHub. Say which version of Runway you have (What's New in its menu shows it) and what you expected to happen. The repo is public, so leave out secrets and private repo names.</p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/datacraftdevelopment/agent-runway/issues/new/choose">Open an issue</a>
         <a class="btn ghost" href="https://github.com/datacraftdevelopment/agent-runway/issues">See open issues</a>
