@@ -131,7 +131,7 @@ class DoctorOneEngineTest(unittest.TestCase):
                 (stubs / name).chmod(0o755)
             (home / '.zprofile').write_text(f'export PATH="{stubs}:/usr/bin:/bin:/usr/sbin:/sbin"\n')
             env = {'HOME': str(home), 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin',
-                   'RUNWAY_HOME': str(Path(tmp) / 'runway')}
+                   'RUNWAY_HOME': str(Path(tmp) / 'runway'), 'RUNWAY_INSTALL_DIRS': '~/.local/bin'}
             cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
             res = subprocess.run(['/usr/bin/python3', str(cli), 'doctor', '--json'], env=env,
                                  capture_output=True, text=True, timeout=120)
@@ -244,7 +244,7 @@ class ZshrcPathTest(unittest.TestCase):
         if not Path('/bin/zsh').exists():
             self.skipTest('needs zsh')
 
-    def doctor(self, zshrc, tools=STUB, where='.local/bin'):
+    def doctor(self, zshrc, tools=STUB, where='.local/bin', **extra):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / 'home'
             stubs = home / where
@@ -255,7 +255,7 @@ class ZshrcPathTest(unittest.TestCase):
             (home / '.zprofile').write_text('')
             (home / '.zshrc').write_text(zshrc.replace('STUBS', str(stubs)))
             env = {'HOME': str(home), 'USER': 'someone', 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
-                   'RUNWAY_HOME': str(Path(tmp) / 'runway')}
+                   'RUNWAY_HOME': str(Path(tmp) / 'runway'), 'RUNWAY_INSTALL_DIRS': '~/.local/bin', **extra}
             cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
             res = subprocess.run(['/usr/bin/python3', str(cli), 'doctor', '--json'], env=env, capture_output=True,
                                  text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -273,7 +273,9 @@ class ZshrcPathTest(unittest.TestCase):
         self.assertTrue(rep['ready'])
 
     def test_the_usual_install_folders_count_even_off_path(self):
-        rep, stubs = self.doctor('')                              # ~/.local/bin, on no PATH at all
+        # ~/.local/bin, on no PATH at all. The shell's PATH is given, as the app passes it: a real login shell would add
+        # this Mac's own folders (/etc/paths.d puts Homebrew's on it), where a real claude may live.
+        rep, stubs = self.doctor('', RUNWAY_SHELL_PATH='/usr/bin:/bin:/usr/sbin:/sbin')
         tools = {t['name']: t for t in rep['tools']}
         self.assertTrue(tools['claude']['ok'])
         self.assertIn('not on your shell', tools['claude']['note'])

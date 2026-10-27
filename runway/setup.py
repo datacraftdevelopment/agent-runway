@@ -29,8 +29,11 @@ PLUGIN = 'agent-runway'          # the plugin and its marketplace share this nam
 
 
 # Where the usual installers put these tools. Looked in even when the person's shell doesn't put them on PATH.
-INSTALL_DIRS = ('~/.local/bin', '~/.npm-global/bin', '~/.claude/local', '~/.bun/bin', '/opt/homebrew/bin',
-                '/usr/local/bin')
+# RUNWAY_INSTALL_DIRS replaces the list (the tests use it, so a Mac's own Homebrew tools can't stand in for theirs).
+INSTALL_DIRS = (tuple(_d for _d in os.environ['RUNWAY_INSTALL_DIRS'].split(':') if _d)
+                if 'RUNWAY_INSTALL_DIRS' in os.environ else
+                ('~/.local/bin', '~/.npm-global/bin', '~/.claude/local', '~/.bun/bin', '/opt/homebrew/bin',
+                 '/usr/local/bin'))
 _shell_dirs = None              # the PATH the person's Terminal has, once found
 
 
