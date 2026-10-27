@@ -279,7 +279,7 @@ class ZshrcPathTest(unittest.TestCase):
         self.assertIn('not on your shell', tools['claude']['note'])
         self.assertIsNone(tools['claude']['fix'])
         self.assertFalse(rep['command']['link_dir_on_path'])     # Terminal still wouldn't find ~/.local/bin
-        self.assertTrue(rep['ready'])
+        self.assertEqual(rep['engines'], ['claude', 'codex'])
 
     def test_a_zshrc_that_waits_for_input_does_not_hang(self):
         rep, _ = self.doctor('read answer\nexport PATH="STUBS:$PATH"\n', where='tools')

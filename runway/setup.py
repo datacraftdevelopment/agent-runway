@@ -75,9 +75,11 @@ def shell_dirs():
     """The folders on the person's own shell PATH (not counting the install folders Runway adds)."""
     global _shell_dirs
     if _shell_dirs is None:
-        # The app already asked the shell (RUNWAY_SHELL_PATH), and a Terminal has it: either way PATH is the one.
-        given = os.environ.get('RUNWAY_SHELL_PATH') or (sys.stdin is not None and sys.stdin.isatty())
-        found = None if given else interactive_path()
+        # The app (or a runway above this one) already asked the shell and passes its PATH in RUNWAY_SHELL_PATH; a
+        # Terminal has it as PATH. Otherwise ask.
+        found = os.environ.get('RUNWAY_SHELL_PATH')
+        if not found and not (sys.stdin is not None and sys.stdin.isatty()):
+            found = interactive_path()
         _shell_dirs = _split(found) + [d for d in _split(os.environ.get('PATH')) if d not in _split(found)]
     return _shell_dirs
 
@@ -91,13 +93,16 @@ def use_shell_path():
         if d and d not in dirs and os.path.isdir(d):
             dirs.append(d)
     os.environ['PATH'] = ':'.join(dirs)
-    os.environ['RUNWAY_SHELL_PATH'] = '1'
+    os.environ['RUNWAY_SHELL_PATH'] = ':'.join(shell_dirs())
 
 
 def login_shell(cmd, timeout=60):
-    """A command as the person's login shell runs it, on the PATH from use_shell_path (a login shell keeps the PATH it
-    is given and adds its own), so it matches what they use in Terminal."""
+    """A command as the person's login shell runs it, on the PATH from use_shell_path, so it matches what they use in
+    Terminal. PATH is set again after the login files run: macOS's path_helper (/etc/zprofile) moves the system
+    folders to the front, which would pick, say, Homebrew's copy of a tool over the one ~/.zshrc puts first."""
     shell = os.environ.get('SHELL', '/bin/zsh')
+    if os.environ.get('RUNWAY_SHELL_PATH'):
+        cmd = f'export PATH={shlex_quote(os.environ.get("PATH", ""))}; {cmd}'
     try:
         return subprocess.run([shell, '-lc', cmd], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:

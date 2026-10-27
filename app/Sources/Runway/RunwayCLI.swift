@@ -9,12 +9,13 @@ struct RunwayCLI: Sendable {
     let path: String
 
     /// The app's environment with the Terminal PATH, found once (ShellPath) and handed to every command, the loop too.
-    /// RUNWAY_SHELL_PATH tells runway not to ask the shell again. Opened from Terminal, the PATH it has is that one.
+    /// RUNWAY_SHELL_PATH carries it to runway, which then doesn't ask the shell again and keeps that order. Opened
+    /// from Terminal, the PATH the app has is that one.
     static let environment: [String: String] = {
         var env = ProcessInfo.processInfo.environment
         if isatty(STDIN_FILENO) == 0, let path = ShellPath.resolve(shell: env["SHELL"] ?? "/bin/zsh") {
             env["PATH"] = path
-            env["RUNWAY_SHELL_PATH"] = "1"
+            env["RUNWAY_SHELL_PATH"] = path
         }
         return env
     }()
