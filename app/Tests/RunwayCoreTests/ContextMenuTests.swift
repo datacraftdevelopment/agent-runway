@@ -26,10 +26,11 @@ final class ContextMenuTests: XCTestCase {
         let s = try status()
         let needs = try XCTUnwrap(s.tickets.first { $0.column == .needsYou && $0.taken != true && $0.question != nil })
         let menu = ContextMenus.ticket(needs, runners: s.runners)
-        XCTAssertEqual(menu.first?.action, .discussTicket)
+        XCTAssertEqual(menu.first?.action, .workOn)
+        XCTAssertEqual(menu.first?.title, "Work on this in Claude Code or Codex")
+        XCTAssertEqual(actions(menu).filter { $0 == .workOn || $0 == .copyTakePrompt }.count, 1)   // one prompt
         XCTAssertTrue(actions(menu).contains(.go))
         XCTAssertTrue(actions(menu).contains(.no))
-        XCTAssertTrue(actions(menu).contains(.takeBack))
         XCTAssertFalse(actions(menu).contains(.giveBack))
         XCTAssertEqual(menu.last?.action, .deleteTicket)
         XCTAssertTrue(menu.last?.destructive ?? false)
@@ -48,14 +49,14 @@ final class ContextMenuTests: XCTestCase {
         var done = try XCTUnwrap(s.tickets.first { $0.column == .done })
         done.prUrl = "https://github.com/someone/recipe-app/pull/1"
         let d = actions(ContextMenus.ticket(done, runners: s.runners))
-        XCTAssertEqual(d, [.discussTicket, .openPR, .copyTicketID, .deleteTicket])
+        XCTAssertEqual(d, [.workOn, .openPR, .copyTicketID, .deleteTicket])
 
-        // Taken back: copy the prompt again and give back.
+        // Taken back: the same prompt again, and give back.
         var taken = needs
         taken.taken = true
         let t = actions(ContextMenus.ticket(taken, runners: s.runners))
-        XCTAssertTrue(t.contains(.copyTakePrompt) && t.contains(.giveBack))
-        XCTAssertFalse(t.contains(.takeBack) || t.contains(.go))
+        XCTAssertTrue(t.contains(.workOn) && t.contains(.giveBack))
+        XCTAssertFalse(t.contains(.go))
     }
 
     func testRepoMenuFollowsItsState() throws {
@@ -154,6 +155,18 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertEqual(Duration.words(97200), "1 d 3 h")
     }
 
+    func testTakenBackShowsHowLongAndLastActivity() throws {
+        let s = try status()
+        var t = try XCTUnwrap(s.tickets.first { $0.column == .needsYou })
+        let now = Date()
+        t.taken = true
+        t.timing = Ticket.Timing(waitingSince: now.addingTimeInterval(-40 * 60))
+        t.lastActivity = now.addingTimeInterval(-5 * 60)
+        XCTAssertEqual(t.timerLine(now: now), "Taken back by you · 40 min · last activity 5 min ago")
+        t.lastActivity = nil                                    // worktree gone: just how long
+        XCTAssertEqual(t.timerLine(now: now), "Taken back by you · 40 min")
+    }
+
     func testHandsOnTicketsAreYoursNotBlocked() throws {
         let s = try status()
         var t = try XCTUnwrap(s.tickets.first { $0.column == .upNext })
@@ -162,7 +175,7 @@ final class ContextMenuTests: XCTestCase {
         let menu = ContextMenus.ticket(t, runners: s.runners)
         XCTAssertTrue(menu.contains { $0.action == .markDone })
         XCTAssertTrue(menu.contains { $0.action == .copyTakePrompt })
-        XCTAssertFalse(menu.contains { $0.action == .takeBack })            // already yours: nothing to take back
+        XCTAssertFalse(menu.contains { $0.action == .workOn })              // already yours: its own prompt
         XCTAssertNil(menu.first { $0.title == "Runs on" })                   // Runway never runs it
         var done = t
         done.column = .done

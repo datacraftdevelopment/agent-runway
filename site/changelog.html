@@ -204,6 +204,27 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-bet
 <main>
 <section style="border-top:0">
   <div class="wrap narrow log">
+<article class="release" id="v0.1.10">
+  <div class="ver"><h2>0.1.10</h2><span class="when">2026-10-27</span></div>
+  <div class="body">
+<h3>Do this after updating</h3>
+<ul>
+<li>Nothing to click: the skills update themselves to 0.3.1 in Claude Code and Codex. Restart your Claude Code or Codex sessions to load them.</li>
+<li>The skills leave repos that aren't in Runway alone now. No tickets, no asking: the work just gets built in the session. In a Runway repo they ask once, after the spec, and only when the work is a good fit: "Run this through the Runway app, or do it here?"</li>
+</ul>
+<h3>New</h3>
+<ul>
+<li>One prompt per ticket. Right-click or the inspector: <strong>Work on this in Claude Code or Codex</strong>. The session reads the ticket and its last run and talks it through. It takes the ticket back only to change code, and it always tells Runway how it ended (an answer, give back, done, drop, or a note).</li>
+<li><code>runway note T-n "..."</code> leaves a note on a ticket when a session only talked it over.</li>
+<li>A taken-back ticket shows how long it's been yours and when its worktree last changed: "Taken back by you · 40 min · last activity 5 min ago".</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Hands-off counts what you didn't have to do yourself. Answering a question or clicking Merge still counts as hands-off. Taking a ticket back or merging outside Runway doesn't.</li>
+</ul>
+<p class="gh"><a href="https://github.com/datacraftdevelopment/agent-runway/releases/tag/v0.1.10">Release on GitHub</a></p>
+  </div>
+</article>
 <article class="release" id="v0.1.9">
   <div class="ver"><h2>0.1.9</h2><span class="when">2026-10-26</span></div>
   <div class="body">

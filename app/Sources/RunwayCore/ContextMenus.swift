@@ -4,7 +4,7 @@ import Foundation
 /// without a window: the app turns each action into a `runway` command (or a copy, a link, a reveal).
 public enum MenuAction: Equatable, Sendable {
     // Tickets
-    case discussTicket, takeBack, copyTakePrompt, giveBack, go, no, openPR, copyTicketID, ticketRunsOn(String?), markDone
+    case workOn, copyTakePrompt, giveBack, go, no, openPR, copyTicketID, ticketRunsOn(String?), markDone
     case deleteTicket
     // Repos
     case discussRepo, pauseRepo, resumeRepo, repoRunsOn(Repo.RunsOn), mainComputer(String), openGitHub, revealFolder
@@ -35,16 +35,14 @@ public struct MenuItem: Equatable, Sendable {
 
 public enum ContextMenus {
     public static func ticket(_ t: Ticket, runners: [Runner]) -> [MenuItem] {
-        var items: [MenuItem] = [.item("Chat about this ticket…", .discussTicket)]
+        var items: [MenuItem] = []
         if t.yoursToDo {
             // Yours by hand: the prompt for your own session, and done when you've done it. Runway never starts it.
             items += [.item("Copy prompt", .copyTakePrompt), .item("Mark done", .markDone)]
-        } else if t.column != .done {
-            if t.taken == true {
-                items += [.item("Copy take-back prompt again", .copyTakePrompt), .item("Give back", .giveBack)]
-            } else {
-                items.append(.item("Take back · copy prompt", .takeBack))
-            }
+        } else {
+            // One prompt (Joe, 27 Oct): the session talks it through and takes it back only if code changes.
+            items.append(.item("Work on this in Claude Code or Codex", .workOn))
+            if t.taken == true { items.append(.item("Give back", .giveBack)) }
         }
         if t.column == .needsYou, t.taken != true, let q = t.question {
             items += [.divider, .item(q.goLabel, .go), .item(q.noLabel, .no)]

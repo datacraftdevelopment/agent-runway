@@ -77,8 +77,8 @@ extension AppModel {
 
     func perform(_ action: MenuAction, ticket t: Ticket) {
         switch action {
-        case .discussTicket: copyPrompt(["show", t.id, "--prompt"])
-        case .takeBack, .copyTakePrompt: takeBack(t.id)
+        case .workOn: workOn(t.id)
+        case .copyTakePrompt: takeBack(t.id)
         case .giveBack: step(["give", t.id])
         case .go: step(["go", t.id])
         case .no: step(["no", t.id])

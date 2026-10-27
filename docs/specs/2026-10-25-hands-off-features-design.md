@@ -10,7 +10,7 @@ Joe is one person and wants Runway to be as autonomous as possible. His judgment
 
 A small strip at the top of the board, per repo and across all repos, for the last 7 and 30 days:
 
-- Hands-off rate: merged tickets that needed nothing from Joe (no needs-you question answered, no take back), divided by all merged tickets.
+- Hands-off rate: merged tickets Joe never had to do himself, divided by all merged tickets. **Ruling, 27 Oct:** answering a ticket (go or no on a question, or the Merge click on a not-low ticket) still counts as hands-off; only taking it back, doing it by hand (hands-on, counted on its own) or merging it outside Runway counts against.
 - Cycle time: median time from filing to merge, shown separately for hands-off tickets and the rest.
 - Cost per ticket: median, with a per-agent split. Show tokens where an agent reports no dollar cost (Codex). Never estimate.
 - Where it stopped: counts of why tickets needed Joe (not low risk, review failed twice, check failed, worker question, sensitive path).

@@ -44,4 +44,4 @@ started by one can be worked by another.
 ## Done
 
 When every decision is resolved (or dropped), the map's last section lists the **chunks**: pieces of work in order,
-each a sentence or two. Each chunk then gets its own `spec`, and from there `file-tickets`.
+each a sentence or two. Each chunk then gets its own `spec`, whose last step decides where it's built.

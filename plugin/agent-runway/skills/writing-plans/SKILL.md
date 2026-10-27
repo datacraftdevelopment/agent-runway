@@ -11,7 +11,7 @@ Write implementation plans for an engineer who has not seen this codebase or thi
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** If working in an isolated worktree, it is the ticket's worktree, made by `runway take T-n` at execution time (agent-runway:hands-on).
+**Context:** If working in an isolated worktree, it is the ticket's worktree, made by `runway take T-n` at execution time (agent-runway:hands-on). With no ticket (a repo not in Runway, or a spec that says `runway: no`), it is a branch or git worktree of this checkout.
 
 **Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)

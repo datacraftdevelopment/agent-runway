@@ -260,11 +260,14 @@ private struct Inspector: View {
         if let runs = ticket.retroRuns, !runs.isEmpty { runsBehind(runs) }
         if let prompt = model.takePrompts[ticket.id] { takePrompt(prompt) }
         HStack(spacing: 8) {
-            Button { model.perform(.discussTicket, ticket: ticket) } label: {
-                Text("Chat about this ticket…").frame(maxWidth: .infinity)
+            if !ticket.yoursToDo {
+                Button { model.workOn(ticket.id) } label: {
+                    Text("Work on this in Claude Code or Codex").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(TakeBackButtonStyle())
+                .help("Copies one prompt. The session talks it through, takes it back only if it changes code, and "
+                      + "always tells Runway how it ended.")
             }
-            .buttonStyle(PlainBoxButtonStyle())
-            .help("Copies a prompt for Claude Code or Codex to talk it over. Nothing is taken back.")
             if ticket.column != .running {
                 Button { model.perform(.deleteTicket, ticket: ticket) } label: {
                     Image(systemName: "trash").foregroundStyle(Color(hex: 0xFF9A94))
@@ -275,20 +278,12 @@ private struct Inspector: View {
         }
         if ticket.yoursToDo {
             yoursToDo(ticket)
-        } else if ticket.column != .done {
-            HStack(spacing: 8) {
-                Button { model.takeBack(ticket.id) } label: {
-                    Text(ticket.taken == true ? "Copy prompt again" : "Take back · copy prompt").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(TakeBackButtonStyle())
-                .help("Stops its worker, keeps its branch and copies a prompt for any Claude Code or Codex session")
-                Button { model.run(["give", ticket.id]) } label: {
-                    Text("Give back").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(PlainBoxButtonStyle())
-                .disabled(ticket.taken != true)
-                .help("Pushes your commits and queues it again; both reviews run on your commit")
+        } else if ticket.taken == true {
+            Button { model.run(["give", ticket.id]) } label: {
+                Text("Give back").frame(maxWidth: .infinity)
             }
+            .buttonStyle(PlainBoxButtonStyle())
+            .help("Pushes your commits and queues it again; both reviews run on your commit")
         }
     }
 
@@ -356,9 +351,9 @@ private struct Inspector: View {
                     if b.handsOn == true && b.column == .upNext {
                         Button("Copy \(b.id)'s prompt") { model.takeBack(b.id) }.buttonStyle(PlainBoxButtonStyle(small: true))
                     } else if b.column == .upNext || b.column == .needsYou {
-                        Button("Take back \(b.id) · copy prompt") { model.takeBack(b.id) }
+                        Button("Work on \(b.id) in Claude Code or Codex") { model.workOn(b.id) }
                             .buttonStyle(PlainBoxButtonStyle(small: true))
-                            .help("Claims it so Runway won't start it, and copies a prompt to do it in your own session")
+                            .help("Copies one prompt for your own session; it takes it back only if it changes code")
                     }
                 }
             }

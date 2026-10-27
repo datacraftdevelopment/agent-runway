@@ -1,6 +1,6 @@
 ---
 name: file-tickets
-description: "Propose tickets for Runway from this session, and file them only when the person types go. Use when the person asks to file work for Runway, hand parts of the work off to run on their own, queue tickets, or says 'file these', 'send these to Runway', 'run these unattended'. Also when you notice parts of the current work could run on their own: propose, never file unasked."
+description: "Propose tickets for Runway from this session, and file them only when the person types go. Use in a repo added to Runway when the spec says runway: yes, or when the person asks to file work for Runway, queue tickets, or says 'file these', 'send these to Runway', 'run these unattended'. Never in a repo that isn't in Runway unless the person asks for it."
 ---
 
 # File tickets for Runway
@@ -26,8 +26,9 @@ you use `RUNWAY` below, then:
 RUNWAY repo which
 ```
 
-- `repo which` prints the name Runway knows this repo by. If it says the repo isn't watched, stop and tell the
-  person to add it in Runway's setup screen (or `runway repo add <path>`), then come back.
+- `repo which` prints the name Runway knows this repo by. If it says the repo isn't watched, this repo doesn't use
+  Runway: stop here and build the work in this session instead (see the `spec` skill's After). Only if the person
+  asked for Runway in so many words, tell them it can be added in Runway's setup screen (or `runway repo add <path>`).
 - No `runway` at all on this Mac: see "From another Mac" or "From a cloud session" below.
 
 ## 2. Propose the batch

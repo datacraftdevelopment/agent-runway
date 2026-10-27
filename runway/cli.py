@@ -235,7 +235,7 @@ def cmd_status(con, a):
 
 def cmd_show(con, a):
     from . import take
-    print(take.discuss_prompt(con, a.ticket) if a.prompt else take.show(con, a.ticket))
+    print(take.prompt(con, a.ticket) if a.prompt else take.show(con, a.ticket))
 
 
 def cmd_take(con, a):
@@ -249,6 +249,11 @@ def cmd_take(con, a):
     print(f'branch:   {branch}')
     print()
     print(take.prompt(con, a.ticket))
+
+
+def cmd_note(con, a):
+    from . import take
+    print(take.note(con, a.ticket, a.text))
 
 
 def cmd_give(con, a):
@@ -590,7 +595,7 @@ def parser():
 
     x = sub.add_parser('show', help='a ticket, its Acceptance lines and every run with where its record is')
     x.add_argument('ticket')
-    x.add_argument('--prompt', action='store_true', help='a prompt to talk it over in your agent (takes nothing back)')
+    x.add_argument('--prompt', action='store_true', help='the prompt to work on it in your agent (takes nothing back)')
     x.set_defaults(fn=cmd_show)
     x = sub.add_parser('take', help='take a ticket back: stop its worker, keep its branch, print a prompt')
     x.add_argument('ticket')
@@ -599,6 +604,10 @@ def parser():
     x = sub.add_parser('give', help='give a taken-back ticket back: push your commits, queue it again')
     x.add_argument('ticket')
     x.set_defaults(fn=cmd_give)
+    x = sub.add_parser('note', help="leave a note on a ticket from your session (when you only talked it over)")
+    x.add_argument('ticket')
+    x.add_argument('text')
+    x.set_defaults(fn=cmd_note)
     x = sub.add_parser('bench', help='head-to-head: re-run done tickets with each engine (never pushes)')
     x.add_argument('tickets', nargs='+')
     x.add_argument('--agents', default='claude,codex')
