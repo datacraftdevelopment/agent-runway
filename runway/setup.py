@@ -38,6 +38,12 @@ def _split(path):
     return [d for d in (path or '').split(':') if d]
 
 
+def install_dirs():
+    """INSTALL_DIRS, or RUNWAY_INSTALL_DIRS (colon-separated, empty for none) so tests see only their stub tools."""
+    given = os.environ.get('RUNWAY_INSTALL_DIRS')
+    return INSTALL_DIRS if given is None else tuple(_split(given))
+
+
 def npm_global_bin():
     """npm's global bin folder from ~/.npmrc's prefix (what `npm prefix -g` says), without starting npm."""
     try:
@@ -88,7 +94,7 @@ def use_shell_path():
     """Puts the person's Terminal PATH, then the usual install folders, on this process's PATH, so every tool Runway
     runs (and the shells it starts them in) finds claude, codex, node, gh and tmux wherever they were installed."""
     dirs = list(shell_dirs())
-    for d in [*INSTALL_DIRS, npm_global_bin()]:
+    for d in [*install_dirs(), npm_global_bin()]:
         d = d and os.path.expanduser(d)
         if d and d not in dirs and os.path.isdir(d):
             dirs.append(d)

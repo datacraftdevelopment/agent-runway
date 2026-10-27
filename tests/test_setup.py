@@ -130,7 +130,7 @@ class DoctorOneEngineTest(unittest.TestCase):
                 (stubs / name).write_text('#!/bin/sh\n' + body)
                 (stubs / name).chmod(0o755)
             (home / '.zprofile').write_text(f'export PATH="{stubs}:/usr/bin:/bin:/usr/sbin:/sbin"\n')
-            env = {'HOME': str(home), 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin',
+            env = {'HOME': str(home), 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin', 'RUNWAY_INSTALL_DIRS': '',
                    'RUNWAY_HOME': str(Path(tmp) / 'runway')}
             cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
             res = subprocess.run(['/usr/bin/python3', str(cli), 'doctor', '--json'], env=env,
@@ -254,7 +254,9 @@ class ZshrcPathTest(unittest.TestCase):
                 (stubs / name).chmod(0o755)
             (home / '.zprofile').write_text('')
             (home / '.zshrc').write_text(zshrc.replace('STUBS', str(stubs)))
+            # Only the stub folder counts as an install folder: never this Mac's real /opt/homebrew/bin and the rest.
             env = {'HOME': str(home), 'USER': 'someone', 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+                   'RUNWAY_INSTALL_DIRS': '~/.local/bin',
                    'RUNWAY_HOME': str(Path(tmp) / 'runway')}
             cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
             res = subprocess.run(['/usr/bin/python3', str(cli), 'doctor', '--json'], env=env, capture_output=True,
@@ -275,7 +277,7 @@ class ZshrcPathTest(unittest.TestCase):
     def test_the_usual_install_folders_count_even_off_path(self):
         rep, stubs = self.doctor('')                              # ~/.local/bin, on no PATH at all
         tools = {t['name']: t for t in rep['tools']}
-        self.assertTrue(tools['claude']['ok'])
+        self.assertEqual(tools['claude']['path'], f'{stubs}/claude')
         self.assertIn('not on your shell', tools['claude']['note'])
         self.assertIsNone(tools['claude']['fix'])
         self.assertFalse(rep['command']['link_dir_on_path'])     # Terminal still wouldn't find ~/.local/bin
