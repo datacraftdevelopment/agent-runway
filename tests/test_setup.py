@@ -234,3 +234,81 @@ class RepoAddTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ZshrcPathTest(unittest.TestCase):
+    """An app opened from Finder: bare PATH, and the engines' folders are added in ~/.zshrc only (Claude Code's own
+    installer puts ~/.local/bin there). `zsh -lc` never reads ~/.zshrc, so Runway has to ask an interactive shell."""
+
+    def setUp(self):
+        if not Path('/bin/zsh').exists():
+            self.skipTest('needs zsh')
+
+    def doctor(self, zshrc, tools=STUB, where='.local/bin'):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / 'home'
+            stubs = home / where
+            stubs.mkdir(parents=True)
+            for name, body in tools.items():
+                (stubs / name).write_text('#!/bin/sh\n' + body)
+                (stubs / name).chmod(0o755)
+            (home / '.zprofile').write_text('')
+            (home / '.zshrc').write_text(zshrc.replace('STUBS', str(stubs)))
+            env = {'HOME': str(home), 'USER': 'someone', 'SHELL': '/bin/zsh', 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+                   'RUNWAY_HOME': str(Path(tmp) / 'runway')}
+            cli = Path(__file__).resolve().parent.parent / 'bin' / 'runway'
+            res = subprocess.run(['/usr/bin/python3', str(cli), 'doctor', '--json'], env=env, capture_output=True,
+                                 text=True, timeout=120, stdin=subprocess.DEVNULL)
+            return json.loads(res.stdout), stubs
+
+    def test_engines_on_a_zshrc_path_are_found(self):
+        rep, stubs = self.doctor('echo "welcome back"\nexport PATH="STUBS:$PATH"\n', where='tools')
+        tools = {t['name']: t for t in rep['tools']}
+        for name in ('claude', 'codex', 'gh', 'tmux'):
+            self.assertTrue(tools[name]['ok'], name)
+            self.assertEqual(tools[name]['path'], f'{stubs}/{name}')
+            self.assertIsNone(tools[name]['fix'])                # never an install line for a tool that's there
+            self.assertNotIn('note', tools[name])                # it is on the shell's PATH, through ~/.zshrc
+        self.assertEqual(rep['engines'], ['claude', 'codex'])
+        self.assertTrue(rep['ready'])
+
+    def test_the_usual_install_folders_count_even_off_path(self):
+        rep, stubs = self.doctor('')                              # ~/.local/bin, on no PATH at all
+        tools = {t['name']: t for t in rep['tools']}
+        self.assertTrue(tools['claude']['ok'])
+        self.assertIn('not on your shell', tools['claude']['note'])
+        self.assertIsNone(tools['claude']['fix'])
+        self.assertFalse(rep['command']['link_dir_on_path'])     # Terminal still wouldn't find ~/.local/bin
+        self.assertTrue(rep['ready'])
+
+    def test_a_zshrc_that_waits_for_input_does_not_hang(self):
+        rep, _ = self.doctor('read answer\nexport PATH="STUBS:$PATH"\n', where='tools')
+        self.assertTrue(rep['ready'])
+
+    def test_link_folder_on_the_zshrc_path_counts_as_on_path(self):
+        rep, _ = self.doctor('export PATH="$HOME/.local/bin:$PATH"\n')
+        self.assertTrue(rep['command']['link_dir_on_path'])
+
+
+class InstallToolTest(unittest.TestCase):
+    def test_tmux_installs_through_brew_without_questions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp)
+            log = bin_dir / 'log'
+            (bin_dir / 'brew').write_text(f'#!/bin/sh\necho "$@ $HOMEBREW_NO_AUTO_UPDATE $NONINTERACTIVE" > {log}\n')
+            (bin_dir / 'brew').chmod(0o755)
+            missing = subprocess.CompletedProcess('', 1, '', '')
+            with mock.patch.dict(os.environ, {'PATH': f'{bin_dir}:/usr/bin:/bin'}), \
+                    mock.patch.object(setup, 'login_shell', return_value=missing):
+                self.assertEqual(setup.brew_install('brew install tmux'), 'tmux')
+                self.assertIsNone(setup.brew_install('npm install -g @openai/codex'))
+                self.assertEqual(setup.install_tool('tmux'), 'installed tmux')
+                self.assertEqual(log.read_text().strip(), 'install tmux 1 1')
+                with self.assertRaisesRegex(db.RunwayError, 'not a Homebrew install'):
+                    setup.install_tool('codex')
+                with self.assertRaisesRegex(db.RunwayError, 'not one of the tools'):
+                    setup.install_tool('vim')
+
+    def test_no_brew_means_the_copy_line(self):
+        with mock.patch.dict(os.environ, {'PATH': '/nonexistent'}):
+            self.assertIsNone(setup.brew_install('brew install tmux'))

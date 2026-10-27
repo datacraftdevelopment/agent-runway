@@ -6,6 +6,8 @@ import json
 import os
 import shutil
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 from . import db
@@ -26,8 +28,75 @@ SIGNINS = [
 PLUGIN = 'agent-runway'          # the plugin and its marketplace share this name
 
 
+# Where the usual installers put these tools. Looked in even when the person's shell doesn't put them on PATH.
+INSTALL_DIRS = ('~/.local/bin', '~/.npm-global/bin', '~/.claude/local', '~/.bun/bin', '/opt/homebrew/bin',
+                '/usr/local/bin')
+_shell_dirs = None              # the PATH the person's Terminal has, once found
+
+
+def _split(path):
+    return [d for d in (path or '').split(':') if d]
+
+
+def npm_global_bin():
+    """npm's global bin folder from ~/.npmrc's prefix (what `npm prefix -g` says), without starting npm."""
+    try:
+        for line in (Path.home() / '.npmrc').read_text().splitlines():
+            key, _, value = line.partition('=')
+            if key.strip() == 'prefix' and value.strip():
+                return str(Path(value.strip()).expanduser() / 'bin')
+    except OSError:
+        pass
+    return None
+
+
+def interactive_path(timeout=10):
+    """PATH as a Terminal window has it. `zsh -l` without `-i` skips ~/.zshrc, which is where Claude Code's installer
+    and most npm setups add their folders, so it asks an interactive login shell, once, and falls back to a login
+    shell. The shell writes PATH to a file: whatever ~/.zshrc prints, or leaves running, can't get in the way. Its own
+    session and no stdin, so it never takes over a terminal or waits for input."""
+    shell = os.environ.get('SHELL', '/bin/zsh')
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / 'path'
+        for flags in ('-lic', '-lc'):
+            try:
+                subprocess.run([shell, flags, 'printf %s "$PATH" > "$1"', 'runway', str(out)], timeout=timeout,
+                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               start_new_session=True)
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            found = out.read_text().strip() if out.exists() else ''
+            if found:
+                return found
+    return None
+
+
+def shell_dirs():
+    """The folders on the person's own shell PATH (not counting the install folders Runway adds)."""
+    global _shell_dirs
+    if _shell_dirs is None:
+        # The app already asked the shell (RUNWAY_SHELL_PATH), and a Terminal has it: either way PATH is the one.
+        given = os.environ.get('RUNWAY_SHELL_PATH') or (sys.stdin is not None and sys.stdin.isatty())
+        found = None if given else interactive_path()
+        _shell_dirs = _split(found) + [d for d in _split(os.environ.get('PATH')) if d not in _split(found)]
+    return _shell_dirs
+
+
+def use_shell_path():
+    """Puts the person's Terminal PATH, then the usual install folders, on this process's PATH, so every tool Runway
+    runs (and the shells it starts them in) finds claude, codex, node, gh and tmux wherever they were installed."""
+    dirs = list(shell_dirs())
+    for d in [*INSTALL_DIRS, npm_global_bin()]:
+        d = d and os.path.expanduser(d)
+        if d and d not in dirs and os.path.isdir(d):
+            dirs.append(d)
+    os.environ['PATH'] = ':'.join(dirs)
+    os.environ['RUNWAY_SHELL_PATH'] = '1'
+
+
 def login_shell(cmd, timeout=60):
-    """A command as the person's login shell runs it, so PATH matches what they use in Terminal."""
+    """A command as the person's login shell runs it, on the PATH from use_shell_path (a login shell keeps the PATH it
+    is given and adds its own), so it matches what they use in Terminal."""
     shell = os.environ.get('SHELL', '/bin/zsh')
     try:
         return subprocess.run([shell, '-lc', cmd], capture_output=True, text=True, timeout=timeout)
@@ -67,9 +136,12 @@ def report(con, check_signins=True):
     tools = []
     for name, why, fix in TOOLS:
         res = login_shell(f'command -v {name}')
-        path = res.stdout.strip() if res.returncode == 0 else None
-        tools.append({'name': name, 'ok': bool(path), 'path': path, 'why': why, 'fix': None if path else fix,
-                      'optional': False})
+        path = res.stdout.strip().splitlines()[-1] if res.returncode == 0 and res.stdout.strip() else None
+        row = {'name': name, 'ok': bool(path), 'path': path, 'why': why, 'fix': None if path else fix,
+               'optional': False, 'install': None if path else brew_install(fix)}
+        if path and os.path.dirname(path) not in shell_dirs():
+            row['note'] = f'found at {path} (not on your shell\'s PATH; Runway looks there anyway)'
+        tools.append(row)
     have = {t['name'] for t in tools if t['ok']}
     need = {'claude': 'claude', 'codex': 'codex', 'github': 'gh'}
     signins = []
@@ -115,8 +187,41 @@ def is_our_link(link):
 
 
 def link_dir_on_path(folder):
-    res = login_shell('echo "$PATH"')
-    return str(folder) in res.stdout.strip().split(':')
+    """Whether Terminal finds commands in this folder: the person's own shell PATH, not the folders Runway adds."""
+    return str(folder) in shell_dirs()
+
+
+# ---- installing a missing tool -----------------------------------------------------------------------------------
+
+def brew_install(fix):
+    """The tool a `brew install <tool>` fix line names, when Homebrew is here to run it; None otherwise."""
+    words = (fix or '').split()
+    if len(words) == 3 and words[:2] == ['brew', 'install'] and shutil.which('brew'):
+        return words[2]
+    return None
+
+
+def install_tool(name):
+    """Installs a missing tool Homebrew can install (tmux, gh), with no questions and no auto-update first, so the
+    app can do it from an Install button. Only tools whose fix line is `brew install`."""
+    fix = next((f for n, _, f in TOOLS if n == name), None)
+    if fix is None:
+        raise db.RunwayError(f'{name} is not one of the tools Runway checks')
+    if login_shell(f'command -v {name}').returncode == 0:
+        return f'{name} is already installed'
+    if not brew_install(fix):
+        raise db.RunwayError(f'Runway can only install {name} with Homebrew; run: {fix}'
+                             if fix.startswith('brew ') else f'{name} is not a Homebrew install; run: {fix}')
+    env = {**os.environ, 'HOMEBREW_NO_AUTO_UPDATE': '1', 'NONINTERACTIVE': '1', 'HOMEBREW_NO_ENV_HINTS': '1'}
+    try:
+        res = subprocess.run(['brew', 'install', name], capture_output=True, text=True, timeout=900, env=env,
+                             stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        raise db.RunwayError(f'brew install {name} took more than 15 minutes; run it in Terminal to see why')
+    said = (res.stdout + res.stderr).strip()
+    if res.returncode != 0:
+        raise db.RunwayError(f'brew install {name} failed: {said[-400:]}')
+    return f'installed {name}'
 
 
 def install_command(where=None):
