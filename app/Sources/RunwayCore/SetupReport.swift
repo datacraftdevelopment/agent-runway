@@ -18,6 +18,10 @@ public struct SetupReport: Codable, Equatable, Sendable {
         public var fix: String?
         /// The engine this Mac doesn't use, while the other one is ready: shown as optional, never as a failure.
         public var optional: Bool?
+        /// Missing, and Homebrew is here to install it: `runway install-tool <install>` (the Install button).
+        public var install: String? = nil
+        /// Found, but somewhere the person's shell PATH doesn't reach ("found at …"). Nil from an older runway.
+        public var note: String? = nil
         public var id: String { name }
     }
 

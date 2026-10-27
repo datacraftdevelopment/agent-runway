@@ -39,6 +39,7 @@ final class AppModel {
         if env["RUNWAY_TAB"] == "stats" { tab = .stats }
         cli = env["RUNWAY_STATUS_FILE"] == nil ? RunwayCLI.find() : nil
         if let cli {
+            RunwayCLI.warmUp()
             source = .live
             // First launch ever: nothing runs until the walkthrough's "Set it up" has made ~/.runway (startLive).
             firstLaunch = !FileManager.default.fileExists(atPath: Self.databasePath)
@@ -193,6 +194,22 @@ final class AppModel {
                 setupMessage = "The check didn't finish: " + (result.error.isEmpty ? "no report" : result.error)
             }
             await refresh()
+        }
+    }
+
+    /// A missing tool Homebrew can install (tmux, gh), from the check's Install button: `runway install-tool`, then
+    /// the check again. The tool being installed, while it runs.
+    var installingTool: String?
+
+    func installTool(_ name: String) {
+        guard let cli, installingTool == nil else { return }
+        installingTool = name
+        setupMessage = "Installing \(name) with Homebrew…"
+        Task {
+            let result = await cli.run(["install-tool", name])
+            installingTool = nil
+            setupMessage = (result.status == 0 ? result.output : result.error).trimmingCharacters(in: .whitespacesAndNewlines)
+            runDoctor()
         }
     }
 

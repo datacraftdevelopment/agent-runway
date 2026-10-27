@@ -408,6 +408,11 @@ def cmd_loop(con, a):
     return loop.run_forever(every=a.every, once=a.once, parent=a.parent_pid, log=stamp)
 
 
+def cmd_install_tool(con, a):
+    from . import setup
+    print(setup.install_tool(a.name))
+
+
 def cmd_doctor(con, a):
     """Checks this Mac: the tools, and whether Claude Code, Codex and GitHub are signed in. Fills the first-run table."""
     from . import setup
@@ -420,8 +425,10 @@ def cmd_doctor(con, a):
 
     def tail(row):
         if row['ok']:
-            return ''
-        return '   (optional: one engine is enough)' if row['optional'] else f'   fix: {row["fix"]}'
+            return f'   ({row["note"]})' if row.get('note') else ''
+        if row['optional']:
+            return '   (optional: one engine is enough)'
+        return f'   fix: {row["fix"]}' + (f' (or: runway install-tool {row["install"]})' if row.get('install') else '')
     for t in rep['tools']:
         print(f'{mark(t)} {t["name"]}{tail(t)}')
     for s in rep['signins']:
@@ -589,6 +596,9 @@ def parser():
     x.add_argument('--update-only', action='store_true',
                    help='only update an install that is older than this Runway (the app runs this after an update)')
     x.set_defaults(fn=cmd_install_skills)
+    x = sub.add_parser('install-tool', help='install a missing tool Homebrew can install (tmux, gh)')
+    x.add_argument('name')
+    x.set_defaults(fn=cmd_install_tool)
     x = sub.add_parser('install-command', help='link runway into ~/.local/bin so Terminal finds it')
     x.add_argument('--to', help='another folder for the link')
     x.set_defaults(fn=cmd_install_command)
@@ -655,6 +665,8 @@ def parser():
 
 def main(argv=None):
     a = parser().parse_args(argv)
+    from . import setup
+    setup.use_shell_path()      # an app opened from Finder has a bare PATH; ~/.zshrc's folders count too
     # doctor only looks: before first run's "Set it up" (runway init), it checks without making ~/.runway.
     con = db.connect(':memory:') if a.fn is cmd_doctor and not db.db_path().exists() else db.connect()
     try:
