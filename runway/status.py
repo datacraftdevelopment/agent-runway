@@ -49,6 +49,7 @@ def ticket_json(con, t, run, slugs=None):
         'taken': t['state'] == 'taken', 'kind': t['kind'], 'hands_on': bool(t['hands_on']),
         'done_locally': bool(t['hands_on']) and t['state'] == 'done',
         'taken_hours': taken_hours(con, t),
+        'last_activity': iso(last_activity(t)),
         'retro_runs': [{'ticket': r['ticket'], 'title': r['title'], 'pr_url': r.get('pr_url'),
                         'record': r.get('record')} for r in json.loads(t['retro_runs'] or '[]')] or None,
         'pr_url': f'https://github.com/{slugs[t["repo"]]}/pull/{t["pr"]}' if t['pr'] and (slugs or {}).get(t['repo'])
@@ -113,6 +114,27 @@ def taken_hours(con, t):
     return round((db.now() - row['at']) / 3600, 1) if row else None
 
 
+def last_activity(t):
+    """When the person last touched a taken-back ticket's worktree: its newest commit, or the newest of the files it has
+    changed but not committed. None when it isn't taken back or the worktree is gone."""
+    from pathlib import Path
+    from .runner import git
+    wt = t['take_dir'] if t['state'] == 'taken' else None
+    if not wt or not Path(wt).is_dir():
+        return None
+    times = []
+    head = git('log', '-1', '--format=%ct', cwd=wt, check=False).stdout.strip()
+    if head.isdigit():
+        times.append(int(head))
+    for line in git('status', '--porcelain', '--untracked-files=all', cwd=wt, check=False).stdout.splitlines():
+        name = line[3:].split(' -> ')[-1].strip('"')
+        try:
+            times.append((Path(wt) / name).stat().st_mtime)
+        except OSError:
+            pass
+    return max(times) if times else None
+
+
 def pr_label(t):
     if not t['pr']:
         return None
@@ -151,6 +173,9 @@ def summary(t, run, open_blockers):
         return resting_for(t) or 'Waiting for a free slot for its reviews.'
     if state == 'merging':
         return 'Waiting for the PR\'s checks before the gate merges it.'
+    if state == 'taken':
+        return ('Taken back by you: Runway leaves it alone while you work on it in your own session. That session ends '
+                f'it with runway give, done or drop {t["id"]}.')
     if state == 'dropped':
         return 'Dropped.'
     if state == 'done' and t['merged_by'] == 'you_local':

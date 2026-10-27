@@ -2,8 +2,9 @@
 
 A ticket the person did by hand (hands_on: a real device or camera, how it looks and feels) is
 counted on its own and kept out of the hands-off rate: it was never meant to run unattended, so it is not a failure.
-Hands-off: a merged ticket that needed nothing from the person: the gate merged it, no needs-you question about it was
-answered, and it was never taken back. Cycle time is filing to merge. Cost is what the engines reported for every run
+Hands-off: a merged ticket the person never had to do themselves. Answering it (a go or no on a question, or the
+Merge click on a not-low ticket) still counts as hands-off; taking it back, doing it by hand, or merging it outside
+Runway doesn't (Joe, 27 Oct). Cycle time is filing to merge. Cost is what the engines reported for every run
 of the ticket (Claude Code reports dollars and tokens; Codex reports tokens only); nothing is estimated. "Where it
 stopped" counts every time a ticket needed the person, by reason.
 """
@@ -44,8 +45,7 @@ def window(con, days, repo=None):
                              "ORDER BY merged_at", (since, *args)).fetchall()
     by_hand = [t for t in all_merged if t['hands_on']]
     merged = [t for t in all_merged if not t['hands_on']]
-    answered = {r['ticket'] for r in con.execute('SELECT DISTINCT ticket FROM answers')}
-    hands_off = [t for t in merged if t['merged_by'] == 'gate' and t['id'] not in answered and not t['taken']]
+    hands_off = [t for t in merged if t['merged_by'] in ('gate', 'you') and not t['taken']]
     rest = [t for t in merged if t not in hands_off]
     minutes = lambda ts: [(t['merged_at'] - t['filed_at']) / 60 for t in ts]
 

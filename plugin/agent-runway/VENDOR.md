@@ -19,7 +19,8 @@ Agreement doesn't cover them: changes to them stay under MIT.
 
 1. References `superpowers:<skill>` became `agent-runway:<skill>`.
 2. Skills that were left out are pointed at what replaces them: the isolated workspace is the ticket's worktree from
-   `runway take`; finishing the branch is closing the ticket with the `hands-on` skill (`runway done`); the final
+   `runway take` (or, with no ticket, a branch of the checkout); finishing the branch is closing the ticket with the
+   `hands-on` skill (`runway done`, or the repo's usual finish when there's no ticket); the final
    review's template is the local `references/code-reviewer.md`; the `writing-skills` and `using-superpowers`
    references became plain prose or were dropped.
 3. Paths: `docs/superpowers/plans/` became `docs/plans/`, and the git-ignored plan workspace `.superpowers/sdd/`

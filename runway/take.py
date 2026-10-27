@@ -71,10 +71,12 @@ def last_build(con, tid):
 
 
 def prompt(con, tid):
-    """What the person pastes into a new Claude Code or Codex session to take over the ticket: the take-back skill
-    first, then a compact fallback for a session without the plugin."""
+    """The one prompt for working on a ticket in Claude Code or Codex (Joe, 27 Oct: one prompt, not two): the take-back
+    skill first, then a compact fallback for a session without the plugin. Copying it changes nothing; the session
+    takes the ticket back only if code is going to change, and always ends by telling Runway what happened."""
     t = db.ticket(con, tid)
     branch = t['branch'] or f'rw/{tid}'
+    pr = f'PR #{t["pr"]}' if t['pr'] else 'no PR yet'
     q = json.loads(t['question'] or '{}')
     failed = (f'code review: {verdict_line(t["review"])}; function review: {verdict_line(t["function_review"])}')
     if q.get('text') and q.get('kind') in ('failed', 'question'):
@@ -94,29 +96,31 @@ def prompt(con, tid):
     if frees:
         last_line += (f' It blocks {", ".join(frees)}: finishing it (runway give {tid} or runway done {tid}) '
                       'lets Runway start them.')
+    waiting = (f' It is waiting for an answer: runway go {tid} --note "..." or runway no {tid} --note "...".'
+               if t['state'] == 'needs_you' else '')
+    taken = ' It is taken back already.' if t['state'] == 'taken' else ''
     return (f'Use the runway take-back skill on ticket {tid} in {t["repo"]}.\n'
             f'\n'
-            f'Without the plugin: {tid} is "{t["title"]}", on branch {branch}. Run runway take {tid} (prints the '
-            f'worktree), then runway show {tid}. What failed: {failed}. {last_line} Fix it in the worktree, run the '
-            f'check, commit, then end it with exactly one of: runway give {tid} (Runway reviews it again), '
-            f'runway done {tid} --note "..." (only on the person\'s go: merges it), or '
-            f'runway drop {tid} --reason "..." (closes the PR). Never leave it taken back.')
+            f'Without the plugin: {tid} is "{t["title"]}", {t["state"].replace("_", " ")}, on branch {branch}, {pr}.'
+            f'{taken} Run runway show {tid}. What failed: {failed}. {last_line} Talk it through with me first. Only '
+            f'if we change code, run runway take {tid} (stops its worker, prints the worktree), fix it there, run the '
+            f'check and commit.{waiting} End by telling Runway, with exactly one of: runway give {tid} (Runway '
+            f'reviews it again), runway done {tid} --note "..." (only on my go: merges it), '
+            f'runway drop {tid} --reason "..." (closes the PR), or, if we only talked, runway note {tid} "...". '
+            f'Never leave it taken back.')
 
 
-def discuss_prompt(con, tid):
-    """What the person pastes to talk a ticket over in Claude Code or Codex, without taking it back: the runway skill
-    first, then a short summary for a session without the plugin."""
+def note(con, tid, text):
+    """What a session that only talked a ticket over leaves on it: an Activity line, and the note the ticket's next
+    run (and its inspector) carries, added after any note it already has."""
     t = db.ticket(con, tid)
-    pr = f'PR #{t["pr"]}' if t['pr'] else 'no PR yet'
-    last = con.execute('SELECT * FROM runs WHERE ticket=? ORDER BY id DESC LIMIT 1', (tid,)).fetchone()
-    record = (f'Its last run ({last["kind"]}, {last["outcome"] or "still going"}) keeps its record in '
-              f'{short_home(db.run_dir(con, last))}/.' if last else 'It has not run yet.')
-    return (f'Use the runway skill to look at ticket {tid} in {t["repo"]} with me. Don\'t take it back or change '
-            f'anything unless I ask.\n'
-            f'\n'
-            f'Without the plugin: {tid} is "{t["title"]}", {t["state"].replace("_", " ")}, on branch '
-            f'{t["branch"] or "rw/" + tid}, {pr}. Code review: {verdict_line(t["review"])}; function review: '
-            f'{verdict_line(t["function_review"])}. {record} runway show {tid} prints the rest.')
+    text = (text or '').strip()
+    if not text:
+        raise db.RunwayError('runway note needs the note text')
+    mine = f'From your session: {text}'
+    db.update_ticket(con, tid, note=f'{t["note"]} {mine}' if t['note'] else mine)
+    db.event(con, 'answer', f'{tid}: note from your session ({text[:120]})', repo=t['repo'], ticket=tid)
+    return f'{tid}: note added'
 
 
 def take(con, tid, runner=None):

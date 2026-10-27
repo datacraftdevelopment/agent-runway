@@ -21,6 +21,8 @@ struct AutonomyStrip: View {
                      + Text("\(w.handsOff) of \(w.merged)").bold().foregroundColor(Palette.runningPillText)
                         .font(.system(size: 14))
                      + Text(" merged (\(percent(w.handsOffRate)))").foregroundColor(Palette.textMuted))
+                        .help("Merged without you doing the work. Answering a question or clicking Merge still counts; "
+                              + "taking it back or merging outside Runway doesn't. Hands-on tickets aren't counted.")
                     (Text("Cycle time ").foregroundColor(Palette.textMuted)
                      + Text(StatsFormat.minutes(w.cycleMinutes.handsOff)).bold()
                      + Text(" hands-off · \(StatsFormat.minutes(w.cycleMinutes.rest)) the rest")

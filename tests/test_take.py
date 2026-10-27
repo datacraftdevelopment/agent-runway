@@ -115,6 +115,9 @@ class TakeBackTest(unittest.TestCase):
         self.assertIn(f'runs/{tid}/1/ (transcript.jsonl, outcome.json, reviews/)', prompt_only)
         self.assertIn(f'runway show {tid}', prompt_only)
         self.assertIn(f'runway give {tid} (Runway reviews it again)', prompt_only)
+        self.assertIn(f'Only if we change code, run runway take {tid}', prompt_only)    # talk first, claim later
+        self.assertIn(f'runway note {tid} "..."', prompt_only)
+        self.assertIn(f'runway go {tid} --note', prompt_only)                            # it's waiting for an answer
 
         wt, branch = take.take(self.con, tid, runner=self.runner)
         self.assertEqual(branch, f'rw/{tid}')
@@ -123,6 +126,16 @@ class TakeBackTest(unittest.TestCase):
         t = db.ticket(self.con, tid)
         self.assertEqual((t['state'], t['taken']), ('taken', 1))
         self.assertEqual(json.loads(t['question'])['go_label'], 'Give back')
+        # The board's "last activity": the newest commit, then a file being edited in the worktree.
+        from runway import status
+        self.assertIsNotNone(status.last_activity(t))
+        wip = Path(wt) / 'wip.txt'
+        wip.write_text('editing')
+        os.utime(wip, (db.now() + 300, db.now() + 300))
+        self.assertAlmostEqual(status.last_activity(t), db.now() + 300, delta=5)
+        self.assertIn('Taken back by you', status.summary(t, None, []))
+        self.assertIsNone(status.last_activity({**dict(t), 'state': 'queued'}))
+        wip.unlink()
         self.assertEqual(take.take(self.con, tid, runner=self.runner), (wt, branch))   # twice is harmless
         self.assertEqual(db.ticket(self.con, tid)['taken'], 1)
         self.assertEqual(stats.waiting(self.con)[0]['reason'], 'taken_back')

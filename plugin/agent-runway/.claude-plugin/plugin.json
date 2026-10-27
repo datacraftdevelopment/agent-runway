@@ -1,7 +1,7 @@
 {
   "name": "agent-runway",
   "displayName": "Agent Runway",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Shape work into tickets (map, grill, prototype, spec), file them for Runway or do the hands-on ones in your own session, check what is running and what needs you, and set Runway up.",
   "author": {
     "name": "DataCraft Development",

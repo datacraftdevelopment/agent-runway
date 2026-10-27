@@ -232,6 +232,8 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
     public var taken: Bool?
     /// Hours since it was taken back; the board nudges after a day.
     public var takenHours: Double?
+    /// Taken back: when its worktree last changed (newest commit or edited file), so the board shows work going on.
+    public var lastActivity: Date?
 
     /// Taken back more than a day ago: a quiet nudge that it is still waiting to be given back, done or dropped.
     public var takenLong: Bool { taken == true && (takenHours ?? 0) >= 24 }
@@ -300,6 +302,11 @@ public struct Ticket: Codable, Equatable, Identifiable, Sendable {
         case .upNext:
             return t.waitingSince.map { "Waiting \(Duration.words(now.timeIntervalSince($0)))" }
         case .needsYou:
+            if taken == true {
+                let since = t.waitingSince.map { " · \(Duration.words(now.timeIntervalSince($0)))" } ?? ""
+                let last = lastActivity.map { " · last activity \(Duration.words(max(0, now.timeIntervalSince($0)))) ago" }
+                return "Taken back by you" + since + (last ?? "")
+            }
             return t.waitingSince.map { "Waiting for you \(Duration.words(now.timeIntervalSince($0)))" }
         case .done:
             return t.totalSeconds.map { "Took \(Duration.words(Double($0)))" }

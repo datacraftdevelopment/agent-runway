@@ -337,6 +337,24 @@ final class AppModel {
         }
     }
 
+    /// The one prompt for working on a ticket in Claude Code or Codex onto the clipboard. Nothing is taken back: the
+    /// session runs `runway take` itself only if it's going to change code, and ends by telling Runway what happened.
+    func workOn(_ ticket: String) {
+        guard let cli else { return act("Sample data: no prompt to copy") }
+        Task {
+            let result = await cli.run(["show", ticket, "--prompt"])
+            guard result.status == 0 else {
+                lastAction = result.error.trimmingCharacters(in: .whitespacesAndNewlines)
+                return
+            }
+            let text = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            takePrompts[ticket] = text
+            lastAction = "\(ticket): prompt copied. Paste it into Claude Code or Codex."
+        }
+    }
+
     func openPR(_ ticket: Ticket) {
         guard let url = ticket.prUrl.flatMap(URL.init(string:)) else { return act("No PR link for \(ticket.id)") }
         NSWorkspace.shared.open(url)

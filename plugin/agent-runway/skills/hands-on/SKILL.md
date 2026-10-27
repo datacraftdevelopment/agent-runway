@@ -1,6 +1,6 @@
 ---
 name: hands-on
-description: "Do the hands-on tickets in this session: the work Runway can't prove on its own, because it needs a real device or camera, or the person's eye on how it looks and feels. Plan them, build them test-first, have the person check what only they can, and close each with runway done. Use when the person says 'do the hands-on tickets', 'work the hands-on batch', or file-tickets has just filed hands-on tickets."
+description: "Build work in this session with the person: hands-on tickets Runway can't prove on its own (a real device or camera, or the person's eye on how it looks and feels), or a whole spec built here because the repo isn't in Runway or the spec says runway: no. Plan, build test-first, have the person check what only they can, and close it. Use when the person says 'do the hands-on tickets', 'build it here', or file-tickets has just filed hands-on tickets."
 ---
 
 # Do the hands-on tickets
@@ -12,6 +12,13 @@ here, with the person, and closes each one so the work waiting on it can start.
 
 Use `runway` on PATH, or `/Applications/Runway.app/Contents/Resources/cli/bin/runway`. Run each command on its own
 (no `&&`, `||` or `;`: a session with an allow-list refuses chained commands).
+
+## No tickets: building a spec here
+
+In a repo that isn't in Runway (`runway repo which` doesn't print its name), or when the spec says `runway: no`,
+there are no tickets and no `runway` commands. The spec is the work: build it on a branch of this checkout (or a git
+worktree), following steps 3 and 4 below, then finish the branch the repo's usual way (a PR or a merge, on the
+person's go). Skip steps 1, 2 and 5.
 
 ## 1. See what's yours
 

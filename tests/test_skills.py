@@ -159,3 +159,34 @@ class FileBatchAndWhichTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RunwayOnlyWhereItFitsTest(unittest.TestCase):
+    """Repos that aren't in Runway never hear about it; in one that is, the spec asks once, only for a good fit, and
+    keeps the answer (Joe, 27 Oct)."""
+
+    def skill(self, name):
+        return (PLUGIN / 'agent-runway/skills' / name / 'SKILL.md').read_text()
+
+    def test_spec_decides_once(self):
+        after = self.skill('spec').split('## After')[1]
+        self.assertIn('runway repo which', after)
+        self.assertIn("don't mention it, don't offer tickets, don't ask", after)
+        self.assertIn('"Run this through the Runway app, or do it here?"', after)
+        self.assertIn('`runway: yes` or `runway: no`', after)
+        self.assertIn('poor fit', after)
+        self.assertEqual(after.count('?"'), 1)                         # asked once
+
+    def test_nothing_pushes_runway_on_a_repo_outside_it(self):
+        tickets = self.skill('file-tickets')
+        self.assertNotIn('Also when you notice', tickets)
+        self.assertIn("Never in a repo that isn't in Runway", tickets)
+        self.assertIn('this repo doesn\'t use\n  Runway: stop here and build the work in this session', tickets)
+        self.assertNotIn('from there `file-tickets`', self.skill('map'))
+        self.assertIn('## No tickets: building a spec here', self.skill('hands-on'))
+
+    def test_take_back_talks_first_and_always_tells_runway(self):
+        t = self.skill('take-back')
+        self.assertLess(t.index('## 2. Talk it through'), t.index('runway take T-22'))
+        self.assertIn('runway note T-22', t)
+        self.assertIn('Take it back just to look at it.', t)

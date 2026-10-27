@@ -7,7 +7,8 @@ from runway import db, stats, tickets
 
 
 class StatsTest(unittest.TestCase):
-    """Hands-off: the gate merged it, nobody answered a question about it, it was never taken back."""
+    """Hands-off: the gate or the person's Merge click merged it, and it was never taken back. Answering a question
+    still counts as hands-off; taking it back, doing it by hand or merging outside Runway doesn't."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -36,15 +37,18 @@ class StatsTest(unittest.TestCase):
     def test_hands_off_rate_and_cycle_times(self):
         a = self.ticket(minutes=10)
         b = self.ticket(minutes=30)
-        c = self.ticket(minutes=90, merged_by='you')              # Joe merged it
+        c = self.ticket(minutes=90, merged_by='you')              # Joe's Merge click on a not-low ticket: an answer
         d = self.ticket(minutes=50)
         self.con.execute("INSERT INTO answers(ticket, answer, at) VALUES (?, 'go', 0)", (d,))   # Joe answered
         e = self.ticket(minutes=40, taken=1)                      # taken back
+        f = self.ticket(minutes=70, merged_by='outside')          # merged on GitHub, outside Runway
+        g = self.ticket(minutes=5, merged_by='you_local', hands_on=1)   # done by hand: not in the rate at all
         w = stats.window(self.con, 7)
-        self.assertEqual((w['merged'], w['hands_off'], w['hands_off_rate']), (5, 2, 0.4))
-        self.assertEqual(w['hands_off_tickets'], [a, b])
-        self.assertEqual(sorted(w['other_tickets']), sorted([c, d, e]))
-        self.assertEqual(w['cycle_minutes'], {'hands_off': 20.0, 'rest': 50.0})
+        self.assertEqual((w['merged'], w['hands_off'], w['hands_off_rate'], w['by_hand']), (6, 4, 0.667, 1))
+        self.assertEqual(w['hands_off_tickets'], [a, b, c, d])
+        self.assertEqual(sorted(w['other_tickets']), sorted([e, f]))
+        self.assertEqual(w['by_hand_tickets'], [g])
+        self.assertEqual(w['cycle_minutes'], {'hands_off': 40.0, 'rest': 55.0})
 
     def test_windows_and_repos(self):
         self.ticket(days_ago=2)

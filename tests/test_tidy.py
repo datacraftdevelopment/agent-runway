@@ -176,15 +176,26 @@ class TidyTest(unittest.TestCase):
 
     # ---- prompts and the main computer ------------------------------------------------------------------------
 
-    def test_discuss_prompts_name_the_skill_and_claim_nothing(self):
+    def test_one_prompt_names_the_take_back_skill_and_claims_nothing(self):
         t = self.file(title='Count lines')
         db.update_ticket(self.con, t, state='needs_you', pr=3)
         self.add_run(t)
-        p = take.discuss_prompt(self.con, t)
-        self.assertTrue(p.startswith(f'Use the runway skill to look at ticket {t} in app'))
+        p = take.prompt(self.con, t)
+        self.assertTrue(p.startswith(f'Use the runway take-back skill on ticket {t} in app'))
         self.assertIn('PR #3', p)
-        self.assertIn('Don\'t take it back', p)
+        self.assertIn('Talk it through with me first', p)
         self.assertEqual(db.ticket(self.con, t)['state'], 'needs_you')           # nothing taken back
+
+    def test_note_from_a_session_that_only_talked(self):
+        t = self.file(title='Count lines')
+        db.update_ticket(self.con, t, state='needs_you', note='This is a fix pass.')
+        self.assertEqual(take.note(self.con, t, 'Looks right; wait for the API key.'), f'{t}: note added')
+        row = db.ticket(self.con, t)
+        self.assertEqual(row['state'], 'needs_you')
+        self.assertEqual(row['note'], 'This is a fix pass. From your session: Looks right; wait for the API key.')
+        self.assertIn('note from your session', self.con.execute('SELECT text FROM events ORDER BY id DESC').fetchone()[0])
+        with self.assertRaises(db.RunwayError):
+            take.note(self.con, t, '  ')
         r = status.repo_prompt(self.con, 'app')
         self.assertTrue(r.startswith('Use the runway skill to look at the app repo'))
         self.assertIn(f'Needs you: {t} Count lines', r)
@@ -236,7 +247,7 @@ class CliTest(unittest.TestCase):
         res = self.runway('repo', 'main', 'app', 'Nowhere')
         self.assertIn('no runner', res.stderr)
         self.assertIn('main computer is This Mac', self.runway('repo', 'main', 'app', 'This Mac').stdout)
-        self.assertIn('Use the runway skill', self.runway('show', self.tid, '--prompt').stdout)
+        self.assertIn('Use the runway take-back skill', self.runway('show', self.tid, '--prompt').stdout)
         self.assertIn('the app repo', self.runway('status', 'app', '--prompt').stdout)
 
 

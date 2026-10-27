@@ -1,11 +1,12 @@
 ---
 name: spec
-description: "Write what this session has worked out into a spec that an unattended agent can build from and check against: what it does, what it doesn't, and acceptance checks. Use when the person says 'write the spec', 'spec this', 'write it up', or when a discussion has settled what to build and tickets come next."
+description: "Write what this session has worked out into a spec a fresh agent can build from and check against: what it does, what it doesn't, and acceptance checks. Use when the person says 'write the spec', 'spec this', 'write it up', or when a discussion has settled what to build."
 ---
 
 # Write the spec
 
-The spec is what every ticket worker and reviewer reads instead of this conversation. Write it from what has
+The spec is what every builder and reviewer reads instead of this conversation (a later session here, or Runway's
+ticket workers in a repo that uses Runway). Write it from what has
 already been said in this session and what the repo shows. Don't start a fresh interview: if something that
 changes what gets built is still open, ask about that one thing (as in `grill`), and leave the rest.
 
@@ -17,6 +18,9 @@ folder only when the first spec is written.
 ## What goes in it
 
 ```markdown
+---
+runway: <yes | no>   (only in a repo added to Runway, once it's decided: see After)
+---
 # <What is being built>
 
 Status: spec, <date>. Risk: <low: one-line reason | not low>.
@@ -63,6 +67,17 @@ These are the part that matters most. Runway's reviewer walks each one, pass or 
   the person checks. `file-tickets` makes those lines hands-on tickets, done in the person's own session.
 - Three to six for a spec. If you need more, the spec is probably two specs.
 
-## After
+## After: build it here, or in Runway
 
-Show the spec, fix what the person changes, and commit it. Then offer `file-tickets` to break it into tickets.
+Show the spec, fix what the person changes, and commit it. Then decide where it's built, without pushing Runway:
+
+1. **Is this repo in Runway?** Run `runway repo which` (if there's no `runway` command, it isn't). If it doesn't print
+   this repo's name, Runway is out of the picture: don't mention it, don't offer tickets, don't ask. Build it here:
+   a plan with `writing-plans`, then `subagent-driven-development` or `executing-plans`, test-first, with the person
+   checking what only they can (`hands-on` covers that).
+2. **Already decided?** If the spec's front matter says `runway: yes` or `runway: no`, follow it and don't ask again.
+3. **A good fit?** Runway suits several independent pieces, each with Acceptance lines a fresh agent can check on its
+   own. Work that's mostly one piece, or mostly a real device, a camera or the person's eye, is a poor fit: don't ask,
+   write `runway: no` and build it here.
+4. **Ask once:** "Run this through the Runway app, or do it here?" Write the answer into the spec's front matter
+   (`runway: yes` or `runway: no`) and commit it. Yes: `file-tickets`. No: build it here, as in 1.

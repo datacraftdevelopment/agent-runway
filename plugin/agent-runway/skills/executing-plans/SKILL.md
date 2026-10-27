@@ -299,7 +299,8 @@ When the final review is clean and its fixes are committed, delete this
 plan's workspace directory — the git history is the record now. Sibling
 directories belong to other plans; leave them alone.
 
-Close the ticket with agent-runway:hands-on (`runway done T-n`).
+Close the ticket with agent-runway:hands-on (`runway done T-n`). With no ticket, finish the branch as
+agent-runway:hands-on says under "No tickets".
 
 ## Common Rationalizations
 
