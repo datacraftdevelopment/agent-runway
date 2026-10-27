@@ -139,7 +139,7 @@ struct SetupGuideView: View {
         let tool = setup.tools.first { $0.name == name }
         let signin = setup.signins.first { $0.name == name }
         if signin?.ok == true {
-            row(.ok, label, detail: "installed and signed in")
+            row(.ok, label, detail: tool?.note ?? "installed and signed in")
         } else if tool?.optional == true || signin?.optional == true {
             row(.optional, label, detail: "optional: the other engine is ready")
         } else if tool?.ok != true {
@@ -153,11 +153,20 @@ struct SetupGuideView: View {
         let t = setup.tools.first { $0.name == name }
         let s = signin.flatMap { n in setup.signins.first { $0.name == n } }
         if t?.ok != true {
-            row(.missing, name, detail: t?.why, fix: t?.fix)
+            if model.installingTool == name {
+                row(.running, name, detail: "installing with Homebrew…")
+            } else {
+                row(.missing, name, detail: t?.why, fix: t?.fix)
+                if let install = t?.install {
+                    Button("Install \(install)") { model.installTool(install) }
+                        .disabled(model.installingTool != nil)
+                        .padding(.leading, 22)
+                }
+            }
         } else if let s, !s.ok {
             row(.missing, name, detail: "installed; \(s.label) not signed in", fix: s.fix)
         } else {
-            row(.ok, name, detail: (t?.why ?? "") + (s != nil ? ", signed in" : ""))
+            row(.ok, name, detail: t?.note ?? ((t?.why ?? "") + (s != nil ? ", signed in" : "")))
         }
     }
 
